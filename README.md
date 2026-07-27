@@ -78,9 +78,9 @@ near-monotonic: you add glamours far more often than you remove them, so an old 
 this" almost always still holds, while its "you don't" is exactly what goes out of date. Amber on an
 x means *probably new, but worth checking*.
 
-Two buttons at the top of the panel flip the filters you are most likely to want mid-shop — whether
-owned pieces are listed, and whether the list is restricted to your current job. Both write the
-shared settings, so they change the duty list too, and the panel says so.
+Three buttons at the top of the panel flip the list filters without a trip to Settings — whether
+owned pieces are listed, whether the list is held to your current job, and whether weapons are
+included. They write the shared settings, so they change the duty list too, and the panel says so.
 
 The panel lists whatever the vendor is currently showing. Switching a category or tab re-reads it;
 scrolling does not change it. It reads the shop window's position and stock but never draws into it,
