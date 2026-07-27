@@ -172,8 +172,25 @@ Anywhere else — or to compile-check on macOS/Linux — extract
 DALAMUD_HOME=/path/to/dalamud dotnet build GlamourAssistant.sln -c Release
 ```
 
-The build produces an installable folder at `GlamourAssistant/bin/Release/GlamourAssistant/`. Add
-that path as a dev plugin location in Dalamud settings to load it in-game.
+### Output paths
+
+The solution sets `Platform=x64`, so a **solution** build and a **project** build land in different
+places:
+
+| Build command | Plugin DLL |
+| --- | --- |
+| `dotnet build GlamourAssistant.sln -c Release` | `GlamourAssistant\bin\x64\Release\GlamourAssistant.dll` |
+| `dotnet build GlamourAssistant\GlamourAssistant.csproj -c Release` | `GlamourAssistant\bin\Release\GlamourAssistant.dll` |
+
+The `...\Release\GlamourAssistant\latest.zip` beside it is DalamudPackager's *distributable* — that
+folder holds only the zip and the manifest, so it is not what you load for testing.
+
+### Loading it in-game
+
+1. `/xlsettings` → **Experimental** → add the **full path to `GlamourAssistant.dll`** (the file, not
+   its folder) under Dev Plugin Locations. This is only needed once.
+2. `/xlplugins` → **Dev Tools → Installed Dev Plugins** → enable **Glamour Assistant**.
+3. After a rebuild, reload it from that same Dev Plugins list — no game restart needed.
 
 ## CI/CD
 
