@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
@@ -234,10 +235,11 @@ public class MissingItemsWindow : Window, IDisposable
 
         var byRole = report.Items
             .Where(item => !item.IsOwned)
-            .GroupBy(item => (item.RoleOrder, item.RoleGroup))
-            .Select(group => (Label: group.Key.RoleGroup, group.Key.RoleOrder, Count: group.Count()))
+            .SelectMany(item => item.RoleGroups)
+            .GroupBy(group => group)
+            .Select(group => (group.Key.Label, group.Key.Order, Count: group.Count()))
             .OrderByDescending(entry => entry.Count)
-            .ThenBy(entry => entry.RoleOrder)
+            .ThenBy(entry => entry.Order)
             .ToList();
 
         if (byRole.Count == 0)
@@ -258,6 +260,12 @@ public class MissingItemsWindow : Window, IDisposable
         ImGui.TextColored(Muted, "Still missing by role:");
         foreach (var (label, _, count) in byRole)
             ImGui.Text($"   {count,3}   {label}");
+
+        if (report.Items.Any(item => !item.IsOwned && item.RoleGroups.Count > 1))
+        {
+            ImGui.Spacing();
+            ImGui.TextColored(Muted, "Gear two roles can roll on is counted under both.");
+        }
     }
 
     private void DrawItems(DutyReport report)
@@ -270,11 +278,42 @@ public class MissingItemsWindow : Window, IDisposable
         if (!child.Success)
             return;
 
-        // The report is already sorted by the active grouping, so GroupBy keeps that order.
-        var groups = report.Items
-            .Where(item => showOwned || !item.IsOwned)
-            .GroupBy(item => byRole ? item.RoleGroup : item.SlotName)
-            .ToList();
+        var visible = report.Items.Where(item => showOwned || !item.IsOwned).ToList();
+
+        // Built by hand rather than GroupBy: under role grouping a shared piece belongs in every
+        // heading whose role can roll on it, so one item can land in two buckets.
+        var groups = new List<(string Key, int Order, List<ReportItem> Items)>();
+        var index = new Dictionary<string, int>();
+
+        void Place(string key, int order, ReportItem item)
+        {
+            if (!index.TryGetValue(key, out var at))
+            {
+                index[key] = at = groups.Count;
+                groups.Add((key, order, []));
+            }
+
+            groups[at].Items.Add(item);
+        }
+
+        foreach (var item in visible)
+        {
+            if (byRole)
+            {
+                foreach (var role in item.RoleGroups)
+                    Place(role.Label, role.Order, item);
+            }
+            else
+            {
+                Place(item.SlotName, item.SlotOrder, item);
+            }
+        }
+
+        groups.Sort((a, b) =>
+        {
+            var byOrder = a.Order.CompareTo(b.Order);
+            return byOrder != 0 ? byOrder : string.Compare(a.Key, b.Key, StringComparison.OrdinalIgnoreCase);
+        });
 
         if (groups.Count == 0)
         {
@@ -286,7 +325,7 @@ public class MissingItemsWindow : Window, IDisposable
 
         foreach (var group in groups)
         {
-            var missing = group.Count(item => !item.IsOwned);
+            var missing = group.Items.Count(item => !item.IsOwned);
             var label = missing > 0 ? $"{group.Key}  ({missing})" : group.Key;
 
             // Restore the remembered state when the window appears, then let clicks win and write
@@ -308,7 +347,7 @@ public class MissingItemsWindow : Window, IDisposable
             if (!open)
                 continue;
 
-            foreach (var item in group)
+            foreach (var item in group.Items)
                 DrawItemRow(item);
 
             ImGui.Spacing();
