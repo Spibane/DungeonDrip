@@ -176,7 +176,7 @@ public sealed unsafe class VendorPanelWindow : Window, IDisposable
     }
 
     /// <summary>
-    /// The two filters worth flipping mid-shop, as buttons rather than a trip to Settings.
+    /// The list filters, as buttons rather than a trip to Settings.
     /// </summary>
     /// <remarks>
     /// They write the shared settings rather than vendor-only copies, which is the point: standing
@@ -218,6 +218,22 @@ public sealed unsafe class VendorPanelWindow : Window, IDisposable
             ImGui.SetTooltip(jobOnly
                 ? "Showing only what your current job can wear. Click to show every job."
                 : "Showing gear for every job. Click to show only your current job.");
+        }
+
+        ImGui.SameLine();
+
+        var hideWeapons = configuration.HideWeapons;
+        if (ImGuiComponents.IconButton("##vendorWeapons", hideWeapons ? FontAwesomeIcon.Ban : FontAwesomeIcon.Khanda))
+        {
+            configuration.HideWeapons = !hideWeapons;
+            changed = true;
+        }
+
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip(hideWeapons
+                ? "Hiding weapons and off-hands. Click to list them."
+                : "Listing weapons and off-hands. Click to hide them.");
         }
 
         ImGui.SameLine();
