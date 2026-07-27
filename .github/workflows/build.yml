@@ -25,14 +25,14 @@ jobs:
           echo "DALAMUD_HOME=$env:GITHUB_WORKSPACE\dalamud" >> $env:GITHUB_ENV
 
       - name: Build
-        run: dotnet build GlamourAssistant.sln -c Release --nologo
+        run: dotnet build DungeonDrip.sln -c Release --nologo
 
       # DalamudPackager writes the installable zip here; the platform folder depends on how
       # MSBuild resolved the solution configuration.
       - uses: actions/upload-artifact@v4
         with:
-          name: GlamourAssistant
+          name: DungeonDrip
           if-no-files-found: error
           path: |
-            GlamourAssistant/bin/Release/GlamourAssistant/
-            GlamourAssistant/bin/x64/Release/GlamourAssistant/
+            DungeonDrip/bin/Release/DungeonDrip/
+            DungeonDrip/bin/x64/Release/DungeonDrip/

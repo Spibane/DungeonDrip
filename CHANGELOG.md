@@ -1,5 +1,19 @@
 # Changelog
 
+### v0.8.0 - 2026-07-27
+- **BREAKING:** Renamed the plugin from Glamour Assistant to Dungeon Drip. The old name sat in a crowded shelf alongside Glamourer, Glamaholic and the existing Glamour Log plugin
+- **BREAKING:** Commands are now `/dungeondrip`, with `/drip` and `/ddrip` as aliases, replacing `/glamassist` and `/gla`
+- Added collision-safe command registration: aliases another plugin already owns are skipped rather than failing silently, and Settings > General lists which ones were claimed
+- Added a one-time migration of settings and caches from the old plugin name, so the dresser snapshot, learned drops and wiki lookups survive the rename
+
+### v0.7.1 - 2026-07-27
+- Added a toolbar button to show or hide pieces you already have, without opening settings
+- Moved "refresh collection" out of the toolbar into Settings > Data, beside the snapshot timestamps it acts on
+
+### v0.7.0 - 2026-07-27
+- Added outfit-set membership to the item tooltip: which sets a piece belongs to, and for each whether it is stored with the piece included, stored with that slot empty, or not stored at all
+- Added tracking of which outfit sets are in the dresser regardless of slot contents, so the "stored but this slot is empty" case can be distinguished; caches written before this reconstruct it on load
+
 ### v0.6.0 - 2026-07-27
 - Changed role grouping to split melee into its actual gear types instead of one bucket: Maiming (DRG RPR), Striking (MNK SAM), Scouting (NIN VPR) and the shared Slaying accessories. The split comes from the job set the game lists on each item, so a new job lands in the right heading with no code change; tanks and healers stay whole because their armour and accessories really do share a category
 - Changed melee headings to drop base classes, reading "DRG RPR" rather than "LNC DRG RPR"
@@ -37,12 +51,12 @@
 ### v0.1.0 - 2026-07-26
 - Initial release
 - Added automatic detection of the duty you zone into, listing the glamour-able gear that drops there and is not yet in your Glamour Dresser or Armoire
-- Added duty lookup without entering: a searchable picker plus `/glamassist <duty name>`, with a pinned selection that survives zoning
+- Added duty lookup without entering: a searchable picker plus `/dungeondrip <duty name>`, with a pinned selection that survives zoning
 - Added outfit-set awareness — pieces inside a stored set count as owned, with an Any/All toggle for pieces belonging to several sets, and partially-filled sets resolved via `MirageManager.IsSetSlotUnlocked`
 - Added a per-character collection snapshot persisted to disk, because the client clears Glamour Dresser data on every zone change and only loads the Armoire on demand; the window reports how stale the snapshot is
 - Added an opt-in toggle to count bags, armoury chest, equipped gear and saddlebags as owning a piece
 - Added an optional current-job filter, re-evaluated when you switch job
-- Added the dungeon loot dataset as a download refreshed on every plugin load, revalidated with `If-None-Match` and cached to disk for offline use; `/glamassist update` forces a re-download
+- Added the dungeon loot dataset as a download refreshed on every plugin load, revalidated with `If-None-Match` and cached to disk for offline use; `/dungeondrip update` forces a re-download
 - Added `loot-overrides.json` for hand-patching duties the upstream dataset has not caught up with
 - Added a `windows-latest` CI build that fetches the Dalamud dev distribution, so builds need no game install
 
