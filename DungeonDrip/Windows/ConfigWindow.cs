@@ -36,6 +36,18 @@ public class ConfigWindow : Window, IDisposable
                 changed |= DrawGeneralTab();
         }
 
+        using (var duties = Dalamud.Interface.Utility.Raii.ImRaii.TabItem("Duties"))
+        {
+            if (duties.Success)
+                changed |= DrawDutiesTab();
+        }
+
+        using (var vendors = Dalamud.Interface.Utility.Raii.ImRaii.TabItem("Vendors"))
+        {
+            if (vendors.Success)
+                changed |= DrawVendorsTab();
+        }
+
         using (var data = Dalamud.Interface.Utility.Raii.ImRaii.TabItem("Data"))
         {
             if (data.Success)
@@ -54,31 +66,9 @@ public class ConfigWindow : Window, IDisposable
         var changed = false;
 
         ImGui.Spacing();
-        ImGui.TextColored(Muted, "Window");
-
-        var autoOpen = configuration.AutoOpenOnDutyEnter;
-        if (ImGui.Checkbox("Open automatically when I enter a duty", ref autoOpen))
-        {
-            configuration.AutoOpenOnDutyEnter = autoOpen;
-            changed = true;
-        }
-
-        var hideWhenComplete = configuration.HideWhenNothingMissing;
-        if (ImGui.Checkbox("...but not when I already have everything", ref hideWhenComplete))
-        {
-            configuration.HideWhenNothingMissing = hideWhenComplete;
-            changed = true;
-        }
-
-        var closeOnLeave = configuration.CloseWhenLeavingDuty;
-        if (ImGui.Checkbox("Close again when I leave the duty", ref closeOnLeave))
-        {
-            configuration.CloseWhenLeavingDuty = closeOnLeave;
-            changed = true;
-        }
-
-        if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("A duty you pinned yourself stays open - only the automatic tracking closes.");
+        ImGui.TextColored(Muted, "What to list");
+        ImGui.TextColored(Muted, "Applies everywhere: the duty window, the loot roll list and vendors.");
+        ImGui.Spacing();
 
         var showOwned = configuration.ShowOwnedItems;
         if (ImGui.Checkbox("List pieces I already have, greyed out", ref showOwned))
@@ -86,24 +76,6 @@ public class ConfigWindow : Window, IDisposable
             configuration.ShowOwnedItems = showOwned;
             changed = true;
         }
-
-        var roleSummary = configuration.ShowRoleSummary;
-        if (ImGui.Checkbox("Call out the role with the most missing pieces", ref roleSummary))
-        {
-            configuration.ShowRoleSummary = roleSummary;
-            changed = true;
-        }
-
-        if (ImGui.IsItemHovered())
-        {
-            ImGui.SetTooltip(
-                "A line above the list naming whichever role still needs the most, so you know what to\n" +
-                "chase. Counts by role even when the list itself is grouped by slot; hover it for the\n" +
-                "full breakdown.");
-        }
-
-        ImGui.Spacing();
-        ImGui.TextColored(Muted, "What to list");
 
         var jobOnly = configuration.OnlyCurrentJobEquippable;
         if (ImGui.Checkbox("Only show gear my current job can wear", ref jobOnly))
@@ -122,34 +94,10 @@ public class ConfigWindow : Window, IDisposable
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip("Hides main hands and off-hands, which drop together.");
 
-        var grouping = configuration.Grouping;
-        ImGui.SetNextItemWidth(200 * ImGuiHelpers.GlobalScale);
-        if (ImGui.BeginCombo("Group the list by", grouping == MissingGrouping.Role ? "Role" : "Equipment slot"))
-        {
-            if (ImGui.Selectable("Equipment slot", grouping == MissingGrouping.Slot))
-            {
-                configuration.Grouping = MissingGrouping.Slot;
-                changed = true;
-            }
-
-            if (ImGui.Selectable("Role that can roll Need", grouping == MissingGrouping.Role))
-            {
-                configuration.Grouping = MissingGrouping.Role;
-                changed = true;
-            }
-
-            ImGui.EndCombo();
-        }
-
-        if (ImGui.IsItemHovered())
-        {
-            ImGui.SetTooltip(
-                "Role grouping buckets pieces by who is allowed to roll Need, which is what you want\n" +
-                "when claiming during a run. Headings can be collapsed and stay that way.");
-        }
-
         ImGui.Spacing();
         ImGui.TextColored(Muted, "What counts as owned");
+        ImGui.TextColored(Muted, "Also applies everywhere.");
+        ImGui.Spacing();
 
         var scope = configuration.Scope;
         ImGui.SetNextItemWidth(200 * ImGuiHelpers.GlobalScale);
@@ -213,6 +161,89 @@ public class ConfigWindow : Window, IDisposable
         }
 
         ImGui.Spacing();
+        ImGui.Separator();
+
+        // Worth showing: a short alias is skipped when another plugin already owns it, and silently
+        // missing commands would otherwise look like a bug here.
+        ImGui.TextColored(Muted, $"Commands: {string.Join("  ", plugin.Commands.Registered)}");
+
+        ImGui.Spacing();
+        return changed;
+    }
+
+    private bool DrawDutiesTab()
+    {
+        var changed = false;
+
+        ImGui.Spacing();
+        ImGui.TextColored(Muted, "Duty window");
+
+        var autoOpen = configuration.AutoOpenOnDutyEnter;
+        if (ImGui.Checkbox("Open automatically when I enter a duty", ref autoOpen))
+        {
+            configuration.AutoOpenOnDutyEnter = autoOpen;
+            changed = true;
+        }
+
+        var hideWhenComplete = configuration.HideWhenNothingMissing;
+        if (ImGui.Checkbox("...but not when I already have everything", ref hideWhenComplete))
+        {
+            configuration.HideWhenNothingMissing = hideWhenComplete;
+            changed = true;
+        }
+
+        var closeOnLeave = configuration.CloseWhenLeavingDuty;
+        if (ImGui.Checkbox("Close again when I leave the duty", ref closeOnLeave))
+        {
+            configuration.CloseWhenLeavingDuty = closeOnLeave;
+            changed = true;
+        }
+
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("A duty you pinned yourself stays open - only the automatic tracking closes.");
+
+        var roleSummary = configuration.ShowRoleSummary;
+        if (ImGui.Checkbox("Call out the role with the most missing pieces", ref roleSummary))
+        {
+            configuration.ShowRoleSummary = roleSummary;
+            changed = true;
+        }
+
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip(
+                "A line above the list naming whichever role still needs the most, so you know what to\n" +
+                "chase. Counts by role even when the list itself is grouped by slot; hover it for the\n" +
+                "full breakdown.");
+        }
+
+        var grouping = configuration.Grouping;
+        ImGui.SetNextItemWidth(200 * ImGuiHelpers.GlobalScale);
+        if (ImGui.BeginCombo("Group the list by", grouping == MissingGrouping.Role ? "Role" : "Equipment slot"))
+        {
+            if (ImGui.Selectable("Equipment slot", grouping == MissingGrouping.Slot))
+            {
+                configuration.Grouping = MissingGrouping.Slot;
+                changed = true;
+            }
+
+            if (ImGui.Selectable("Role that can roll Need", grouping == MissingGrouping.Role))
+            {
+                configuration.Grouping = MissingGrouping.Role;
+                changed = true;
+            }
+
+            ImGui.EndCombo();
+        }
+
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip(
+                "Role grouping buckets pieces by who is allowed to roll Need, which is what you want\n" +
+                "when claiming during a run. Headings can be collapsed and stay that way.");
+        }
+
+        ImGui.Spacing();
         ImGui.TextColored(Muted, "Loot roll window");
 
         var companion = configuration.ShowLootCompanion;
@@ -249,8 +280,16 @@ public class ConfigWindow : Window, IDisposable
             }
         }
 
+        DrawSharedSettingsNote();
+        return changed;
+    }
+
+    private bool DrawVendorsTab()
+    {
+        var changed = false;
+
         ImGui.Spacing();
-        ImGui.TextColored(Muted, "Vendors");
+        ImGui.TextColored(Muted, "Vendor panel");
 
         var vendorPanel = configuration.ShowVendorPanel;
         if (ImGui.Checkbox("Show a panel beside vendor windows", ref vendorPanel))
@@ -285,37 +324,42 @@ public class ConfigWindow : Window, IDisposable
                 ImGui.EndCombo();
             }
 
-            var vendorOwned = configuration.VendorShowOwnedItems;
-            if (ImGui.Checkbox("List pieces you already have##vendor", ref vendorOwned))
-            {
-                configuration.VendorShowOwnedItems = vendorOwned;
-                changed = true;
-            }
-
-            if (ImGui.IsItemHovered())
-            {
-                ImGui.SetTooltip(
-                    "Off leaves only what you are missing, and each heading still says how many were\n" +
-                    "filtered out.");
-            }
-
             var vendorGrouped = configuration.VendorGroupBySlot;
             if (ImGui.Checkbox("Group by equipment slot##vendor", ref vendorGrouped))
             {
                 configuration.VendorGroupBySlot = vendorGrouped;
                 changed = true;
             }
+
+            ImGui.Spacing();
+            ImGui.TextColored(Muted, "What the markers mean");
+            ImGui.BulletText("x - not collected");
+            ImGui.BulletText("tick - in the Glamour Dresser");
+            ImGui.BulletText("layers - in a stored outfit set that still has gaps");
+            ImGui.BulletText("star - in an outfit set you have completed");
+            ImGui.BulletText("box - in the Armoire");
+            ImGui.BulletText("case - carried or equipped");
+            ImGui.BulletText("? - no dresser data, so nothing can be said either way");
+            ImGui.TextColored(Muted, "An old dresser snapshot turns the x amber, not the ticks:");
+            ImGui.TextColored(Muted, "what it says you own stays true far longer than what it says you lack.");
         }
 
+        DrawSharedSettingsNote();
+        return changed;
+    }
+
+    /// <summary>
+    /// The filters and the ownership rules are shared by every list, and the whole point of the tab
+    /// split is that you can see which settings reach this surface. Saying where they live beats
+    /// repeating them per tab and letting the two drift apart.
+    /// </summary>
+    private static void DrawSharedSettingsNote()
+    {
         ImGui.Spacing();
         ImGui.Separator();
-
-        // Worth showing: a short alias is skipped when another plugin already owns it, and silently
-        // missing commands would otherwise look like a bug here.
-        ImGui.TextColored(Muted, $"Commands: {string.Join("  ", plugin.Commands.Registered)}");
-
+        ImGui.TextColored(Muted, "What to list and what counts as owned are on the General tab,");
+        ImGui.TextColored(Muted, "and apply here too.");
         ImGui.Spacing();
-        return changed;
     }
 
     private bool DrawDataTab()

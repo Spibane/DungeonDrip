@@ -14,7 +14,13 @@ public enum VendorMarker
     NotCollected,
 
     Dresser,
+
+    /// <summary>Held inside a stored outfit set that still has gaps in it.</summary>
     Outfit,
+
+    /// <summary>Held inside a stored outfit set with every slot filled.</summary>
+    OutfitComplete,
+
     Armoire,
     Inventory,
 
@@ -28,7 +34,10 @@ public enum VendorMarker
 /// </summary>
 public static class VendorMarkers
 {
-    public static VendorMarker For(OwnershipSource source, bool hasDresserData)
+    /// <param name="outfitCompleted">
+    /// Only consulted for a piece held in an outfit set: whether any set holding it is finished.
+    /// </param>
+    public static VendorMarker For(OwnershipSource source, bool hasDresserData, bool outfitCompleted = false)
     {
         // Positive evidence stands on its own and needs no dresser snapshot behind it: inventory is
         // re-read every tick, and an armoire result is only ever recorded when the game genuinely
@@ -36,7 +45,7 @@ public static class VendorMarkers
         var marker = source switch
         {
             OwnershipSource.Dresser => VendorMarker.Dresser,
-            OwnershipSource.Outfit => VendorMarker.Outfit,
+            OwnershipSource.Outfit => outfitCompleted ? VendorMarker.OutfitComplete : VendorMarker.Outfit,
             OwnershipSource.Armoire => VendorMarker.Armoire,
             OwnershipSource.Inventory => VendorMarker.Inventory,
             _ => VendorMarker.NotCollected,
@@ -72,6 +81,7 @@ public static class VendorMarkers
     {
         VendorMarker.Dresser => "In your Glamour Dresser",
         VendorMarker.Outfit => "Part of a stored outfit set",
+        VendorMarker.OutfitComplete => "Outfit completed",
         VendorMarker.Armoire => "In your Armoire",
         VendorMarker.Inventory => "Carried or equipped",
         VendorMarker.NotCollected => "Not collected",
