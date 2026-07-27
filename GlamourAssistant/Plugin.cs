@@ -22,6 +22,7 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] internal static IDataManager DataManager { get; private set; } = null!;
     [PluginService] internal static IFramework Framework { get; private set; } = null!;
     [PluginService] internal static IChatGui ChatGui { get; private set; } = null!;
+    [PluginService] internal static IGameGui GameGui { get; private set; } = null!;
     [PluginService] internal static IPluginLog Log { get; private set; } = null!;
 
     private const string CommandName = "/glamassist";
@@ -30,14 +31,22 @@ public sealed class Plugin : IDalamudPlugin
     public Configuration Configuration { get; }
     public LootDataService LootData { get; }
     public OwnershipTracker Ownership { get; }
+    public LearnedLootStore LearnedLoot { get; }
+    public WikiLootSource Wiki { get; }
 
     /// <summary>Rebuilt whenever the loot dataset changes; null until the first dataset arrives.</summary>
     public DutyCatalog? Duties { get; private set; }
 
+    /// <summary>Outfit-set membership, needed anywhere ownership is judged.</summary>
+    public OutfitCatalog Outfits => outfits;
+
     private readonly WindowSystem windowSystem = new("GlamourAssistant");
     private readonly OutfitCatalog outfits;
+    private readonly ContentFinderIndex contentFinder;
+    private readonly LootObserver lootObserver;
     private readonly MissingItemsWindow mainWindow;
     private readonly ConfigWindow configWindow;
+    private readonly LootCompanionWindow lootCompanionWindow;
 
     private DutyReportBuilder? reportBuilder;
     private uint currentTerritory;
@@ -48,6 +57,7 @@ public sealed class Plugin : IDalamudPlugin
     private int seenOwnershipRevision = -1;
     private uint seenClassJob;
     private uint? autoOpenForTerritory;
+    private uint wikiRequestedFor;
 
     public Plugin()
     {
@@ -56,16 +66,23 @@ public sealed class Plugin : IDalamudPlugin
         var configDirectory = PluginInterface.GetPluginConfigDirectory();
 
         outfits = OutfitCatalog.Build();
+        contentFinder = ContentFinderIndex.Build();
         Ownership = new OwnershipTracker(configDirectory, Configuration);
+
+        LearnedLoot = new LearnedLootStore(configDirectory);
+        lootObserver = new LootObserver(Configuration, LearnedLoot, contentFinder);
+        Wiki = new WikiLootSource(configDirectory, Configuration);
 
         // Reads the on-disk copy immediately and starts an update check in the background, so a
         // returning user has data before the first frame and a first-time user gets it shortly after.
-        LootData = new LootDataService(configDirectory);
+        LootData = new LootDataService(configDirectory, LearnedLoot, Wiki);
 
         mainWindow = new MissingItemsWindow(this);
         configWindow = new ConfigWindow(this);
+        lootCompanionWindow = new LootCompanionWindow(this) { IsOpen = true };
         windowSystem.AddWindow(mainWindow);
         windowSystem.AddWindow(configWindow);
+        windowSystem.AddWindow(lootCompanionWindow);
 
         currentTerritory = ClientState.TerritoryType;
 
@@ -99,7 +116,10 @@ public sealed class Plugin : IDalamudPlugin
         windowSystem.RemoveAllWindows();
         mainWindow.Dispose();
         configWindow.Dispose();
+        lootCompanionWindow.Dispose();
+        lootObserver.Dispose();
         LootData.Dispose();
+        Wiki.Dispose();
 
         CommandManager.RemoveHandler(CommandName);
         CommandManager.RemoveHandler(ShortCommandName);
@@ -143,13 +163,15 @@ public sealed class Plugin : IDalamudPlugin
 
     private void OnFrameworkUpdate(IFramework framework)
     {
+        Wiki.Update();
         LootData.Update();
         Ownership.Update();
+        RequestWikiDataIfNeeded();
 
         if (LootData.Revision != seenLootRevision && LootData.Data != null)
         {
             seenLootRevision = LootData.Revision;
-            Duties = DutyCatalog.Build(LootData.Data);
+            Duties = DutyCatalog.Build(LootData.Data, contentFinder);
             reportBuilder = new DutyReportBuilder(LootData.Data, Duties, outfits);
             reportDirty = true;
         }
@@ -182,6 +204,31 @@ public sealed class Plugin : IDalamudPlugin
             mainWindow.IsOpen = true;
     }
 
+    /// <summary>
+    /// Asks the wiki about the duty in view. Driven by the selection rather than by the report,
+    /// because the duties that need it most are exactly the ones with no report at all.
+    /// </summary>
+    private void RequestWikiDataIfNeeded()
+    {
+        var selected = SelectedTerritory;
+        if (selected == 0 || selected == wikiRequestedFor)
+            return;
+
+        if (!contentFinder.TryGet(selected, out var condition))
+            return;
+
+        wikiRequestedFor = selected;
+        Wiki.RequestIfStale(selected, condition.Name.ExtractText());
+    }
+
+    /// <summary>Forces a fresh wiki lookup for the duty in view, ignoring the cache.</summary>
+    public void RefetchWikiForSelection()
+    {
+        var selected = SelectedTerritory;
+        if (selected != 0 && contentFinder.TryGet(selected, out var condition))
+            Wiki.RequestIfStale(selected, condition.Name.ExtractText(), force: true);
+    }
+
     private void OnCommand(string command, string arguments)
     {
         var args = arguments.Trim();
@@ -204,6 +251,7 @@ public sealed class Plugin : IDalamudPlugin
 
             case "update":
                 LootData.CheckForUpdates(force: true);
+                RefetchWikiForSelection();
                 ChatGui.Print("Glamour Assistant is re-downloading the dungeon loot data.");
                 return;
         }

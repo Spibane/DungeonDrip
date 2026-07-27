@@ -4,6 +4,22 @@ using System.Text.Json.Serialization;
 
 namespace GlamourAssistant.Data;
 
+/// <summary>Which source put a piece on a duty's list.</summary>
+public enum LootProvenance
+{
+    /// <summary>The downloaded primary dataset.</summary>
+    Dataset,
+
+    /// <summary>The user's hand-maintained loot-overrides.json.</summary>
+    Override,
+
+    /// <summary>Observed dropping in that duty on this client.</summary>
+    Learned,
+
+    /// <summary>Read off the FFXIV Console Games Wiki.</summary>
+    Wiki,
+}
+
 /// <summary>One duty's drop list, keyed on the map id it was sourced from.</summary>
 /// <remarks>
 /// Map rather than ContentFinderCondition because the upstream dataset numbers instances its own

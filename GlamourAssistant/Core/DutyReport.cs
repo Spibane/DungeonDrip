@@ -15,7 +15,8 @@ public sealed record ReportItem(
     ushort ItemLevel,
     int SlotOrder,
     string SlotName,
-    OwnershipSource Source)
+    OwnershipSource Source,
+    LootProvenance Provenance)
 {
     public bool IsOwned => Source != OwnershipSource.None;
 }
@@ -65,7 +66,8 @@ public sealed class DutyReportBuilder(DungeonLootData loot, DutyCatalog catalog,
                 (ushort)item.LevelItem.RowId,
                 order,
                 slotName,
-                source));
+                source,
+                loot.ProvenanceOf(territoryId, itemId)));
         }
 
         results.Sort((a, b) =>

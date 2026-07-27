@@ -22,6 +22,7 @@ public sealed class DungeonLootData
 
     private readonly Dictionary<uint, uint[]> itemsByTerritory;
     private readonly Dictionary<uint, string> fallbackNames;
+    private readonly Dictionary<uint, Dictionary<uint, LootProvenance>> provenance;
 
     /// <summary>When the underlying dataset was downloaded.</summary>
     public DateTime FetchedUtc { get; }
@@ -34,16 +35,24 @@ public sealed class DungeonLootData
     private DungeonLootData(
         Dictionary<uint, uint[]> itemsByTerritory,
         Dictionary<uint, string> fallbackNames,
+        Dictionary<uint, Dictionary<uint, LootProvenance>> provenance,
         DateTime fetchedUtc,
         int emptyAfterFilter,
         int overrideCount)
     {
         this.itemsByTerritory = itemsByTerritory;
         this.fallbackNames = fallbackNames;
+        this.provenance = provenance;
         FetchedUtc = fetchedUtc;
         EmptyAfterFilter = emptyAfterFilter;
         OverrideCount = overrideCount;
     }
+
+    /// <summary>Where this piece's entry came from, for showing the user why it is listed.</summary>
+    public LootProvenance ProvenanceOf(uint territoryId, uint itemId) =>
+        provenance.TryGetValue(territoryId, out var items) && items.TryGetValue(itemId, out var source)
+            ? source
+            : LootProvenance.Dataset;
 
     public IReadOnlyCollection<uint> Territories => itemsByTerritory.Keys;
 
@@ -55,7 +64,11 @@ public sealed class DungeonLootData
     public string? GetFallbackName(uint territoryId) =>
         fallbackNames.TryGetValue(territoryId, out var name) ? name : null;
 
-    public static DungeonLootData Build(LootCacheFile cache, string configDirectory)
+    public static DungeonLootData Build(
+        LootCacheFile cache,
+        string configDirectory,
+        LearnedLootStore learned,
+        WikiLootSource wiki)
     {
         var maps = Plugin.DataManager.GetExcelSheet<Map>();
         var items = Plugin.DataManager.GetExcelSheet<Item>();
@@ -87,10 +100,53 @@ public sealed class DungeonLootData
             names.TryAdd(territoryId, instance.Name);
         }
 
-        var overrides = ApplyOverrides(configDirectory, accumulated);
+        var provenance = new Dictionary<uint, Dictionary<uint, LootProvenance>>();
+        var overrides = ApplyOverrides(configDirectory, accumulated, provenance);
 
-        var byTerritory = accumulated.ToDictionary(kv => kv.Key, kv => kv.Value.ToArray());
-        return new DungeonLootData(byTerritory, names, cache.FetchedUtc, empty, overrides);
+        // Supplementary sources are layered on last. Each records which pieces only exist because
+        // of it, so the UI can show provenance - and because they can add a duty the primary
+        // dataset omits entirely, they use the same "create the territory if absent" path.
+        foreach (var (territoryId, entry) in wiki.All)
+            Merge(items, accumulated, provenance, territoryId, entry.Items, LootProvenance.Wiki);
+
+        foreach (var (territoryId, seen) in learned.All)
+            Merge(items, accumulated, provenance, territoryId, seen, LootProvenance.Learned);
+
+        var byTerritory = accumulated
+            .Where(kv => kv.Value.Count > 0)
+            .ToDictionary(kv => kv.Key, kv => kv.Value.ToArray());
+
+        return new DungeonLootData(byTerritory, names, provenance, cache.FetchedUtc, empty, overrides);
+    }
+
+    /// <summary>
+    /// Adds a supplementary source's items, tagging only the ones it actually contributed. An item
+    /// the primary dataset already listed keeps its original provenance.
+    /// </summary>
+    private static void Merge(
+        Lumina.Excel.ExcelSheet<Item> items,
+        Dictionary<uint, HashSet<uint>> accumulated,
+        Dictionary<uint, Dictionary<uint, LootProvenance>> provenance,
+        uint territoryId,
+        IEnumerable<uint> itemIds,
+        LootProvenance source)
+    {
+        foreach (var itemId in itemIds)
+        {
+            if (!IsGlamourableGear(items, itemId))
+                continue;
+
+            if (!accumulated.TryGetValue(territoryId, out var set))
+                accumulated[territoryId] = set = [];
+
+            if (!set.Add(itemId))
+                continue;
+
+            if (!provenance.TryGetValue(territoryId, out var tagged))
+                provenance[territoryId] = tagged = [];
+
+            tagged[itemId] = source;
+        }
     }
 
     /// <summary>
@@ -112,7 +168,10 @@ public sealed class DungeonLootData
     /// Merges the user-maintained overrides file. Additive only - it exists because the upstream
     /// dataset lags badly on the newest dungeons.
     /// </summary>
-    private static int ApplyOverrides(string configDirectory, Dictionary<uint, HashSet<uint>> accumulated)
+    private static int ApplyOverrides(
+        string configDirectory,
+        Dictionary<uint, HashSet<uint>> accumulated,
+        Dictionary<uint, Dictionary<uint, LootProvenance>> provenance)
     {
         var path = Path.Combine(configDirectory, OverridesFileName);
         if (!File.Exists(path))
@@ -133,7 +192,17 @@ public sealed class DungeonLootData
                 if (!accumulated.TryGetValue(territoryId, out var set))
                     accumulated[territoryId] = set = [];
 
-                set.UnionWith(extra);
+                foreach (var itemId in extra)
+                {
+                    if (!set.Add(itemId))
+                        continue;
+
+                    if (!provenance.TryGetValue(territoryId, out var tagged))
+                        provenance[territoryId] = tagged = [];
+
+                    tagged[itemId] = LootProvenance.Override;
+                }
+
                 applied++;
             }
 

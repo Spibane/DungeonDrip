@@ -55,6 +55,43 @@ public class ConfigWindow : Window, IDisposable
         }
 
         ImGui.Spacing();
+        ImGui.TextColored(Muted, "Loot roll window");
+
+        var companion = configuration.ShowLootCompanion;
+        if (ImGui.Checkbox("Show a companion list beside the Need/Greed window", ref companion))
+        {
+            configuration.ShowLootCompanion = companion;
+            changed = true;
+        }
+
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip(
+                "A separate window pinned to the side of the roll window, marking what you do not own.\n" +
+                "It never draws into the game's own loot window, so it cannot fight with plugins that do\n" +
+                "(Allagan Tools, Simple Tweaks, VanillaPlus, Collections).");
+        }
+
+        if (companion)
+        {
+            var side = configuration.LootCompanionSide;
+            ImGui.SetNextItemWidth(160 * Dalamud.Interface.Utility.ImGuiHelpers.GlobalScale);
+            if (ImGui.BeginCombo("Side", side.ToString()))
+            {
+                foreach (var option in Enum.GetValues<LootCompanionSide>())
+                {
+                    if (ImGui.Selectable(option.ToString(), side == option))
+                    {
+                        configuration.LootCompanionSide = option;
+                        changed = true;
+                    }
+                }
+
+                ImGui.EndCombo();
+            }
+        }
+
+        ImGui.Spacing();
         ImGui.TextColored(Muted, "What counts as owned");
 
         var countInventory = configuration.CountInventoryAndEquipped;
@@ -127,9 +164,87 @@ public class ConfigWindow : Window, IDisposable
             plugin.LootData.CheckForUpdates(force: true);
 
         ImGui.Spacing();
+        ImGui.TextColored(Muted, "Console Games Wiki");
+
+        var useWiki = configuration.UseWikiSource;
+        if (ImGui.Checkbox("Fill gaps from the wiki", ref useWiki))
+        {
+            configuration.UseWikiSource = useWiki;
+            changed = true;
+        }
+
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip(
+                "Looks the duty you are viewing up on ffxiv.consolegameswiki.com and merges its loot\n" +
+                "table in. One page per duty, cached for two weeks, checked one at a time. The primary\n" +
+                "dataset lags months on new dungeons where the wiki is usually complete.");
+        }
+
+        if (useWiki)
+        {
+            var wiki = plugin.Wiki;
+            ImGui.TextColored(Muted, wiki.TotalItems == 0
+                ? "No wiki lookups cached yet."
+                : $"{wiki.TotalItems} items cached across {wiki.DutiesWithData} duties.");
+
+            var entry = wiki.EntryFor(plugin.SelectedTerritory);
+            if (entry != null)
+            {
+                var detail = entry.Error != null ? $"failed: {entry.Error}"
+                    : entry.NotFound ? "no matching page"
+                    : $"{entry.Items.Length} items from \"{entry.Title}\"" +
+                      (entry.UnmatchedNames > 0 ? $", {entry.UnmatchedNames} names unrecognised" : string.Empty);
+
+                ImGui.TextColored(Muted, $"This duty: {detail}");
+            }
+            else if (wiki.IsBusy)
+            {
+                ImGui.TextColored(Muted, "Looking this duty up...");
+            }
+
+            if (ImGui.Button("Re-fetch this duty"))
+                plugin.RefetchWikiForSelection();
+
+            ImGui.SameLine();
+            if (ImGui.Button("Clear wiki cache"))
+                wiki.Clear();
+        }
+
+        ImGui.Spacing();
+        ImGui.TextColored(Muted, "Learning from what you see drop");
+
+        var learn = configuration.LearnDropsFromLoot;
+        if (ImGui.Checkbox("Record gear that drops in duties", ref learn))
+        {
+            configuration.LearnDropsFromLoot = learn;
+            changed = true;
+        }
+
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip(
+                "Watches loot messages and adds anything new to this duty's list, including rolls other\n" +
+                "party members win. Upstream lags months behind on new dungeons; this fills the gap with\n" +
+                "what you actually see. Nothing is uploaded anywhere.");
+        }
+
+        var learned = plugin.LearnedLoot;
+        ImGui.TextColored(Muted, learned.ItemCount == 0
+            ? "Nothing learned yet."
+            : $"{learned.ItemCount} pieces learned across {learned.TerritoryCount} duties.");
+
+        if (learned.ItemCount > 0)
+        {
+            ImGui.SameLine();
+            if (ImGui.Button("Forget all"))
+                learned.Clear();
+        }
+
+        ImGui.Spacing();
         ImGui.TextWrapped(
-            "Missing drops for a very recent dungeon? Upstream lags on brand-new content. Add them to " +
-            "loot-overrides.json in the plugin config folder and reload the plugin.");
+            "Learned drops are written to learned-loot.json in the same format as loot-overrides.json, " +
+            "so you can promote them by hand or contribute them upstream.");
 
         // Shown as text as well as a button: under Wine the shell handler usually cannot open a
         // folder, and on Linux this path is the easiest way to inspect the caches by hand.
