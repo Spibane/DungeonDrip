@@ -22,8 +22,6 @@ public sealed class CommandRegistration : IDisposable
     /// <summary>The commands that were actually claimed, best first.</summary>
     public IReadOnlyList<string> Registered => registered;
 
-    public string Primary => registered.Count > 0 ? registered[0] : "(none)";
-
     public CommandRegistration(string primary, IEnumerable<string> aliases, IReadOnlyCommandInfo.HandlerDelegate handler)
     {
         Claim(primary, new CommandInfo(handler)

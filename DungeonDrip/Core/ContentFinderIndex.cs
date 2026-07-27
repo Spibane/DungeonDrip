@@ -4,8 +4,8 @@ using Lumina.Excel.Sheets;
 namespace DungeonDrip.Core;
 
 /// <summary>
-/// Territory -> ContentFinderCondition, built once. Answers both "what is this duty called" and
-/// "am I even in a duty right now".
+/// Territory -> ContentFinderCondition, built once. Answers what a duty is called and whether it is
+/// one this plugin covers.
 /// </summary>
 /// <remarks>
 /// Separate from <see cref="DutyCatalog"/> because that only covers duties we have loot for, and is
@@ -27,9 +27,6 @@ public sealed class ContentFinderIndex
     public bool TryGet(uint territoryId, out ContentFinderCondition condition) =>
         byTerritory.TryGetValue(territoryId, out condition);
 
-    /// <summary>True when the territory is an instanced duty rather than an open-world zone.</summary>
-    public bool IsDuty(uint territoryId) => byTerritory.ContainsKey(territoryId);
-
     /// <summary>
     /// Dungeons and alliance raids only - the content whose gear people actually farm for glamour.
     /// </summary>
@@ -41,7 +38,7 @@ public sealed class ContentFinderIndex
     public bool IsSupportedDuty(uint territoryId) =>
         byTerritory.TryGetValue(territoryId, out var condition) && IsSupported(condition);
 
-    public static bool IsSupported(ContentFinderCondition condition) =>
+    private static bool IsSupported(ContentFinderCondition condition) =>
         condition.ContentType.RowId == DungeonContentType ||
         (condition.ContentType.RowId == RaidContentType &&
          condition.ContentMemberType.RowId == AllianceMemberType);

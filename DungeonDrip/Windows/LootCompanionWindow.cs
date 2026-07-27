@@ -4,6 +4,7 @@ using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Textures;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Windowing;
+using Dalamud.Utility;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using DungeonDrip.Core;
 using Lumina.Excel.Sheets;
@@ -130,8 +131,8 @@ public sealed unsafe class LootCompanionWindow : Window, IDisposable
 
         for (var i = 0; i < count; i++)
         {
-            var itemId = Game.ItemId.Normalize(addon->Items[i].ItemId);
-            if (itemId == 0 || !items.TryGetRow(itemId, out var item))
+            var (itemId, kind) = ItemUtil.GetBaseId(addon->Items[i].ItemId);
+            if (itemId == 0 || kind == ItemKind.EventItem || !items.TryGetRow(itemId, out var item))
                 continue;
 
             // Only what the chosen store can hold; the rest of the roll list is not our business.

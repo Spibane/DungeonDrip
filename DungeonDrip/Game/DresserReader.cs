@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using FFXIVClientStructs.FFXIV.Client.Game;
+using Dalamud.Utility;
 using Lumina.Excel.Sheets;
 
 namespace DungeonDrip.Game;
@@ -52,7 +53,11 @@ public static unsafe class DresserReader
                 continue;
 
             used++;
-            var itemId = ItemId.Normalize(rawId);
+            // Event items share the id space behind an offset; without the kind check their base
+            // id collides with real gear.
+            var (itemId, kind) = ItemUtil.GetBaseId(rawId);
+            if (kind == ItemKind.EventItem)
+                continue;
 
             if (!setSheet.TryGetRow(itemId, out var set))
             {
