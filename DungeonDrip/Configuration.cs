@@ -61,6 +61,9 @@ public class Configuration : IPluginConfiguration
     /// <summary>Show owned pieces greyed out alongside the missing ones.</summary>
     public bool ShowOwnedItems { get; set; }
 
+    /// <summary>Call out which role has the most still missing, above the list.</summary>
+    public bool ShowRoleSummary { get; set; } = true;
+
     /// <summary>Restrict the list to gear the current job can actually wear.</summary>
     public bool OnlyCurrentJobEquippable { get; set; }
 

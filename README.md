@@ -4,7 +4,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-0.8.0-black)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.9.0-black)](./CHANGELOG.md)
 [![Status](https://img.shields.io/badge/status-Alpha-orange)](./CHANGELOG.md)
 [![Changelog](https://img.shields.io/badge/changelog-blue)](./CHANGELOG.md)
 
@@ -107,7 +107,8 @@ judged, **Data** for the collection snapshot and the loot sources behind it.
 | Open automatically when I enter a duty | General | on | Pops the window on zoning in |
 | ...but not when I already have everything | General | on | Suppresses the pop-up at 0 missing |
 | Close again when I leave the duty | General | on | A duty you pinned yourself stays open |
-| List pieces I already have, greyed out | General | off | |
+| List pieces I already have, greyed out | General | off | Also a toolbar button |
+| Call out the role with the most missing | General | on | Line above the list; hover for the breakdown |
 | Only show gear my current job can wear | General | off | Re-evaluated when you switch job |
 | Skip weapons | General | off | Main hands and off-hands, which drop together |
 | Group the list by | General | Slot | Equipment slot, or role that can roll Need |
