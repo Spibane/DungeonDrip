@@ -84,8 +84,12 @@ included. They write the shared settings, so they change the duty list too, and 
 
 The panel lists whatever the vendor is currently showing. Switching a category or tab re-reads it;
 scrolling does not change it. It reads the shop window's position and stock but never draws into it,
-so it cannot fight with plugins that do. It is pinned where you cannot drag it, so fold it to its
-title bar when it is in the way.
+so it cannot fight with plugins that do.
+
+It opens the same height as the shop window, with the list scrolling inside, so a long stock list
+cannot run off the bottom of the screen. Drag it to any size you prefer and that size is remembered;
+a fourth button appears while a custom size is in use, to go back to matching the shop. It is pinned
+where you cannot move it, so fold it to its title bar when it is in the way.
 
 Covered: gil vendors and Calamity Salvagers, item-exchange counters, currency and scrip exchanges,
 Grand Company quartermasters, free-item counters and the Firmament. Anything else simply gets no
