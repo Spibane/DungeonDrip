@@ -233,11 +233,9 @@ public class MissingItemsWindow : Window, IDisposable
         if (!plugin.Configuration.ShowRoleSummary || report.MissingCount == 0)
             return;
 
-        var byRole = report.Items
-            .Where(item => !item.IsOwned)
-            .SelectMany(item => item.RoleGroups)
-            .GroupBy(group => group)
-            .Select(group => (group.Key.Label, group.Key.Order, Count: group.Count()))
+        var byRole = BuildGroups([.. report.Items.Where(item => !item.IsOwned)], true)
+            .Select(bucket => (bucket.Group.Label, bucket.Group.Order, Count: bucket.MissingCount))
+            .Where(entry => entry.Count > 0)
             .OrderByDescending(entry => entry.Count)
             .ThenBy(entry => entry.Order)
             .ToList();
@@ -261,10 +259,85 @@ public class MissingItemsWindow : Window, IDisposable
         foreach (var (label, _, count) in byRole)
             ImGui.Text($"   {count,3}   {label}");
 
-        if (report.Items.Any(item => !item.IsOwned && item.RoleGroups.Count > 1))
+        if (byRole.Sum(entry => entry.Count) > report.MissingCount)
         {
             ImGui.Spacing();
-            ImGui.TextColored(Muted, "Gear two roles can roll on is counted under both.");
+            ImGui.TextColored(Muted, "Shared gear is counted under every role that can roll on it.");
+        }
+    }
+
+    /// <summary>
+    /// Buckets pieces into the headings they should be drawn under.
+    /// </summary>
+    /// <remarks>
+    /// Role view deliberately duplicates. It answers "what can I claim if I queue as this", so a
+    /// piece belongs under every heading whose jobs can roll on it: "of Slaying" accessories show
+    /// under their own MNK DRG SAM RPR heading and again under Maiming and Striking, and "of Aiming"
+    /// under both Physical Ranged and Scouting. Slot view never duplicates and stays the true list,
+    /// which is where the counts in the summary come from.
+    ///
+    /// Broader headings are only folded into narrower ones that some item already created in this
+    /// duty. A blind subset rule would conjure a "Melee DPS (DRG)" heading out of a legacy sheet row
+    /// and fill it with nothing but shared accessories.
+    /// </remarks>
+    private static List<Bucket> BuildGroups(IReadOnlyList<ReportItem> items, bool byRole)
+    {
+        var buckets = new Dictionary<string, Bucket>();
+
+        Bucket Ensure(RoleGroup group)
+        {
+            if (!buckets.TryGetValue(group.Label, out var bucket))
+                buckets[group.Label] = bucket = new Bucket(group);
+
+            return bucket;
+        }
+
+        foreach (var item in items)
+        {
+            if (byRole)
+            {
+                foreach (var group in item.RoleGroups)
+                    Ensure(group).Add(item);
+            }
+            else
+            {
+                Ensure(new RoleGroup(item.SlotOrder, item.SlotName, string.Empty)).Add(item);
+            }
+        }
+
+        if (byRole)
+        {
+            foreach (var bucket in buckets.Values.ToList())
+            {
+                foreach (var item in items)
+                {
+                    if (item.RoleGroups.Any(group => bucket.Group.IsCoveredBy(group)))
+                        bucket.Add(item);
+                }
+            }
+        }
+
+        return [.. buckets.Values.OrderBy(b => b.Group.Order).ThenBy(b => b.Group.Label, StringComparer.OrdinalIgnoreCase)];
+    }
+
+    private sealed class Bucket(RoleGroup group)
+    {
+        private readonly HashSet<uint> seen = [];
+
+        public RoleGroup Group { get; } = group;
+
+        public List<ReportItem> Items { get; } = [];
+
+        public int MissingCount { get; private set; }
+
+        public void Add(ReportItem item)
+        {
+            if (!seen.Add(item.ItemId))
+                return;
+
+            Items.Add(item);
+            if (!item.IsOwned)
+                MissingCount++;
         }
     }
 
@@ -279,41 +352,7 @@ public class MissingItemsWindow : Window, IDisposable
             return;
 
         var visible = report.Items.Where(item => showOwned || !item.IsOwned).ToList();
-
-        // Built by hand rather than GroupBy: under role grouping a shared piece belongs in every
-        // heading whose role can roll on it, so one item can land in two buckets.
-        var groups = new List<(string Key, int Order, List<ReportItem> Items)>();
-        var index = new Dictionary<string, int>();
-
-        void Place(string key, int order, ReportItem item)
-        {
-            if (!index.TryGetValue(key, out var at))
-            {
-                index[key] = at = groups.Count;
-                groups.Add((key, order, []));
-            }
-
-            groups[at].Items.Add(item);
-        }
-
-        foreach (var item in visible)
-        {
-            if (byRole)
-            {
-                foreach (var role in item.RoleGroups)
-                    Place(role.Label, role.Order, item);
-            }
-            else
-            {
-                Place(item.SlotName, item.SlotOrder, item);
-            }
-        }
-
-        groups.Sort((a, b) =>
-        {
-            var byOrder = a.Order.CompareTo(b.Order);
-            return byOrder != 0 ? byOrder : string.Compare(a.Key, b.Key, StringComparison.OrdinalIgnoreCase);
-        });
+        var groups = BuildGroups(visible, byRole);
 
         if (groups.Count == 0)
         {
@@ -325,21 +364,21 @@ public class MissingItemsWindow : Window, IDisposable
 
         foreach (var group in groups)
         {
-            var missing = group.Items.Count(item => !item.IsOwned);
-            var label = missing > 0 ? $"{group.Key}  ({missing})" : group.Key;
+            var missing = group.MissingCount;
+            var label = missing > 0 ? $"{group.Group.Label}  ({missing})" : group.Group.Label;
 
             // Restore the remembered state when the window appears, then let clicks win and write
             // whatever the user settles on back to the config.
-            var collapsed = configuration.CollapsedGroups.Contains(group.Key);
+            var collapsed = configuration.CollapsedGroups.Contains(group.Group.Label);
             ImGui.SetNextItemOpen(!collapsed, ImGuiCond.Appearing);
 
-            var open = ImGui.CollapsingHeader($"{label}###group{group.Key}");
+            var open = ImGui.CollapsingHeader($"{label}###group{group.Group.Label}");
             if (open == collapsed)
             {
                 if (open)
-                    configuration.CollapsedGroups.Remove(group.Key);
+                    configuration.CollapsedGroups.Remove(group.Group.Label);
                 else
-                    configuration.CollapsedGroups.Add(group.Key);
+                    configuration.CollapsedGroups.Add(group.Group.Label);
 
                 configuration.Save();
             }

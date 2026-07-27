@@ -1,5 +1,9 @@
 # Changelog
 
+### v0.9.3 - 2026-07-27
+- Changed role view to also show "of Slaying" accessories under the narrower melee headings they serve, so they appear under Maiming and Striking as well as their own heading. Role view answers "what can I claim", so it duplicates on purpose; slot view still never duplicates and the headline count still counts each piece once
+- Changed the list and the most-missing callout to share one bucketing routine, so the two can no longer disagree
+
 ### v0.9.2 - 2026-07-27
 - Changed gear shared between roles to appear under each role that can roll on it instead of a combined heading of its own. "of Aiming" accessories now sit under both Physical Ranged and Melee DPS (NIN VPR), so a scouting player sees them in their own pile; this replaces the combined "Physical Ranged / Melee DPS" heading added in 0.9.1
 - Changed the "most missing" callout to count shared pieces under each applicable role, noting on hover that it does so
