@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Dalamud.Configuration;
 
 namespace GlamourAssistant;
@@ -21,6 +22,24 @@ public enum LootCompanionSide
     Right,
 }
 
+/// <summary>Which storage counts when deciding whether a piece is collected.</summary>
+public enum CollectionScope
+{
+    Both,
+    DresserOnly,
+    ArmoireOnly,
+}
+
+/// <summary>How the missing list is grouped.</summary>
+public enum MissingGrouping
+{
+    /// <summary>By equipment slot - head, body, hands and so on.</summary>
+    Slot,
+
+    /// <summary>By the role allowed to roll Need, for claiming during a run.</summary>
+    Role,
+}
+
 public class Configuration : IPluginConfiguration
 {
     public int Version { get; set; } = 1;
@@ -30,6 +49,9 @@ public class Configuration : IPluginConfiguration
 
     /// <summary>Suppress the automatic pop-up when you already have everything.</summary>
     public bool HideWhenNothingMissing { get; set; } = true;
+
+    /// <summary>Close the window again when you leave the duty.</summary>
+    public bool CloseWhenLeavingDuty { get; set; } = true;
 
     /// <summary>Also treat bags, armoury, equipped gear and saddlebags as owning a piece.</summary>
     public bool CountInventoryAndEquipped { get; set; }
@@ -41,6 +63,18 @@ public class Configuration : IPluginConfiguration
 
     /// <summary>Restrict the list to gear the current job can actually wear.</summary>
     public bool OnlyCurrentJobEquippable { get; set; }
+
+    /// <summary>Leave main-hand weapons out of the list.</summary>
+    public bool HideWeapons { get; set; }
+
+    /// <summary>Which storage is compared against.</summary>
+    public CollectionScope Scope { get; set; } = CollectionScope.Both;
+
+    /// <summary>Group the missing list by slot, or by who can roll Need on it.</summary>
+    public MissingGrouping Grouping { get; set; } = MissingGrouping.Slot;
+
+    /// <summary>Headings the user has collapsed, remembered between sessions.</summary>
+    public List<string> CollapsedGroups { get; set; } = [];
 
     /// <summary>Age at which the cached Glamour Dresser snapshot starts warning you.</summary>
     public int StaleAfterDays { get; set; } = 7;

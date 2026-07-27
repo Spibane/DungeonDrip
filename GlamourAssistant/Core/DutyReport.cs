@@ -16,7 +16,9 @@ public sealed record ReportItem(
     int SlotOrder,
     string SlotName,
     OwnershipSource Source,
-    LootProvenance Provenance)
+    LootProvenance Provenance,
+    int RoleOrder,
+    string RoleGroup)
 {
     public bool IsOwned => Source != OwnershipSource.None;
 }
@@ -27,10 +29,16 @@ public sealed record DutyReport(
     IReadOnlyList<ReportItem> Items,
     int MissingCount,
     int TotalCount,
-    int HiddenByJobFilter);
+    int HiddenByJobFilter,
+    int HiddenWeapons);
 
 /// <summary>Turns a territory plus an ownership snapshot into the list the window draws.</summary>
-public sealed class DutyReportBuilder(DungeonLootData loot, DutyCatalog catalog, OutfitCatalog outfits)
+public sealed class DutyReportBuilder(
+    DungeonLootData loot,
+    DutyCatalog catalog,
+    OutfitCatalog outfits,
+    JobRoleIndex jobRoles,
+    StorageEligibility storage)
 {
     private readonly Dictionary<(uint Category, uint Job), bool> jobFilterCache = [];
 
@@ -41,23 +49,38 @@ public sealed class DutyReportBuilder(DungeonLootData loot, DutyCatalog catalog,
 
         var items = Plugin.DataManager.GetExcelSheet<Item>();
         var results = new List<ReportItem>(itemIds.Length);
-        var hidden = 0;
+        var hiddenByJob = 0;
+        var hiddenWeapons = 0;
 
         foreach (var itemId in itemIds)
         {
             if (!items.TryGetRow(itemId, out var item))
                 continue;
 
+            // Only list what the store being compared against can actually hold.
+            if (!storage.MatchesScope(storage.Of(item), configuration.Scope))
+                continue;
+
             if (configuration.OnlyCurrentJobEquippable && !CurrentJobCanEquip(item))
             {
-                hidden++;
+                hiddenByJob++;
+                continue;
+            }
+
+            var (order, slotName) = EquipSlots.Describe(item.EquipSlotCategory.Value);
+
+            // Weapons are the bulk of a dungeon's list and are often not what people are hunting.
+            if (configuration.HideWeapons && EquipSlots.IsWeaponSlot(order))
+            {
+                hiddenWeapons++;
                 continue;
             }
 
             var source = MissingItems.Resolve(
-                itemId, ownership, outfits.SetsContaining(itemId), configuration.OutfitOwnership);
+                itemId, ownership, outfits.SetsContaining(itemId), configuration.OutfitOwnership,
+                configuration.Scope);
 
-            var (order, slotName) = EquipSlots.Describe(item.EquipSlotCategory.Value);
+            var (roleOrder, roleGroup) = JobRoleIndex.Describe(jobRoles.RolesFor(item.ClassJobCategory.RowId));
 
             results.Add(new ReportItem(
                 itemId,
@@ -67,13 +90,24 @@ public sealed class DutyReportBuilder(DungeonLootData loot, DutyCatalog catalog,
                 order,
                 slotName,
                 source,
-                loot.ProvenanceOf(territoryId, itemId)));
+                loot.ProvenanceOf(territoryId, itemId),
+                roleOrder,
+                roleGroup));
         }
 
+        // Grouping drives the primary sort so the window can just walk the list in order.
+        var byRole = configuration.Grouping == MissingGrouping.Role;
         results.Sort((a, b) =>
         {
+            if (byRole)
+            {
+                var byRoleOrder = a.RoleOrder.CompareTo(b.RoleOrder);
+                if (byRoleOrder != 0) return byRoleOrder;
+            }
+
             var bySlot = a.SlotOrder.CompareTo(b.SlotOrder);
             if (bySlot != 0) return bySlot;
+
             return string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase);
         });
 
@@ -83,7 +117,8 @@ public sealed class DutyReportBuilder(DungeonLootData loot, DutyCatalog catalog,
             results,
             results.Count(r => !r.IsOwned),
             results.Count,
-            hidden);
+            hiddenByJob,
+            hiddenWeapons);
     }
 
     /// <summary>

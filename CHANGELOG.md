@@ -1,5 +1,19 @@
 # Changelog
 
+### v0.5.0 - 2026-07-27
+- Added an option, on by default, to close the window again when you leave a duty; a duty you pinned yourself stays open
+- **BREAKING:** Restricted coverage to dungeons and alliance raids (103 and 18 duties). Trials, 8-player raids, ultimates, guildhests and deep dungeons are no longer tracked, and drops are no longer learned in them
+- Changed the list to only include pieces that can actually be stored, so "compare against" now also decides what is eligible to appear. The Dresser and Armoire overlap rather than being alternatives: Dawntrail dungeon sets are accepted by both, older sets are Dresser-only
+- Changed the "skip weapons" toggle to cover off-hands as well, since they drop alongside main hands
+- Changed the wiki parser to stop reading game sheets off the framework thread; storability is decided during the merge instead
+
+### v0.4.0 - 2026-07-27
+- Added collapsible group headings to the missing list, remembered between sessions, with a missing count per group
+- Added grouping by the role allowed to roll Need — Tank, Healer, Melee DPS, Physical Ranged, Magical Ranged — for claiming during a run, switchable from the window toolbar; pieces spanning roles are labelled as such rather than forced into one
+- Added a setting to skip weapons (main hand only; shields are still listed)
+- Added a choice of what ownership is compared against: Glamour Dresser, Armoire, or both
+- Changed settings into General and Data tabs, splitting what the window shows from the collection snapshot and loot sources
+
 ### v0.3.0 - 2026-07-27
 - Added the FFXIV Console Games Wiki as a supplementary loot source, looked up one duty at a time when you view it and merged into that duty's list — the Clyteum goes from 1 listed drop to a full table, Mistwake from 2
 - Added provenance markers so each entry shows whether it came from the downloaded dataset, the wiki, your overrides, or your own sightings

@@ -68,11 +68,11 @@ public sealed class DungeonLootData
         LootCacheFile cache,
         string configDirectory,
         LearnedLootStore learned,
-        WikiLootSource wiki)
+        WikiLootSource wiki,
+        Core.ContentFinderIndex duties,
+        Core.StorageEligibility storage)
     {
         var maps = Plugin.DataManager.GetExcelSheet<Map>();
-        var items = Plugin.DataManager.GetExcelSheet<Item>();
-
         var accumulated = new Dictionary<uint, HashSet<uint>>();
         var names = new Dictionary<uint, string>();
         var empty = 0;
@@ -86,7 +86,11 @@ public sealed class DungeonLootData
             if (territoryId == 0)
                 continue;
 
-            var gear = instance.Items.Where(id => IsGlamourableGear(items, id)).ToList();
+            // Dungeons and alliance raids only.
+            if (!duties.IsSupportedDuty(territoryId))
+                continue;
+
+            var gear = instance.Items.Where(storage.CanBeStored).ToList();
             if (gear.Count == 0)
             {
                 empty++;
@@ -107,10 +111,10 @@ public sealed class DungeonLootData
         // of it, so the UI can show provenance - and because they can add a duty the primary
         // dataset omits entirely, they use the same "create the territory if absent" path.
         foreach (var (territoryId, entry) in wiki.All)
-            Merge(items, accumulated, provenance, territoryId, entry.Items, LootProvenance.Wiki);
+            Merge(duties, storage, accumulated, provenance, territoryId, entry.Items, LootProvenance.Wiki);
 
         foreach (var (territoryId, seen) in learned.All)
-            Merge(items, accumulated, provenance, territoryId, seen, LootProvenance.Learned);
+            Merge(duties, storage, accumulated, provenance, territoryId, seen, LootProvenance.Learned);
 
         var byTerritory = accumulated
             .Where(kv => kv.Value.Count > 0)
@@ -124,16 +128,20 @@ public sealed class DungeonLootData
     /// the primary dataset already listed keeps its original provenance.
     /// </summary>
     private static void Merge(
-        Lumina.Excel.ExcelSheet<Item> items,
+        Core.ContentFinderIndex duties,
+        Core.StorageEligibility storage,
         Dictionary<uint, HashSet<uint>> accumulated,
         Dictionary<uint, Dictionary<uint, LootProvenance>> provenance,
         uint territoryId,
         IEnumerable<uint> itemIds,
         LootProvenance source)
     {
+        if (!duties.IsSupportedDuty(territoryId))
+            return;
+
         foreach (var itemId in itemIds)
         {
-            if (!IsGlamourableGear(items, itemId))
+            if (!storage.CanBeStored(itemId))
                 continue;
 
             if (!accumulated.TryGetValue(territoryId, out var set))
@@ -147,21 +155,6 @@ public sealed class DungeonLootData
 
             tagged[itemId] = source;
         }
-    }
-
-    /// <summary>
-    /// Anything with an equip slot, minus soul crystals. Drops the orchestrion rolls, Triple Triad
-    /// cards, materials and job coffers that share the same loot lists.
-    /// </summary>
-    private static bool IsGlamourableGear(Lumina.Excel.ExcelSheet<Item> items, uint itemId)
-    {
-        if (!items.TryGetRow(itemId, out var item))
-            return false;
-
-        if (item.EquipSlotCategory.RowId == 0 || !item.EquipSlotCategory.IsValid)
-            return false;
-
-        return item.EquipSlotCategory.Value.SoulCrystal == 0;
     }
 
     /// <summary>

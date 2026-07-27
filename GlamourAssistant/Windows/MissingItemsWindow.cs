@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Game.Text.SeStringHandling;
@@ -120,6 +121,18 @@ public class MissingItemsWindow : Window, IDisposable
             ImGui.SetTooltip("Re-read the Glamour Dresser and Armoire, if the game currently has them loaded.");
 
         ImGui.SameLine();
+        var byRole = plugin.Configuration.Grouping == MissingGrouping.Role;
+        if (ImGui.Button(byRole ? "Grouped by role" : "Grouped by slot"))
+        {
+            plugin.Configuration.Grouping = byRole ? MissingGrouping.Slot : MissingGrouping.Role;
+            plugin.Configuration.Save();
+            plugin.InvalidateReport();
+        }
+
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Switch between equipment slots and who can roll Need, for claiming during a run.");
+
+        ImGui.SameLine();
         if (ImGui.Button("Settings"))
             plugin.ToggleConfigUi();
     }
@@ -194,38 +207,64 @@ public class MissingItemsWindow : Window, IDisposable
 
         if (report.HiddenByJobFilter > 0)
             ImGui.TextColored(Muted, $"{report.HiddenByJobFilter} hidden by the current-job filter.");
+
+        if (report.HiddenWeapons > 0)
+            ImGui.TextColored(Muted, $"{report.HiddenWeapons} weapons hidden.");
     }
 
     private void DrawItems(DutyReport report)
     {
-        var showOwned = plugin.Configuration.ShowOwnedItems;
+        var configuration = plugin.Configuration;
+        var showOwned = configuration.ShowOwnedItems;
+        var byRole = configuration.Grouping == MissingGrouping.Role;
 
         using var child = ImRaii.Child("itemList", Vector2.Zero, false);
         if (!child.Success)
             return;
 
-        var currentSlot = string.Empty;
-        var drewAnything = false;
+        // The report is already sorted by the active grouping, so GroupBy keeps that order.
+        var groups = report.Items
+            .Where(item => showOwned || !item.IsOwned)
+            .GroupBy(item => byRole ? item.RoleGroup : item.SlotName)
+            .ToList();
 
-        foreach (var item in report.Items)
+        if (groups.Count == 0)
         {
-            if (item.IsOwned && !showOwned)
-                continue;
+            if (report.TotalCount > 0)
+                ImGui.TextColored(Good, "Nothing missing here.");
 
-            if (item.SlotName != currentSlot)
-            {
-                currentSlot = item.SlotName;
-                ImGui.Spacing();
-                ImGui.TextColored(Muted, currentSlot);
-                ImGui.Separator();
-            }
-
-            DrawItemRow(item);
-            drewAnything = true;
+            return;
         }
 
-        if (!drewAnything && report.TotalCount > 0)
-            ImGui.TextColored(Good, "Nothing missing here.");
+        foreach (var group in groups)
+        {
+            var missing = group.Count(item => !item.IsOwned);
+            var label = missing > 0 ? $"{group.Key}  ({missing})" : group.Key;
+
+            // Restore the remembered state when the window appears, then let clicks win and write
+            // whatever the user settles on back to the config.
+            var collapsed = configuration.CollapsedGroups.Contains(group.Key);
+            ImGui.SetNextItemOpen(!collapsed, ImGuiCond.Appearing);
+
+            var open = ImGui.CollapsingHeader($"{label}###group{group.Key}");
+            if (open == collapsed)
+            {
+                if (open)
+                    configuration.CollapsedGroups.Remove(group.Key);
+                else
+                    configuration.CollapsedGroups.Add(group.Key);
+
+                configuration.Save();
+            }
+
+            if (!open)
+                continue;
+
+            foreach (var item in group)
+                DrawItemRow(item);
+
+            ImGui.Spacing();
+        }
     }
 
     private void DrawItemRow(ReportItem item)

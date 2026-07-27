@@ -40,9 +40,14 @@ public sealed class Plugin : IDalamudPlugin
     /// <summary>Outfit-set membership, needed anywhere ownership is judged.</summary>
     public OutfitCatalog Outfits => outfits;
 
+    /// <summary>Which store can hold a given piece.</summary>
+    public StorageEligibility Storage => storage;
+
     private readonly WindowSystem windowSystem = new("GlamourAssistant");
     private readonly OutfitCatalog outfits;
     private readonly ContentFinderIndex contentFinder;
+    private readonly JobRoleIndex jobRoles;
+    private readonly StorageEligibility storage;
     private readonly LootObserver lootObserver;
     private readonly MissingItemsWindow mainWindow;
     private readonly ConfigWindow configWindow;
@@ -67,15 +72,17 @@ public sealed class Plugin : IDalamudPlugin
 
         outfits = OutfitCatalog.Build();
         contentFinder = ContentFinderIndex.Build();
+        jobRoles = JobRoleIndex.Build();
+        storage = StorageEligibility.Build();
         Ownership = new OwnershipTracker(configDirectory, Configuration);
 
         LearnedLoot = new LearnedLootStore(configDirectory);
-        lootObserver = new LootObserver(Configuration, LearnedLoot, contentFinder);
+        lootObserver = new LootObserver(Configuration, LearnedLoot, contentFinder, storage);
         Wiki = new WikiLootSource(configDirectory, Configuration);
 
         // Reads the on-disk copy immediately and starts an update check in the background, so a
         // returning user has data before the first frame and a first-time user gets it shortly after.
-        LootData = new LootDataService(configDirectory, LearnedLoot, Wiki);
+        LootData = new LootDataService(configDirectory, LearnedLoot, Wiki, contentFinder, storage);
 
         mainWindow = new MissingItemsWindow(this);
         configWindow = new ConfigWindow(this);
@@ -151,12 +158,20 @@ public sealed class Plugin : IDalamudPlugin
 
     private void OnTerritoryChanged(uint territoryId)
     {
+        var leftSupportedDuty = contentFinder.IsSupportedDuty(currentTerritory) &&
+                                !contentFinder.IsSupportedDuty(territoryId);
+
         currentTerritory = territoryId;
         InvalidateReport();
 
+        // A pinned duty means the user is deliberately looking something up, so leave them to it.
+        if (leftSupportedDuty && Configuration.CloseWhenLeavingDuty && !pinnedTerritory.HasValue)
+            mainWindow.IsOpen = false;
+
         // Tied to the territory rather than a bare flag so that a duty entered while the dataset is
         // still downloading still pops the window once the data lands - and nothing else does.
-        autoOpenForTerritory = Configuration.AutoOpenOnDutyEnter && !pinnedTerritory.HasValue
+        autoOpenForTerritory = Configuration.AutoOpenOnDutyEnter && !pinnedTerritory.HasValue &&
+                               contentFinder.IsSupportedDuty(territoryId)
             ? territoryId
             : null;
     }
@@ -172,7 +187,7 @@ public sealed class Plugin : IDalamudPlugin
         {
             seenLootRevision = LootData.Revision;
             Duties = DutyCatalog.Build(LootData.Data, contentFinder);
-            reportBuilder = new DutyReportBuilder(LootData.Data, Duties, outfits);
+            reportBuilder = new DutyReportBuilder(LootData.Data, Duties, outfits, jobRoles, storage);
             reportDirty = true;
         }
 
@@ -214,7 +229,7 @@ public sealed class Plugin : IDalamudPlugin
         if (selected == 0 || selected == wikiRequestedFor)
             return;
 
-        if (!contentFinder.TryGet(selected, out var condition))
+        if (!contentFinder.IsSupportedDuty(selected) || !contentFinder.TryGet(selected, out var condition))
             return;
 
         wikiRequestedFor = selected;

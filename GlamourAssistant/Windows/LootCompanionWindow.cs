@@ -134,14 +134,13 @@ public sealed unsafe class LootCompanionWindow : Window, IDisposable
             if (itemId == 0 || !items.TryGetRow(itemId, out var item))
                 continue;
 
-            // Only gear can be in a glamour collection; the rest of the roll list is not our business.
-            if (item.EquipSlotCategory.RowId == 0 || !item.EquipSlotCategory.IsValid)
+            // Only what the chosen store can hold; the rest of the roll list is not our business.
+            var storage = plugin.Storage;
+            if (!storage.MatchesScope(storage.Of(item), plugin.Configuration.Scope))
                 continue;
 
-            if (item.EquipSlotCategory.Value.SoulCrystal != 0)
-                continue;
-
-            var source = MissingItems.Resolve(itemId, view, outfits.SetsContaining(itemId), mode);
+            var source = MissingItems.Resolve(
+                itemId, view, outfits.SetsContaining(itemId), mode, plugin.Configuration.Scope);
             var owned = source != OwnershipSource.None;
             if (!owned)
                 anyMissing = true;

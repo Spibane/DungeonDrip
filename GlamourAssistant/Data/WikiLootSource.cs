@@ -420,8 +420,9 @@ public sealed class WikiLootSource : IDisposable
     }
 
     /// <summary>
-    /// Pulls item names out of the page's drop tables and resolves them to ids, keeping only
-    /// glamour-able gear. Unresolvable names are counted, not guessed at.
+    /// Pulls item names out of the page's drop tables and resolves them to ids. Storability is left
+    /// to the merge step, which runs on the framework thread - nothing here may touch Lumina.
+    /// Unresolvable names are counted, not guessed at.
     /// </summary>
     private static (uint[] Items, int Unmatched) ExtractItems(
         string wikitext, IReadOnlyDictionary<string, uint> names)
@@ -429,8 +430,6 @@ public sealed class WikiLootSource : IDisposable
         var resolved = new HashSet<uint>();
         var unmatched = 0;
         var seen = 0;
-
-        var items = Plugin.DataManager.GetExcelSheet<Lumina.Excel.Sheets.Item>();
 
         foreach (Match match in DropRowPattern.Matches(wikitext))
         {
@@ -446,15 +445,6 @@ public sealed class WikiLootSource : IDisposable
                 unmatched++;
                 continue;
             }
-
-            if (!items.TryGetRow(itemId, out var item))
-                continue;
-
-            if (item.EquipSlotCategory.RowId == 0 || !item.EquipSlotCategory.IsValid)
-                continue;
-
-            if (item.EquipSlotCategory.Value.SoulCrystal != 0)
-                continue;
 
             resolved.Add(itemId);
         }

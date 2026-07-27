@@ -23,12 +23,18 @@ public sealed class LootObserver : IDisposable
     private readonly Configuration configuration;
     private readonly LearnedLootStore store;
     private readonly ContentFinderIndex duties;
+    private readonly StorageEligibility storage;
 
-    public LootObserver(Configuration configuration, LearnedLootStore store, ContentFinderIndex duties)
+    public LootObserver(
+        Configuration configuration,
+        LearnedLootStore store,
+        ContentFinderIndex duties,
+        StorageEligibility storage)
     {
         this.configuration = configuration;
         this.store = store;
         this.duties = duties;
+        this.storage = storage;
 
         Plugin.ChatGui.ChatMessage += OnChatMessage;
     }
@@ -45,7 +51,7 @@ public sealed class LootObserver : IDisposable
             return;
 
         var territoryId = Plugin.ClientState.TerritoryType;
-        if (territoryId == 0 || !duties.IsDuty(territoryId))
+        if (territoryId == 0 || !duties.IsSupportedDuty(territoryId))
             return;
 
         var items = Plugin.DataManager.GetExcelSheet<Item>();
@@ -54,7 +60,7 @@ public sealed class LootObserver : IDisposable
         {
             var itemId = ItemId.Normalize(payload.ItemId);
 
-            if (!IsGlamourableGear(items, itemId))
+            if (!storage.CanBeStored(itemId))
                 continue;
 
             if (store.Add(territoryId, itemId))
@@ -65,15 +71,4 @@ public sealed class LootObserver : IDisposable
         }
     }
 
-    /// <summary>Same test the bundled dataset is filtered by, so learned entries stay consistent.</summary>
-    private static bool IsGlamourableGear(Lumina.Excel.ExcelSheet<Item> items, uint itemId)
-    {
-        if (!items.TryGetRow(itemId, out var item))
-            return false;
-
-        if (item.EquipSlotCategory.RowId == 0 || !item.EquipSlotCategory.IsValid)
-            return false;
-
-        return item.EquipSlotCategory.Value.SoulCrystal == 0;
-    }
 }
