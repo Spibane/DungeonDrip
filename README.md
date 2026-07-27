@@ -4,7 +4,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-0.9.0-black)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.9.1-black)](./CHANGELOG.md)
 [![Status](https://img.shields.io/badge/status-Alpha-orange)](./CHANGELOG.md)
 [![Changelog](https://img.shields.io/badge/changelog-blue)](./CHANGELOG.md)
 
@@ -147,8 +147,8 @@ this splits exactly where the game splits. A new job lands in the right heading 
 needed no code. Base classes are dropped from the labels via `JobIndex`, so it reads "DRG RPR"
 rather than "LNC DRG RPR".
 
-Pieces that span roles say so: "of Aiming" accessories show as *Melee DPS / Physical Ranged*,
-because NIN and VPR really can roll on them alongside BRD, MCH and DNC.
+Pieces that span roles say so, primary owner first: "of Aiming" accessories show as *Physical Ranged
+/ Melee DPS*, because they are a ranged gear line that NIN and VPR happen to share.
 
 ### What counts as owned, and what can be kept at all
 
