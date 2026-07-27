@@ -17,8 +17,7 @@ public sealed record ReportItem(
     string SlotName,
     OwnershipSource Source,
     LootProvenance Provenance,
-    int RoleOrder,
-    string RoleGroup)
+    IReadOnlyList<RoleGroup> RoleGroups)
 {
     public bool IsOwned => Source != OwnershipSource.None;
 }
@@ -80,7 +79,7 @@ public sealed class DutyReportBuilder(
                 itemId, ownership, outfits.SetsContaining(itemId), configuration.OutfitOwnership,
                 configuration.Scope);
 
-            var (roleOrder, roleGroup) = jobRoles.GroupFor(item.ClassJobCategory.RowId);
+            var roleGroups = jobRoles.GroupsFor(item.ClassJobCategory.RowId);
 
             results.Add(new ReportItem(
                 itemId,
@@ -91,24 +90,15 @@ public sealed class DutyReportBuilder(
                 slotName,
                 source,
                 loot.ProvenanceOf(territoryId, itemId),
-                roleOrder,
-                roleGroup));
+                roleGroups));
         }
 
-        // Grouping drives the primary sort so the window can just walk the list in order.
-        var byRole = configuration.Grouping == MissingGrouping.Role;
+        // One entry per piece, always slot-sorted. The window buckets into headings, because with
+        // shared gear a piece can belong to more than one role heading and a flat sort cannot say so.
         results.Sort((a, b) =>
         {
-            if (byRole)
-            {
-                var byRoleOrder = a.RoleOrder.CompareTo(b.RoleOrder);
-                if (byRoleOrder != 0) return byRoleOrder;
-            }
-
             var bySlot = a.SlotOrder.CompareTo(b.SlotOrder);
-            if (bySlot != 0) return bySlot;
-
-            return string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase);
+            return bySlot != 0 ? bySlot : string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase);
         });
 
         return new DutyReport(

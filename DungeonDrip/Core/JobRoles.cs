@@ -6,6 +6,9 @@ using Lumina.Excel.Sheets;
 
 namespace DungeonDrip.Core;
 
+/// <summary>A heading in the role-grouped list, and where it sorts.</summary>
+public readonly record struct RoleGroup(int Order, string Label);
+
 public enum LootRole
 {
     Tank,
@@ -46,15 +49,16 @@ public sealed class JobRoleIndex
     private const int AnyRoleOrder = 9000;
     private const int UnknownOrder = 9900;
 
-    private static readonly (int Order, string Label) Unknown = (UnknownOrder, "Anyone");
+    private static readonly RoleGroup Unknown = new(UnknownOrder, "Anyone");
+    private static readonly IReadOnlyList<RoleGroup> UnknownOnly = [Unknown];
 
     /// <summary>
-    /// Order roles appear in within a shared heading, primary owner first.
+    /// Order a shared piece's headings are listed in, primary owner first.
     /// </summary>
     /// <remarks>
-    /// Melee comes last because the case that actually occurs is "of Aiming": a ranged gear line
-    /// that NIN and VPR happen to share, so it should read Physical Ranged / Melee DPS rather than
-    /// implying the pieces are melee gear.
+    /// Melee last because the case that occurs is "of Aiming": a ranged line NIN and VPR also roll
+    /// on. Headings are sorted globally before drawing, so this only fixes the order within one
+    /// piece's own list - kept so that list is deterministic rather than hash-ordered.
     /// </remarks>
     private static readonly LootRole[] SharedLabelOrder =
     [
@@ -65,14 +69,17 @@ public sealed class JobRoleIndex
         LootRole.Melee,
     ];
 
-    private readonly Dictionary<uint, (int Order, string Label)> groupByCategory;
+    private readonly Dictionary<uint, IReadOnlyList<RoleGroup>> groupByCategory;
 
-    private JobRoleIndex(Dictionary<uint, (int Order, string Label)> groupByCategory) =>
+    private JobRoleIndex(Dictionary<uint, IReadOnlyList<RoleGroup>> groupByCategory) =>
         this.groupByCategory = groupByCategory;
 
-    /// <summary>The heading a piece belongs under, and where that heading sorts.</summary>
-    public (int Order, string Label) GroupFor(uint classJobCategoryRow) =>
-        groupByCategory.TryGetValue(classJobCategoryRow, out var group) ? group : Unknown;
+    /// <summary>
+    /// The headings a piece belongs under. Usually one, but gear shared across roles lands in each
+    /// role's heading rather than a combined one of its own.
+    /// </summary>
+    public IReadOnlyList<RoleGroup> GroupsFor(uint classJobCategoryRow) =>
+        groupByCategory.TryGetValue(classJobCategoryRow, out var groups) ? groups : UnknownOnly;
 
     private readonly record struct JobEntry(string Abbreviation, LootRole Role, bool IsFullJob);
 
@@ -134,7 +141,7 @@ public sealed class JobRoleIndex
             .Select((set, index) => (set, index))
             .ToDictionary(x => x.set, x => MeleeOrderBase + x.index);
 
-        var groups = new Dictionary<uint, (int, string)>();
+        var groups = new Dictionary<uint, IReadOnlyList<RoleGroup>>();
         foreach (var (categoryRow, present) in members)
             groups[categoryRow] = Classify(present, meleeOrder);
 
@@ -157,35 +164,50 @@ public sealed class JobRoleIndex
         return string.Join(' ', named);
     }
 
-    private static (int Order, string Label) Classify(
+    /// <summary>
+    /// Splits a category into the headings it belongs under, one per role present.
+    /// </summary>
+    /// <remarks>
+    /// Gear shared between roles used to get a combined heading of its own, which left it in
+    /// neither pile: "of Aiming" accessories are ranged gear that NIN and VPR also roll on, so a
+    /// scouting player scanning their own heading never saw them. Each role now gets its own copy of
+    /// the entry, and the melee side resolves to the gear-type heading for exactly those melee jobs -
+    /// Aiming's melee members are ROG NIN VPR, which is the Scouting heading already on screen.
+    /// </remarks>
+    private static IReadOnlyList<RoleGroup> Classify(
         List<JobEntry> present, IReadOnlyDictionary<string, int> meleeOrder)
     {
         var roles = present.Select(job => job.Role).ToHashSet();
 
         if (roles.Count == 0)
-            return Unknown;
+            return UnknownOnly;
 
-        if (roles.Count > 1)
-        {
-            return roles.Count == Enum.GetValues<LootRole>().Length
-                ? (AnyRoleOrder, "Any role")
-                : (MixedOrder, string.Join(" / ", roles.OrderBy(r => Array.IndexOf(SharedLabelOrder, r)).Select(NameOf)));
-        }
+        if (roles.Count == Enum.GetValues<LootRole>().Length)
+            return [new RoleGroup(AnyRoleOrder, "Any role")];
 
-        var role = roles.First();
-        if (role != LootRole.Melee)
+        var groups = new List<RoleGroup>();
+        foreach (var role in roles.OrderBy(r => Array.IndexOf(SharedLabelOrder, r)))
         {
-            return role switch
+            if (role != LootRole.Melee)
             {
-                LootRole.Tank => (TankOrder, "Tank"),
-                LootRole.Healer => (HealerOrder, "Healer"),
-                LootRole.PhysicalRanged => (PhysicalRangedOrder, "Physical Ranged"),
-                _ => (MagicalRangedOrder, "Magical Ranged"),
-            };
+                groups.Add(role switch
+                {
+                    LootRole.Tank => new RoleGroup(TankOrder, "Tank"),
+                    LootRole.Healer => new RoleGroup(HealerOrder, "Healer"),
+                    LootRole.PhysicalRanged => new RoleGroup(PhysicalRangedOrder, "Physical Ranged"),
+                    _ => new RoleGroup(MagicalRangedOrder, "Magical Ranged"),
+                });
+
+                continue;
+            }
+
+            var set = LabelJobs(present.Where(job => job.Role == LootRole.Melee).ToList());
+            groups.Add(new RoleGroup(
+                meleeOrder.TryGetValue(set, out var order) ? order : MeleeOrderBase,
+                $"Melee DPS ({set})"));
         }
 
-        var set = LabelJobs(present);
-        return (meleeOrder.TryGetValue(set, out var order) ? order : MeleeOrderBase, $"Melee DPS ({set})");
+        return groups;
     }
 
     public static string NameOf(LootRole role) => role switch

@@ -1,5 +1,9 @@
 # Changelog
 
+### v0.9.2 - 2026-07-27
+- Changed gear shared between roles to appear under each role that can roll on it instead of a combined heading of its own. "of Aiming" accessories now sit under both Physical Ranged and Melee DPS (NIN VPR), so a scouting player sees them in their own pile; this replaces the combined "Physical Ranged / Melee DPS" heading added in 0.9.1
+- Changed the "most missing" callout to count shared pieces under each applicable role, noting on hover that it does so
+
 ### v0.9.1 - 2026-07-27
 - Changed shared role headings to name the primary owner first, so "of Aiming" reads as "Physical Ranged / Melee DPS" rather than implying the pieces are melee gear
 
