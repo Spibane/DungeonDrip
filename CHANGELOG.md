@@ -1,5 +1,9 @@
 # Changelog
 
+### v0.9.5 - 2026-07-28
+- Added the GNU AGPL v3.0-or-later licence, with the SPDX expression and copyright recorded in the project file
+- Added AI-DECLARATION.md (spec 0.1.2) declaring how much of this codebase was AI-authored, what the human decided and tested, and the caveats that follow
+
 ### v0.9.4 - 2026-07-28
 - Fixed downloads being read without a size limit. Content-Length is advisory and a chunked response can stream indefinitely, so every response now goes through a hard byte ceiling enforced while reading, not just on the declared length
 - Fixed cache writes being able to truncate a good file if the game died mid-write; they now go to a temporary file and are moved into place
