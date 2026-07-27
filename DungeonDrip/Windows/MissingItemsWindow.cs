@@ -156,17 +156,11 @@ public class MissingItemsWindow : Window, IDisposable
             return;
         }
 
+        var age = Format.Age(tracker.DresserUpdatedUtc!.Value);
         if (tracker.IsDresserStale)
-        {
-            var age = DateTime.UtcNow - tracker.DresserUpdatedUtc!.Value;
-            ImGui.TextColored(Warning,
-                $"Glamour Dresser snapshot is {Describe(age)} old - open your dresser to refresh it.");
-        }
+            ImGui.TextColored(Warning, $"Glamour Dresser snapshot is {age} old - open your dresser to refresh it.");
         else
-        {
-            var age = DateTime.UtcNow - tracker.DresserUpdatedUtc!.Value;
-            ImGui.TextColored(Muted, $"Dresser: {tracker.DresserSlotsUsed} slots, read {Describe(age)} ago.");
-        }
+            ImGui.TextColored(Muted, $"Dresser: {tracker.DresserSlotsUsed} slots, read {age} ago.");
 
         if (tracker.ArmoireUpdatedUtc == null)
         {
@@ -492,11 +486,4 @@ public class MissingItemsWindow : Window, IDisposable
         _ => "Listed by the downloaded dataset.",
     };
 
-    private static string Describe(TimeSpan age) => age switch
-    {
-        { TotalMinutes: < 1 } => "less than a minute",
-        { TotalHours: < 1 } => $"{(int)age.TotalMinutes} minute(s)",
-        { TotalDays: < 1 } => $"{(int)age.TotalHours} hour(s)",
-        _ => $"{(int)age.TotalDays} day(s)",
-    };
 }

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Dalamud.Utility;
 using FFXIVClientStructs.FFXIV.Client.Game;
 
 namespace DungeonDrip.Game;
@@ -47,7 +48,9 @@ public static unsafe class InventoryReader
                 if (item == null || item->ItemId == 0)
                     continue;
 
-                held.Add(ItemId.Normalize(item->ItemId));
+                var (itemId, kind) = ItemUtil.GetBaseId(item->ItemId);
+                if (kind != ItemKind.EventItem)
+                    held.Add(itemId);
             }
         }
 

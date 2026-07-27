@@ -229,13 +229,4 @@ public sealed class JobRoleIndex
         return groups;
     }
 
-    public static string NameOf(LootRole role) => role switch
-    {
-        LootRole.Tank => "Tank",
-        LootRole.Healer => "Healer",
-        LootRole.Melee => "Melee DPS",
-        LootRole.PhysicalRanged => "Physical Ranged",
-        LootRole.MagicalRanged => "Magical Ranged",
-        _ => "Unknown",
-    };
 }

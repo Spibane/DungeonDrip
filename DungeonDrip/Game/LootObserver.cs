@@ -3,6 +3,7 @@ using System.Linq;
 using Dalamud.Game.Chat;
 using Dalamud.Game.Text;
 using Dalamud.Game.Text.SeStringHandling.Payloads;
+using Dalamud.Utility;
 using DungeonDrip.Core;
 using DungeonDrip.Data;
 using Lumina.Excel.Sheets;
@@ -58,8 +59,11 @@ public sealed class LootObserver : IDisposable
 
         foreach (var payload in message.Message.Payloads.OfType<ItemPayload>())
         {
-            var itemId = ItemId.Normalize(payload.ItemId);
+            // ItemPayload.ItemId is already the base id; only the kind still needs excluding.
+            if (payload.Kind == ItemKind.EventItem)
+                continue;
 
+            var itemId = payload.ItemId;
             if (!storage.CanBeStored(itemId))
                 continue;
 

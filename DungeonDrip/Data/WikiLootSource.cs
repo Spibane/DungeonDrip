@@ -2,8 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Net;
-using System.Net.Http;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -56,6 +54,8 @@ public sealed class WikiLootSource : IDisposable
     /// <summary>Politeness floor between requests to a community-run wiki.</summary>
     private static readonly TimeSpan MinRequestInterval = TimeSpan.FromSeconds(2);
 
+    private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(20);
+
     private const int MaxResponseBytes = 4 * 1024 * 1024;
     private const int MaxNamesPerPage = 2000;
 
@@ -65,7 +65,7 @@ public sealed class WikiLootSource : IDisposable
 
     private readonly string path;
     private readonly Configuration configuration;
-    private readonly HttpClient http;
+    private readonly HttpFetcher http;
     private readonly CancellationTokenSource cancellation = new();
     private readonly object sync = new();
 
@@ -75,20 +75,11 @@ public sealed class WikiLootSource : IDisposable
     private Task? inFlight;
     private DateTime nextRequestAllowed = DateTime.MinValue;
 
-    public WikiLootSource(string configDirectory, Configuration configuration)
+    public WikiLootSource(string configDirectory, Configuration configuration, HttpFetcher http)
     {
         path = Path.Combine(configDirectory, CacheFileName);
         this.configuration = configuration;
-
-        http = new HttpClient(new HttpClientHandler { AutomaticDecompression = DecompressionMethods.All })
-        {
-            Timeout = TimeSpan.FromSeconds(20),
-        };
-
-        // Version read from the assembly so this identifier cannot drift out of date.
-        var version = typeof(WikiLootSource).Assembly.GetName().Version?.ToString(3) ?? "0";
-        http.DefaultRequestHeaders.UserAgent.ParseAdd(
-            $"DungeonDrip/{version} (Dalamud plugin; https://github.com/Spibane/DungeonDrip)");
+        this.http = http;
 
         Load();
     }
@@ -172,12 +163,8 @@ public sealed class WikiLootSource : IDisposable
         Save();
     }
 
-    public void Dispose()
-    {
-        cancellation.Cancel();
-        cancellation.Dispose();
-        http.Dispose();
-    }
+    /// <remarks>See <see cref="LootDataService.Dispose"/> - cancelled, not disposed.</remarks>
+    public void Dispose() => cancellation.Cancel();
 
     private bool NeedsLookup(uint territoryId)
     {
@@ -408,18 +395,8 @@ public sealed class WikiLootSource : IDisposable
         return (resolved, text);
     }
 
-    private async Task<string?> GetJsonAsync(string queryString, CancellationToken token)
-    {
-        using var response = await http.GetAsync(ApiUrl + queryString, token);
-        if (!response.IsSuccessStatusCode)
-            return null;
-
-        // The wiki is third-party; refuse anything absurd rather than buffering it.
-        if (response.Content.Headers.ContentLength > MaxResponseBytes)
-            throw new InvalidOperationException($"response too large ({response.Content.Headers.ContentLength} bytes)");
-
-        return await response.Content.ReadAsStringAsync(token);
-    }
+    private async Task<string?> GetJsonAsync(string queryString, CancellationToken token) =>
+        (await http.GetAsync(ApiUrl + queryString, null, RequestTimeout, MaxResponseBytes, token)).Body;
 
     /// <summary>
     /// Pulls item names out of the page's drop tables and resolves them to ids. Storability is left
@@ -456,39 +433,19 @@ public sealed class WikiLootSource : IDisposable
 
     private void Load()
     {
-        if (!File.Exists(path))
+        var raw = JsonStore.Read<Dictionary<string, WikiEntry>>(path);
+        if (raw == null)
             return;
 
-        try
+        foreach (var (key, entry) in raw)
         {
-            var raw = JsonSerializer.Deserialize<Dictionary<string, WikiEntry>>(File.ReadAllText(path));
-            if (raw == null)
-                return;
-
-            foreach (var (key, entry) in raw)
-            {
-                if (uint.TryParse(key, out var territoryId))
-                    byTerritory[territoryId] = entry;
-            }
-
-            Plugin.Log.Information($"Loaded wiki loot cache: {DutiesWithData} duties, {TotalItems} items");
+            if (uint.TryParse(key, out var territoryId))
+                byTerritory[territoryId] = entry;
         }
-        catch (Exception ex)
-        {
-            Plugin.Log.Error(ex, $"Could not read {path}; wiki data will be re-fetched");
-        }
+
+        Plugin.Log.Information($"Loaded wiki loot cache: {DutiesWithData} duties, {TotalItems} items");
     }
 
-    private void Save()
-    {
-        try
-        {
-            var raw = byTerritory.ToDictionary(kv => kv.Key.ToString(), kv => kv.Value);
-            File.WriteAllText(path, JsonSerializer.Serialize(raw, new JsonSerializerOptions { WriteIndented = true }));
-        }
-        catch (Exception ex)
-        {
-            Plugin.Log.Error(ex, $"Could not write {path}");
-        }
-    }
+    private void Save() =>
+        JsonStore.Write(path, byTerritory.ToDictionary(kv => kv.Key.ToString(), kv => kv.Value), indented: true);
 }

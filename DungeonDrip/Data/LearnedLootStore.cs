@@ -1,8 +1,6 @@
-using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text.Json;
 
 namespace DungeonDrip.Data;
 
@@ -17,7 +15,7 @@ namespace DungeonDrip.Data;
 /// </remarks>
 public sealed class LearnedLootStore
 {
-    public const string FileName = "learned-loot.json";
+    private const string FileName = "learned-loot.json";
 
     private readonly string path;
     private readonly Dictionary<uint, HashSet<uint>> byTerritory = [];
@@ -63,42 +61,23 @@ public sealed class LearnedLootStore
 
     private void Load()
     {
-        if (!File.Exists(path))
+        var raw = JsonStore.Read<Dictionary<string, uint[]>>(path);
+        if (raw == null)
             return;
 
-        try
+        foreach (var (key, items) in raw)
         {
-            var raw = JsonSerializer.Deserialize<Dictionary<string, uint[]>>(File.ReadAllText(path));
-            if (raw == null)
-                return;
-
-            foreach (var (key, items) in raw)
-            {
-                if (uint.TryParse(key, out var territoryId))
-                    byTerritory[territoryId] = [.. items];
-            }
-
-            Plugin.Log.Information($"Loaded {ItemCount} learned drops across {TerritoryCount} duties");
+            if (uint.TryParse(key, out var territoryId))
+                byTerritory[territoryId] = [.. items];
         }
-        catch (Exception ex)
-        {
-            Plugin.Log.Error(ex, $"Could not read {path}; starting with no learned drops");
-        }
+
+        Plugin.Log.Information($"Loaded {ItemCount} learned drops across {TerritoryCount} duties");
     }
 
-    private void Save()
-    {
-        try
-        {
-            var raw = byTerritory
-                .Where(kv => kv.Value.Count > 0)
-                .ToDictionary(kv => kv.Key.ToString(), kv => kv.Value.Order().ToArray());
-
-            File.WriteAllText(path, JsonSerializer.Serialize(raw, new JsonSerializerOptions { WriteIndented = true }));
-        }
-        catch (Exception ex)
-        {
-            Plugin.Log.Error(ex, $"Could not write {path}");
-        }
-    }
+    private void Save() =>
+        JsonStore.Write(
+            path,
+            byTerritory.Where(kv => kv.Value.Count > 0)
+                       .ToDictionary(kv => kv.Key.ToString(), kv => kv.Value.Order().ToArray()),
+            indented: true);
 }

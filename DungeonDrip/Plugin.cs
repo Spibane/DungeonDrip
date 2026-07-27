@@ -54,6 +54,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly JobRoleIndex jobRoles;
     private readonly StorageEligibility storage;
     private readonly LootObserver lootObserver;
+    private readonly HttpFetcher http = new();
     private readonly CommandRegistration commands;
 
     private readonly MissingItemsWindow mainWindow;
@@ -88,11 +89,11 @@ public sealed class Plugin : IDalamudPlugin
 
         LearnedLoot = new LearnedLootStore(configDirectory);
         lootObserver = new LootObserver(Configuration, LearnedLoot, contentFinder, storage);
-        Wiki = new WikiLootSource(configDirectory, Configuration);
+        Wiki = new WikiLootSource(configDirectory, Configuration, http);
 
         // Reads the on-disk copy immediately and starts an update check in the background, so a
         // returning user has data before the first frame and a first-time user gets it shortly after.
-        LootData = new LootDataService(configDirectory, LearnedLoot, Wiki, contentFinder, storage);
+        LootData = new LootDataService(configDirectory, LearnedLoot, Wiki, contentFinder, storage, http);
 
         mainWindow = new MissingItemsWindow(this);
         configWindow = new ConfigWindow(this);
@@ -127,6 +128,7 @@ public sealed class Plugin : IDalamudPlugin
         lootObserver.Dispose();
         LootData.Dispose();
         Wiki.Dispose();
+        http.Dispose();
 
         commands.Dispose();
     }

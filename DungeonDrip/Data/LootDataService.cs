@@ -2,24 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Net;
-using System.Net.Http;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace DungeonDrip.Data;
-
-public enum LootDataState
-{
-    /// <summary>Nothing usable yet - first run, or the very first download failed.</summary>
-    NoData,
-
-    /// <summary>Talking to the source right now. Cached data may still be usable meanwhile.</summary>
-    Checking,
-
-    Ready,
-}
 
 /// <summary>
 /// Owns the dungeon loot dataset: fetches it from upstream on every plugin load, revalidates it
@@ -40,12 +27,17 @@ public sealed class LootDataService : IDisposable
     private const string InstancesUrl = $"{SourceBase}/instances.json";
     private const string CacheFileName = "dungeon-loot-cache.json";
 
+    /// <summary>instances.json is around 1.4 MB today; the ceiling is slack, not a target.</summary>
+    private const int MaxResponseBytes = 16 * 1024 * 1024;
+
+    private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(60);
+
     private readonly string configDirectory;
     private readonly LearnedLootStore learned;
     private readonly WikiLootSource wiki;
     private readonly Core.ContentFinderIndex duties;
     private readonly Core.StorageEligibility storage;
-    private readonly HttpClient http;
+    private readonly HttpFetcher http;
     private readonly CancellationTokenSource cancellation = new();
     private readonly object sync = new();
 
@@ -60,23 +52,15 @@ public sealed class LootDataService : IDisposable
         LearnedLootStore learned,
         WikiLootSource wiki,
         Core.ContentFinderIndex duties,
-        Core.StorageEligibility storage)
+        Core.StorageEligibility storage,
+        HttpFetcher http)
     {
         this.configDirectory = configDirectory;
         this.learned = learned;
         this.wiki = wiki;
         this.duties = duties;
         this.storage = storage;
-
-        http = new HttpClient(new HttpClientHandler
-        {
-            AutomaticDecompression = DecompressionMethods.All,
-        })
-        {
-            Timeout = TimeSpan.FromSeconds(60),
-        };
-
-        http.DefaultRequestHeaders.UserAgent.ParseAdd("DungeonDrip (Dalamud plugin)");
+        this.http = http;
 
         LoadCacheFromDisk();
         CheckForUpdates();
@@ -85,15 +69,11 @@ public sealed class LootDataService : IDisposable
     /// <summary>The resolved dataset. Null until the first successful load finishes.</summary>
     public DungeonLootData? Data { get; private set; }
 
-    public LootDataState State { get; private set; } = LootDataState.NoData;
-
     /// <summary>Human-readable one-liner for the UI.</summary>
     public string StatusMessage { get; private set; } = "Loot data has not been loaded yet.";
 
     /// <summary>Bumped whenever <see cref="Data"/> is replaced, so callers can rebuild derived state.</summary>
     public int Revision { get; private set; }
-
-    public DateTime? LastCheckedUtc { get; private set; }
 
     /// <summary>Kicks off an update check unless one is already running.</summary>
     public void CheckForUpdates(bool force = false)
@@ -135,7 +115,6 @@ public sealed class LootDataService : IDisposable
         try
         {
             Data = DungeonLootData.Build(incoming, configDirectory, learned, wiki, duties, storage);
-            State = LootDataState.Ready;
             Revision++;
 
             Plugin.Log.Information(
@@ -145,71 +124,53 @@ public sealed class LootDataService : IDisposable
         {
             Plugin.Log.Error(ex, "Could not build the loot dataset");
             StatusMessage = $"Loot data could not be processed: {ex.Message}";
-            State = Data == null ? LootDataState.NoData : LootDataState.Ready;
         }
     }
 
-    public void Dispose()
-    {
-        cancellation.Cancel();
-        cancellation.Dispose();
-        http.Dispose();
-    }
+    /// <remarks>
+    /// The token source is cancelled but not disposed: a request may still be unwinding on it, and
+    /// disposing underneath that throws. It holds no timer or wait handle, so there is nothing to
+    /// release. The client is owned by the plugin, not by this.
+    /// </remarks>
+    public void Dispose() => cancellation.Cancel();
 
     private string CachePath => Path.Combine(configDirectory, CacheFileName);
 
     private void LoadCacheFromDisk()
     {
-        if (!File.Exists(CachePath))
+        var loaded = JsonStore.Read<LootCacheFile>(CachePath);
+        if (loaded == null || loaded.Instances.Count == 0)
             return;
 
-        try
-        {
-            var loaded = JsonSerializer.Deserialize<LootCacheFile>(File.ReadAllText(CachePath));
-            if (loaded == null || loaded.Instances.Count == 0)
-                return;
+        cache = loaded;
+        lock (sync)
+            pending = loaded;
 
-            cache = loaded;
-            lock (sync)
-                pending = loaded;
-
-            StatusMessage = $"Using loot data downloaded {Describe(loaded.FetchedUtc)}.";
-            Plugin.Log.Information($"Loaded cached loot data ({loaded.Instances.Count} duties)");
-        }
-        catch (Exception ex)
-        {
-            Plugin.Log.Error(ex, $"Could not read {CachePath}; will download a fresh copy");
-        }
+        StatusMessage = $"Using loot data downloaded {Core.Format.Age(loaded.FetchedUtc)} ago.";
+        Plugin.Log.Information($"Loaded cached loot data ({loaded.Instances.Count} duties)");
     }
 
     private async Task CheckForUpdatesAsync(bool force, CancellationToken token)
     {
-        State = cache == null ? LootDataState.NoData : State;
         StatusMessage = cache == null
             ? "Downloading loot data..."
             : "Checking for loot data updates...";
 
-        var previousState = State;
-        State = LootDataState.Checking;
-
         try
         {
             var existing = cache;
-            var sources = await FetchAsync(SourcesUrl, force ? null : existing?.SourcesETag, token);
-            var instances = await FetchAsync(InstancesUrl, force ? null : existing?.InstancesETag, token);
+            var sources = await Fetch(SourcesUrl, force ? null : existing?.SourcesETag, token);
+            var instances = await Fetch(InstancesUrl, force ? null : existing?.InstancesETag, token);
 
-            LastCheckedUtc = DateTime.UtcNow;
-
-            if (!sources.Changed && !instances.Changed && existing != null)
+            if (sources.NotModified && instances.NotModified && existing != null)
             {
-                State = previousState;
-                StatusMessage = $"Loot data is up to date (downloaded {Describe(existing.FetchedUtc)}).";
+                StatusMessage = $"Loot data is up to date (downloaded {Core.Format.Age(existing.FetchedUtc)} ago).";
                 return;
             }
 
             // Only one of the two changed: we still need the other's body to rebuild the join.
-            var sourcesJson = sources.Content ?? (await FetchAsync(SourcesUrl, null, token)).Content;
-            var instancesJson = instances.Content ?? (await FetchAsync(InstancesUrl, null, token)).Content;
+            var sourcesJson = sources.Body ?? (await Fetch(SourcesUrl, null, token)).Body;
+            var instancesJson = instances.Body ?? (await Fetch(InstancesUrl, null, token)).Body;
 
             if (sourcesJson == null || instancesJson == null)
                 throw new InvalidOperationException("upstream returned no body");
@@ -226,7 +187,7 @@ public sealed class LootDataService : IDisposable
                 throw new InvalidOperationException("upstream data produced no duties");
 
             cache = built;
-            SaveCacheToDisk(built);
+            JsonStore.Write(CachePath, built);
 
             lock (sync)
                 pending = built;
@@ -240,29 +201,14 @@ public sealed class LootDataService : IDisposable
         catch (Exception ex)
         {
             Plugin.Log.Warning(ex, "Loot data update failed");
-            State = cache == null ? LootDataState.NoData : previousState;
             StatusMessage = cache == null
                 ? $"Could not download loot data: {ex.Message}"
-                : $"Update failed ({ex.Message}); using data downloaded {Describe(cache.FetchedUtc)}.";
+                : $"Update failed ({ex.Message}); using data downloaded {Core.Format.Age(cache.FetchedUtc)} ago.";
         }
     }
 
-    private async Task<(bool Changed, string? Content, string? ETag)> FetchAsync(
-        string url, string? etag, CancellationToken token)
-    {
-        using var request = new HttpRequestMessage(HttpMethod.Get, url);
-        if (!string.IsNullOrEmpty(etag))
-            request.Headers.TryAddWithoutValidation("If-None-Match", etag);
-
-        using var response = await http.SendAsync(request, token);
-
-        if (response.StatusCode == HttpStatusCode.NotModified)
-            return (false, null, etag);
-
-        response.EnsureSuccessStatusCode();
-        var body = await response.Content.ReadAsStringAsync(token);
-        return (true, body, response.Headers.ETag?.Tag);
-    }
+    private Task<HttpFetcher.Response> Fetch(string url, string? etag, CancellationToken token) =>
+        http.GetAsync(url, etag, RequestTimeout, MaxResponseBytes, token);
 
     /// <summary>
     /// Inverts item -> instances into instance -> items and attaches each instance's map id.
@@ -325,29 +271,4 @@ public sealed class LootDataService : IDisposable
         return result;
     }
 
-    private void SaveCacheToDisk(LootCacheFile file)
-    {
-        try
-        {
-            Directory.CreateDirectory(configDirectory);
-            File.WriteAllText(CachePath, JsonSerializer.Serialize(file));
-        }
-        catch (Exception ex)
-        {
-            Plugin.Log.Error(ex, $"Could not write {CachePath}");
-        }
-    }
-
-    private static string Describe(DateTime utc)
-    {
-        var age = DateTime.UtcNow - utc;
-        return age switch
-        {
-            { TotalMinutes: < 2 } => "just now",
-            { TotalHours: < 1 } => $"{(int)age.TotalMinutes} minutes ago",
-            { TotalDays: < 1 } => $"{(int)age.TotalHours} hours ago",
-            { TotalDays: < 2 } => "yesterday",
-            _ => $"{(int)age.TotalDays} days ago",
-        };
-    }
 }

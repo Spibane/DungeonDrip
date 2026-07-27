@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text.Json;
 
 namespace DungeonDrip.Game;
 
@@ -135,16 +134,11 @@ public sealed class OwnershipTracker
         DresserSlotsUsed = 0;
         Revision++;
 
-        if (!File.Exists(CachePath))
+        var dto = Data.JsonStore.Read<CacheFile>(CachePath);
+        if (dto == null)
             return;
 
-        try
-        {
-            var dto = JsonSerializer.Deserialize<CacheFile>(File.ReadAllText(CachePath));
-            if (dto == null)
-                return;
-
-            dresser = new DresserSnapshot
+        dresser = new DresserSnapshot
             {
                 DirectItems = [.. dto.DresserDirect],
                 ItemsInStoredOutfits = dto.DresserOutfits.ToDictionary(kv => kv.Key, kv => new HashSet<uint>(kv.Value)),
@@ -155,47 +149,35 @@ public sealed class OwnershipTracker
                     : [.. dto.DresserOutfits.Values.SelectMany(v => v)],
                 SlotsUsed = dto.DresserSlotsUsed,
             };
-            armoire = dto.ArmoireUpdatedUtc.HasValue ? [.. dto.Armoire] : null;
-            DresserSlotsUsed = dto.DresserSlotsUsed;
-            DresserUpdatedUtc = dto.DresserUpdatedUtc;
-            ArmoireUpdatedUtc = dto.ArmoireUpdatedUtc;
+        armoire = dto.ArmoireUpdatedUtc.HasValue ? [.. dto.Armoire] : null;
+        DresserSlotsUsed = dto.DresserSlotsUsed;
+        DresserUpdatedUtc = dto.DresserUpdatedUtc;
+        ArmoireUpdatedUtc = dto.ArmoireUpdatedUtc;
 
-            if (!DresserUpdatedUtc.HasValue)
-                dresser = null;
+        if (!DresserUpdatedUtc.HasValue)
+            dresser = null;
 
-            Plugin.Log.Information(
-                $"Loaded collection cache for {dto.CharacterName}: " +
-                $"{dto.DresserDirect.Count} dresser items, {dto.DresserOutfits.Count} outfit pieces, {dto.Armoire.Count} armoire items");
-        }
-        catch (Exception ex)
-        {
-            Plugin.Log.Error(ex, $"Could not read {CachePath}; starting from an empty cache");
-        }
+        Plugin.Log.Information(
+            $"Loaded collection cache for {dto.CharacterName}: {dto.DresserDirect.Count} dresser items, " +
+            $"{dto.DresserOutfits.Count} outfit pieces, {dto.Armoire.Count} armoire items");
     }
 
     private void SaveToDisk()
     {
-        try
+        var dto = new CacheFile
         {
-            var dto = new CacheFile
-            {
-                ContentId = loadedContentId,
-                CharacterName = CharacterName,
-                DresserDirect = dresser?.DirectItems.ToList() ?? [],
-                DresserOutfits = dresser?.ItemsInStoredOutfits.ToDictionary(kv => kv.Key, kv => kv.Value.ToList()) ?? [],
-                StoredOutfits = dresser?.StoredOutfits.ToList() ?? [],
-                DresserSlotsUsed = DresserSlotsUsed,
-                Armoire = armoire?.ToList() ?? [],
-                DresserUpdatedUtc = DresserUpdatedUtc,
-                ArmoireUpdatedUtc = ArmoireUpdatedUtc,
-            };
+            ContentId = loadedContentId,
+            CharacterName = CharacterName,
+            DresserDirect = dresser?.DirectItems.ToList() ?? [],
+            DresserOutfits = dresser?.ItemsInStoredOutfits.ToDictionary(kv => kv.Key, kv => kv.Value.ToList()) ?? [],
+            StoredOutfits = dresser?.StoredOutfits.ToList() ?? [],
+            DresserSlotsUsed = DresserSlotsUsed,
+            Armoire = armoire?.ToList() ?? [],
+            DresserUpdatedUtc = DresserUpdatedUtc,
+            ArmoireUpdatedUtc = ArmoireUpdatedUtc,
+        };
 
-            File.WriteAllText(CachePath, JsonSerializer.Serialize(dto));
-        }
-        catch (Exception ex)
-        {
-            Plugin.Log.Error(ex, $"Could not write {CachePath}");
-        }
+        Data.JsonStore.Write(CachePath, dto);
     }
 
     private sealed class CacheFile

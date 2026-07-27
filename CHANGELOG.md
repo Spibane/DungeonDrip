@@ -1,5 +1,14 @@
 # Changelog
 
+### v0.9.4 - 2026-07-28
+- Fixed downloads being read without a size limit. Content-Length is advisory and a chunked response can stream indefinitely, so every response now goes through a hard byte ceiling enforced while reading, not just on the declared length
+- Fixed cache writes being able to truncate a good file if the game died mid-write; they now go to a temporary file and are moved into place
+- Fixed the cancellation source being disposed while a request could still be unwinding on it during plugin unload
+- Changed the two HTTP clients into one, so the identifying User-Agent and the safety limits are stated once
+- Changed the four copies of JSON load/save boilerplate into a single store, and the two age formatters into one
+- Changed raw item ids to resolve through Dalamud's `ItemUtil.GetBaseId` instead of hand-rolled offset arithmetic, and to reject event items by kind. Event items sit behind an offset that shares the id space with real gear, so stripping it blindly maps them onto unrelated equipment
+- Removed dead code: the unread LootDataState/State and LastCheckedUtc, ContentFinderIndex.IsDuty, JobRoleIndex.NameOf (unreachable since role headings replaced combined ones), DungeonLootData's unread counters, CommandRegistration.Primary, and two never-read DutyEntry fields
+
 ### v0.9.3 - 2026-07-27
 - Changed role view to also show "of Slaying" accessories under the narrower melee headings they serve, so they appear under Maiming and Striking as well as their own heading. Role view answers "what can I claim", so it duplicates on purpose; slot view still never duplicates and the headline count still counts each piece once
 - Changed the list and the most-missing callout to share one bucketing routine, so the two can no longer disagree

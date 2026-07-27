@@ -10,9 +10,7 @@ public sealed record DutyEntry(
     uint TerritoryId,
     string Name,
     byte Level,
-    string Expansion,
     int ExpansionOrder,
-    string ContentType,
     int ItemCount);
 
 /// <summary>
@@ -58,9 +56,7 @@ public sealed class DutyCatalog
                     territoryId,
                     Capitalise(cfc.Name.ExtractText()),
                     cfc.ClassJobLevelRequired,
-                    cfc.RequiredExVersion.IsValid ? cfc.RequiredExVersion.Value.Name.ExtractText() : "Unknown",
                     (int)cfc.RequiredExVersion.RowId,
-                    cfc.ContentType.IsValid ? cfc.ContentType.Value.Name.ExtractText() : "Duty",
                     items.Length));
             }
             else
@@ -71,9 +67,7 @@ public sealed class DutyCatalog
                     territoryId,
                     loot.GetFallbackName(territoryId) ?? $"Territory {territoryId}",
                     0,
-                    "Unknown",
                     int.MaxValue,
-                    "Duty",
                     items.Length));
             }
         }

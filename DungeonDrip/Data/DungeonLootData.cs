@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text.Json;
 using Lumina.Excel.Sheets;
 
 namespace DungeonDrip.Data;
@@ -18,7 +17,7 @@ namespace DungeonDrip.Data;
 /// </remarks>
 public sealed class DungeonLootData
 {
-    public const string OverridesFileName = "loot-overrides.json";
+    private const string OverridesFileName = "loot-overrides.json";
 
     private readonly Dictionary<uint, uint[]> itemsByTerritory;
     private readonly Dictionary<uint, string> fallbackNames;
@@ -27,25 +26,16 @@ public sealed class DungeonLootData
     /// <summary>When the underlying dataset was downloaded.</summary>
     public DateTime FetchedUtc { get; }
 
-    /// <summary>Duties whose listed drops contained no glamour-able gear at all.</summary>
-    public int EmptyAfterFilter { get; }
-
-    public int OverrideCount { get; }
-
     private DungeonLootData(
         Dictionary<uint, uint[]> itemsByTerritory,
         Dictionary<uint, string> fallbackNames,
         Dictionary<uint, Dictionary<uint, LootProvenance>> provenance,
-        DateTime fetchedUtc,
-        int emptyAfterFilter,
-        int overrideCount)
+        DateTime fetchedUtc)
     {
         this.itemsByTerritory = itemsByTerritory;
         this.fallbackNames = fallbackNames;
         this.provenance = provenance;
         FetchedUtc = fetchedUtc;
-        EmptyAfterFilter = emptyAfterFilter;
-        OverrideCount = overrideCount;
     }
 
     /// <summary>Where this piece's entry came from, for showing the user why it is listed.</summary>
@@ -75,7 +65,6 @@ public sealed class DungeonLootData
         var maps = Plugin.DataManager.GetExcelSheet<Map>();
         var accumulated = new Dictionary<uint, HashSet<uint>>();
         var names = new Dictionary<uint, string>();
-        var empty = 0;
 
         foreach (var instance in cache.Instances)
         {
@@ -92,10 +81,7 @@ public sealed class DungeonLootData
 
             var gear = instance.Items.Where(storage.CanBeStored).ToList();
             if (gear.Count == 0)
-            {
-                empty++;
                 continue;
-            }
 
             if (!accumulated.TryGetValue(territoryId, out var set))
                 accumulated[territoryId] = set = [];
@@ -105,7 +91,7 @@ public sealed class DungeonLootData
         }
 
         var provenance = new Dictionary<uint, Dictionary<uint, LootProvenance>>();
-        var overrides = ApplyOverrides(configDirectory, accumulated, provenance);
+        ApplyOverrides(configDirectory, accumulated, provenance);
 
         // Supplementary sources are layered on last. Each records which pieces only exist because
         // of it, so the UI can show provenance - and because they can add a duty the primary
@@ -120,7 +106,7 @@ public sealed class DungeonLootData
             .Where(kv => kv.Value.Count > 0)
             .ToDictionary(kv => kv.Key, kv => kv.Value.ToArray());
 
-        return new DungeonLootData(byTerritory, names, provenance, cache.FetchedUtc, empty, overrides);
+        return new DungeonLootData(byTerritory, names, provenance, cache.FetchedUtc);
     }
 
     /// <summary>
@@ -161,51 +147,39 @@ public sealed class DungeonLootData
     /// Merges the user-maintained overrides file. Additive only - it exists because the upstream
     /// dataset lags badly on the newest dungeons.
     /// </summary>
-    private static int ApplyOverrides(
+    private static void ApplyOverrides(
         string configDirectory,
         Dictionary<uint, HashSet<uint>> accumulated,
         Dictionary<uint, Dictionary<uint, LootProvenance>> provenance)
     {
         var path = Path.Combine(configDirectory, OverridesFileName);
-        if (!File.Exists(path))
-            return 0;
+        var raw = JsonStore.Read<Dictionary<string, uint[]>>(path);
+        if (raw == null)
+            return;
 
-        try
+        var applied = 0;
+        foreach (var (key, extra) in raw)
         {
-            var raw = JsonSerializer.Deserialize<Dictionary<string, uint[]>>(File.ReadAllText(path));
-            if (raw == null)
-                return 0;
+            if (!uint.TryParse(key, out var territoryId))
+                continue;
 
-            var applied = 0;
-            foreach (var (key, extra) in raw)
+            if (!accumulated.TryGetValue(territoryId, out var set))
+                accumulated[territoryId] = set = [];
+
+            foreach (var itemId in extra)
             {
-                if (!uint.TryParse(key, out var territoryId))
+                if (!set.Add(itemId))
                     continue;
 
-                if (!accumulated.TryGetValue(territoryId, out var set))
-                    accumulated[territoryId] = set = [];
+                if (!provenance.TryGetValue(territoryId, out var tagged))
+                    provenance[territoryId] = tagged = [];
 
-                foreach (var itemId in extra)
-                {
-                    if (!set.Add(itemId))
-                        continue;
-
-                    if (!provenance.TryGetValue(territoryId, out var tagged))
-                        provenance[territoryId] = tagged = [];
-
-                    tagged[itemId] = LootProvenance.Override;
-                }
-
-                applied++;
+                tagged[itemId] = LootProvenance.Override;
             }
 
-            Plugin.Log.Information($"Applied {applied} loot override entries from {path}");
-            return applied;
+            applied++;
         }
-        catch (Exception ex)
-        {
-            Plugin.Log.Error(ex, $"Could not read {path}; ignoring overrides");
-            return 0;
-        }
+
+        Plugin.Log.Information($"Applied {applied} loot override entries from {path}");
     }
 }
