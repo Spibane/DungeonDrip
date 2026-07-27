@@ -250,6 +250,64 @@ public class ConfigWindow : Window, IDisposable
         }
 
         ImGui.Spacing();
+        ImGui.TextColored(Muted, "Vendors");
+
+        var vendorPanel = configuration.ShowVendorPanel;
+        if (ImGui.Checkbox("Show a panel beside vendor windows", ref vendorPanel))
+        {
+            configuration.ShowVendorPanel = vendorPanel;
+            changed = true;
+        }
+
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip(
+                "Lists the glamour gear the vendor is currently showing, marked by where you already\n" +
+                "have each piece. Items that cannot be kept as a glamour are left out entirely.\n" +
+                "Run \"/dungeondrip shop\" at a vendor it does not recognise to identify it.");
+        }
+
+        if (vendorPanel)
+        {
+            var vendorSide = configuration.VendorPanelSide;
+            ImGui.SetNextItemWidth(200 * ImGuiHelpers.GlobalScale);
+            if (ImGui.BeginCombo("Side##vendor", vendorSide.ToString()))
+            {
+                foreach (var option in Enum.GetValues<LootCompanionSide>())
+                {
+                    if (ImGui.Selectable($"{option}##vendor", vendorSide == option))
+                    {
+                        configuration.VendorPanelSide = option;
+                        changed = true;
+                    }
+                }
+
+                ImGui.EndCombo();
+            }
+
+            var vendorOwned = configuration.VendorShowOwnedItems;
+            if (ImGui.Checkbox("List pieces you already have##vendor", ref vendorOwned))
+            {
+                configuration.VendorShowOwnedItems = vendorOwned;
+                changed = true;
+            }
+
+            if (ImGui.IsItemHovered())
+            {
+                ImGui.SetTooltip(
+                    "Off leaves only what you are missing, and each heading still says how many were\n" +
+                    "filtered out.");
+            }
+
+            var vendorGrouped = configuration.VendorGroupBySlot;
+            if (ImGui.Checkbox("Group by equipment slot##vendor", ref vendorGrouped))
+            {
+                configuration.VendorGroupBySlot = vendorGrouped;
+                changed = true;
+            }
+        }
+
+        ImGui.Spacing();
         ImGui.Separator();
 
         // Worth showing: a short alias is skipped when another plugin already owns it, and silently

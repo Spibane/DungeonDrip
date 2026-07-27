@@ -1,5 +1,13 @@
 # Changelog
 
+### v0.10.0 - 2026-07-28
+- **A new panel now appears beside vendor windows by default.** Turn it off under Settings > General > Vendors if you would rather it did not
+- Added vendor collection markers. Open a shop and the panel lists the glamour gear it stocks, marked as not collected, in the Glamour Dresser, part of a stored outfit set, in the Armoire, or carried. Anything that cannot be kept as a glamour is left out entirely, so an unmarked shop row never reads as "you already have this". Covers gil vendors and Calamity Salvagers, item-exchange counters, currency and scrip exchanges, Grand Company quartermasters, free-item counters and the Firmament
+- Added `/dungeondrip shop`, which names the open vendor window so an uncovered one can be reported
+- Changed the plugin's framing to match what it does. The collection is the engine and duty loot is one question asked of it; vendors are the third place that question gets answered, after the duty list and the loot-roll companion
+- The vendor panel degrades rather than refusing when the dresser snapshot is old: a stale snapshot turns the "not collected" marker amber and leaves the "you have this" markers alone. Dresser contents are near-monotonic, so an old snapshot's positives hold up far better than its negatives
+- Like the loot-roll companion, the panel reads the shop window but never draws into it, so it cannot collide with plugins that write to those nodes
+
 ### v0.9.5 - 2026-07-28
 - Added the GNU AGPL v3.0-or-later licence, with the SPDX expression and copyright recorded in the project file
 - Added AI-DECLARATION.md (spec 0.1.2) declaring how much of this codebase was AI-authored, what the human decided and tested, and the caveats that follow

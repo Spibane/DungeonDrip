@@ -23,6 +23,7 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] internal static IFramework Framework { get; private set; } = null!;
     [PluginService] internal static IChatGui ChatGui { get; private set; } = null!;
     [PluginService] internal static IGameGui GameGui { get; private set; } = null!;
+    [PluginService] internal static IAddonLifecycle AddonLifecycle { get; private set; } = null!;
     [PluginService] internal static IPluginLog Log { get; private set; } = null!;
 
     private const string CommandName = "/dungeondrip";
@@ -48,18 +49,23 @@ public sealed class Plugin : IDalamudPlugin
     /// <summary>Chat commands that were actually claimed at load.</summary>
     public CommandRegistration Commands => commands;
 
+    /// <summary>The vendor currently in front of the player, and what it is selling.</summary>
+    public ShopWatcher Shop => shopWatcher;
+
     private readonly WindowSystem windowSystem = new("DungeonDrip");
     private readonly OutfitCatalog outfits;
     private readonly ContentFinderIndex contentFinder;
     private readonly JobRoleIndex jobRoles;
     private readonly StorageEligibility storage;
     private readonly LootObserver lootObserver;
+    private readonly ShopWatcher shopWatcher;
     private readonly HttpFetcher http = new();
     private readonly CommandRegistration commands;
 
     private readonly MissingItemsWindow mainWindow;
     private readonly ConfigWindow configWindow;
     private readonly LootCompanionWindow lootCompanionWindow;
+    private readonly VendorPanelWindow vendorPanelWindow;
 
     private DutyReportBuilder? reportBuilder;
     private uint currentTerritory;
@@ -89,6 +95,7 @@ public sealed class Plugin : IDalamudPlugin
 
         LearnedLoot = new LearnedLootStore(configDirectory);
         lootObserver = new LootObserver(Configuration, LearnedLoot, contentFinder, storage);
+        shopWatcher = new ShopWatcher(this);
         Wiki = new WikiLootSource(configDirectory, Configuration, http);
 
         // Reads the on-disk copy immediately and starts an update check in the background, so a
@@ -98,9 +105,11 @@ public sealed class Plugin : IDalamudPlugin
         mainWindow = new MissingItemsWindow(this);
         configWindow = new ConfigWindow(this);
         lootCompanionWindow = new LootCompanionWindow(this) { IsOpen = true };
+        vendorPanelWindow = new VendorPanelWindow(this) { IsOpen = true };
         windowSystem.AddWindow(mainWindow);
         windowSystem.AddWindow(configWindow);
         windowSystem.AddWindow(lootCompanionWindow);
+        windowSystem.AddWindow(vendorPanelWindow);
 
         currentTerritory = ClientState.TerritoryType;
 
@@ -125,7 +134,9 @@ public sealed class Plugin : IDalamudPlugin
         mainWindow.Dispose();
         configWindow.Dispose();
         lootCompanionWindow.Dispose();
+        vendorPanelWindow.Dispose();
         lootObserver.Dispose();
+        shopWatcher.Dispose();
         LootData.Dispose();
         Wiki.Dispose();
         http.Dispose();
@@ -263,6 +274,12 @@ public sealed class Plugin : IDalamudPlugin
             case "refresh":
                 Ownership.RequestRefresh();
                 ChatGui.Print("Dungeon Drip will re-read your collection on the next tick.");
+                return;
+
+            // Turns "the panel does not work at this vendor" into a report that names the addon.
+            case "shop":
+            case "vendor":
+                ChatGui.Print(shopWatcher.Describe());
                 return;
 
             case "update":

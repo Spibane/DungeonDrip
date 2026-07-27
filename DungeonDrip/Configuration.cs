@@ -94,5 +94,17 @@ public class Configuration : IPluginConfiguration
     /// <summary>Which side of the loot window the companion sits on. Auto flips if space is tight.</summary>
     public LootCompanionSide LootCompanionSide { get; set; } = LootCompanionSide.Auto;
 
+    /// <summary>Show a panel beside vendor windows marking which of their stock you already have.</summary>
+    public bool ShowVendorPanel { get; set; } = true;
+
+    /// <summary>Which side of the vendor window the panel sits on. Auto flips if space is tight.</summary>
+    public LootCompanionSide VendorPanelSide { get; set; } = LootCompanionSide.Auto;
+
+    /// <summary>List pieces you already have, greyed out, alongside the ones you do not.</summary>
+    public bool VendorShowOwnedItems { get; set; } = true;
+
+    /// <summary>Group the vendor panel by equipment slot rather than listing it flat.</summary>
+    public bool VendorGroupBySlot { get; set; } = true;
+
     public void Save() => Plugin.PluginInterface.SavePluginConfig(this);
 }
