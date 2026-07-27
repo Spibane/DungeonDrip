@@ -18,6 +18,7 @@ public class MissingItemsWindow : Window, IDisposable
     private static readonly Vector4 Warning = new(1.00f, 0.71f, 0.20f, 1f);
     private static readonly Vector4 Good = new(0.45f, 0.85f, 0.45f, 1f);
     private static readonly Vector4 Muted = new(0.60f, 0.60f, 0.60f, 1f);
+    private static readonly Vector4 Focus = new(0.55f, 0.80f, 1.00f, 1f);
 
     private readonly Plugin plugin;
 
@@ -88,6 +89,7 @@ public class MissingItemsWindow : Window, IDisposable
         }
 
         DrawSummary(report);
+        DrawRoleFocus(report);
         ImGui.Separator();
         DrawItems(report);
     }
@@ -215,6 +217,47 @@ public class MissingItemsWindow : Window, IDisposable
 
         if (report.HiddenWeapons > 0)
             ImGui.TextColored(Muted, $"{report.HiddenWeapons} weapons hidden.");
+    }
+
+    /// <summary>
+    /// Names whichever role still needs the most from this duty.
+    /// </summary>
+    /// <remarks>
+    /// Always counts by role, even when the list is grouped by slot - "what should I chase here" is
+    /// a different question from how you want the list arranged. Ties are reported as ties rather
+    /// than silently picking one, which is the common case on a duty you have barely run.
+    /// </remarks>
+    private void DrawRoleFocus(DutyReport report)
+    {
+        if (!plugin.Configuration.ShowRoleSummary || report.MissingCount == 0)
+            return;
+
+        var byRole = report.Items
+            .Where(item => !item.IsOwned)
+            .GroupBy(item => (item.RoleOrder, item.RoleGroup))
+            .Select(group => (Label: group.Key.RoleGroup, group.Key.RoleOrder, Count: group.Count()))
+            .OrderByDescending(entry => entry.Count)
+            .ThenBy(entry => entry.RoleOrder)
+            .ToList();
+
+        if (byRole.Count == 0)
+            return;
+
+        var most = byRole[0].Count;
+        var leaders = byRole.Where(entry => entry.Count == most).Select(entry => entry.Label).ToList();
+
+        ImGui.Spacing();
+        ImGui.TextColored(Focus, leaders.Count == 1
+            ? $"Most missing: {leaders[0]} ({most})"
+            : $"Most missing: {string.Join(", ", leaders)} ({most} each)");
+
+        if (!ImGui.IsItemHovered())
+            return;
+
+        using var tooltip = ImRaii.Tooltip();
+        ImGui.TextColored(Muted, "Still missing by role:");
+        foreach (var (label, _, count) in byRole)
+            ImGui.Text($"   {count,3}   {label}");
     }
 
     private void DrawItems(DutyReport report)

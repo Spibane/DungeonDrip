@@ -87,6 +87,21 @@ public class ConfigWindow : Window, IDisposable
             changed = true;
         }
 
+        var roleSummary = configuration.ShowRoleSummary;
+        if (ImGui.Checkbox("Call out the role with the most missing pieces", ref roleSummary))
+        {
+            configuration.ShowRoleSummary = roleSummary;
+            changed = true;
+        }
+
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip(
+                "A line above the list naming whichever role still needs the most, so you know what to\n" +
+                "chase. Counts by role even when the list itself is grouped by slot; hover it for the\n" +
+                "full breakdown.");
+        }
+
         ImGui.Spacing();
         ImGui.TextColored(Muted, "What to list");
 

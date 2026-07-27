@@ -1,5 +1,8 @@
 # Changelog
 
+### v0.9.0 - 2026-07-27
+- Added a line above the list naming whichever role still needs the most from this duty, with the full per-role breakdown on hover. Counts by role even when the list is grouped by slot, reports ties as ties, and can be turned off in Settings > General
+
 ### v0.8.0 - 2026-07-27
 - **BREAKING:** Renamed the plugin from Glamour Assistant to Dungeon Drip. The old name sat in a crowded shelf alongside Glamourer, Glamaholic and the existing Glamour Log plugin
 - **BREAKING:** Commands are now `/dungeondrip`, with `/drip` and `/ddrip` as aliases, replacing `/glamassist` and `/gla`
