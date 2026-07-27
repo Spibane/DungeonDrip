@@ -61,9 +61,12 @@ public sealed unsafe class VendorPanelWindow : Window, IDisposable
     private float contentWidth = FallbackWidth;
     private VendorStock? measuredFrom;
 
-    /// <summary>What PreDraw last asked for, so a size we chose is not mistaken for a drag.</summary>
+    /// <summary>The size PreDraw wants, so a size we chose is not mistaken for a drag.</summary>
     private Vector2 appliedSize;
+
+    /// <summary>The size the window actually had last frame.</summary>
     private Vector2 lastSize;
+
     private bool resizing;
 
     public VendorPanelWindow(Plugin plugin)
@@ -133,8 +136,21 @@ public sealed unsafe class VendorPanelWindow : Window, IDisposable
         desired.X = Math.Clamp(desired.X, 180f, display.X);
         desired.Y = Math.Clamp(desired.Y, 120f, display.Y);
 
+        // Appearing alone is not enough: it only lands while the window is coming up, so pressing
+        // reset - or walking to a taller vendor - did nothing visible until the panel happened to
+        // close and open again. Whenever the size we want actually moves, insist on it for a frame.
+        //
+        // Not while the user has hold of the resize grip, though: mid-drag their size is not saved
+        // yet, so the tracked size still differs and insisting would snap the window out from under
+        // them on every frame of the gesture.
+        // Measured against what is actually on screen, not against what was last asked for. A
+        // request made on a frame ImGui ignores is not a size the window has, and recording it as
+        // one is what would let a deferred reset quietly cancel itself.
+        var moved = lastSize != Vector2.Zero && Vector2.Distance(desired, lastSize) > 1f;
+        var theirs = resizing || ImGui.IsMouseDown(ImGuiMouseButton.Left);
+
         Size = desired;
-        SizeCondition = ImGuiCond.Appearing;
+        SizeCondition = moved && !theirs ? ImGuiCond.Always : ImGuiCond.Appearing;
         appliedSize = desired;
 
         var side = configuration.VendorPanelSide;
