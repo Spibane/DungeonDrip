@@ -1,12 +1,14 @@
-<h1 align="center">💧 Dungeon Drip</h1>
+<h1 align="center">Dungeon Drip</h1>
 
 <h2 align="center"><strong>Shows which dungeon glamour pieces are still missing from your Glamour Dresser and Armoire</strong></h2>
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-0.9.3-black)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.9.5-black)](./CHANGELOG.md)
 [![Status](https://img.shields.io/badge/status-Alpha-orange)](./CHANGELOG.md)
 [![Changelog](https://img.shields.io/badge/changelog-blue)](./CHANGELOG.md)
+[![License](https://img.shields.io/badge/license-AGPL--3.0--or--later-663366)](./LICENSE)
+[![AI](https://img.shields.io/badge/AI--DECLARATION-pair-ffedd5)](./AI-DECLARATION.md)
 
 [![C#](https://img.shields.io/badge/C%23-14-239120?logo=csharp&logoColor=white)](https://learn.microsoft.com/dotnet/csharp/)
 [![.NET](https://img.shields.io/badge/.NET-10.x-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
@@ -89,7 +91,8 @@ shows which commands actually got claimed on your install.
 
 | Command | What it does |
 | --- | --- |
-| `/dungeondrip` | Toggle the window (`/gla` also works) |
+| `/dungeondrip` | Toggle the window |
+| `/drip`, `/ddrip` | Aliases, claimed only if free |
 | `/dungeondrip <duty name>` | Pin the window to that duty; ambiguous names open the picker |
 | `/dungeondrip config` | Settings |
 | `/dungeondrip refresh` | Re-read the dresser and armoire now |
@@ -281,6 +284,8 @@ DungeonDrip/
 ├── Plugin.cs                    # services, territory tracking, report cache, commands
 ├── Configuration.cs
 ├── Data/
+│   ├── HttpFetcher.cs           # the one HTTP client; capped, timed-out reads
+│   ├── JsonStore.cs             # read/write for every cache file, atomic writes
 │   ├── LootDataService.cs       # download, ETag revalidation, transform, disk cache
 │   ├── DungeonLootData.cs       # map → territory, gear filter, source merge + provenance
 │   ├── WikiLootSource.cs        # per-duty wiki lookup, parse, cache, backoff
@@ -292,13 +297,13 @@ DungeonDrip/
 │   ├── InventoryReader.cs       # bags / armoury / equipped / saddlebags
 │   ├── LootObserver.cs          # records gear seen dropping in a duty
 │   ├── OutfitCatalog.cs         # MirageStoreSetItem membership + slot order
-│   ├── OwnershipTracker.cs      # per-character snapshot, staleness, persistence
-│   └── ItemId.cs                # HQ / collectable offset normalisation
+│   └── OwnershipTracker.cs      # per-character snapshot, staleness, persistence
 ├── Core/
 │   ├── MissingItems.cs          # the ownership decision, Dalamud-free
 │   ├── DutyReport.cs            # territory + ownership → the drawn list
 │   ├── DutyCatalog.cs           # duty list for lookup, ordered by level
 │   ├── ContentFinderIndex.cs    # territory → duty name; "am I in a duty"
+│   ├── Format.cs                # shared age wording
 │   ├── ItemNameIndex.cs         # item name → row id, for wiki name resolution
 │   └── EquipSlots.cs
 └── Windows/
@@ -403,3 +408,17 @@ suppresses the verdict and says so rather than showing a confident guess.
 - Retainer inventories — the client cannot read them unless you are at a retainer.
 - Per-boss attribution of drops.
 - Recolouring the game's own loot window (deliberately avoided — see below).
+
+## Licence
+
+Licensed under the [GNU Affero General Public License v3.0 or later](./LICENSE).
+
+The AGPL's network clause is the reason for choosing it here: this plugin talks to remote services
+and caches what it fetches, and anyone who builds on that should have to pass the same freedoms on.
+It also matches the licence used by the Dalamud SamplePlugin this project started from.
+
+## AI use
+
+The code in this repository was largely written by an AI model. [AI-DECLARATION.md](./AI-DECLARATION.md)
+sets out what was AI-authored, what the human decided and tested, and what that means for anyone
+depending on it.
