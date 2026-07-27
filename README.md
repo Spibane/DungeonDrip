@@ -156,17 +156,25 @@ GlamourAssistant/
 
 ## Building
 
-Requires the .NET 10 SDK (10.0.101 or newer) and the Dalamud dev assemblies.
+Requires the .NET 10 SDK (10.0.101 or newer) and the Dalamud dev assemblies. The target framework is
+`net10.0-windows`, but it compiles fine on Linux and macOS — nothing Windows-only is referenced.
 
-On Windows with XIVLauncher installed the assemblies are already at
-`%AppData%\XIVLauncher\addon\Hooks\dev`, so nothing extra is needed:
+The SDK auto-detects the assemblies from the local XIVLauncher install, so on a machine that has run
+the game with Dalamud once, nothing extra is needed:
+
+| Host | Auto-detected path |
+| --- | --- |
+| Windows (XIVLauncher) | `%AppData%\XIVLauncher\addon\Hooks\dev\` |
+| Linux (XIVLauncher.Core) | `~/.xlcore/dalamud/Hooks/dev/` |
+| macOS (XIV on Mac) | `~/Library/Application Support/XIV on Mac/dalamud/Hooks/dev/` |
 
 ```bash
 dotnet build GlamourAssistant.sln -c Release
 ```
 
-Anywhere else — or to compile-check on macOS/Linux — extract
-<https://goatcorp.github.io/dalamud-distrib/latest.zip> and point `DALAMUD_HOME` at it:
+With no XIVLauncher present — CI, or compile-checking on a dev machine — extract
+<https://goatcorp.github.io/dalamud-distrib/latest.zip> and point `DALAMUD_HOME` at it, which
+overrides all of the above:
 
 ```bash
 DALAMUD_HOME=/path/to/dalamud dotnet build GlamourAssistant.sln -c Release
@@ -185,12 +193,36 @@ places:
 The `...\Release\GlamourAssistant\latest.zip` beside it is DalamudPackager's *distributable* — that
 folder holds only the zip and the manifest, so it is not what you load for testing.
 
-### Loading it in-game
+### Loading it in-game — Windows
 
 1. `/xlsettings` → **Experimental** → add the **full path to `GlamourAssistant.dll`** (the file, not
    its folder) under Dev Plugin Locations. This is only needed once.
 2. `/xlplugins` → **Dev Tools → Installed Dev Plugins** → enable **Glamour Assistant**.
 3. After a rebuild, reload it from that same Dev Plugins list — no game restart needed.
+
+### Loading it in-game — Linux (XIVLauncher.Core)
+
+Dalamud runs inside the Wine prefix, so a path typed into Dev Plugin Locations has to be
+Wine-visible (`Z:\home\you\...`, since Wine maps `/` to `Z:`). Avoid that entirely by using the
+`devPlugins` folder, which Dalamud scans automatically:
+
+```bash
+mkdir -p ~/.xlcore/devPlugins/GlamourAssistant && cp GlamourAssistant/bin/x64/Release/GlamourAssistant.{dll,json,deps.json} ~/.xlcore/devPlugins/GlamourAssistant/
+```
+
+Then `/xlplugins` → **Dev Tools → Installed Dev Plugins** → enable **Glamour Assistant**. Re-run the
+copy after each rebuild and hit reload there.
+
+The runtime files are plain text and directly inspectable, which is the easiest way to confirm the
+data pipeline while testing:
+
+```bash
+ls -la ~/.xlcore/pluginConfigs/GlamourAssistant/
+```
+
+Note that **Open config folder** in settings generally fails under Wine — there is no shell handler
+to hand the folder to. The window shows the path as text with a **Copy path** button, and the failure
+also prints the path to chat.
 
 ## CI/CD
 

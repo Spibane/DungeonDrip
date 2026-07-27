@@ -131,8 +131,17 @@ public class ConfigWindow : Window, IDisposable
             "Missing drops for a very recent dungeon? Upstream lags on brand-new content. Add them to " +
             "loot-overrides.json in the plugin config folder and reload the plugin.");
 
+        // Shown as text as well as a button: under Wine the shell handler usually cannot open a
+        // folder, and on Linux this path is the easiest way to inspect the caches by hand.
+        var configPath = Plugin.PluginInterface.GetPluginConfigDirectory();
+        ImGui.TextColored(Muted, configPath);
+
         if (ImGui.Button("Open config folder"))
-            OpenConfigFolder();
+            OpenConfigFolder(configPath);
+
+        ImGui.SameLine();
+        if (ImGui.Button("Copy path"))
+            ImGui.SetClipboardText(configPath);
 
         if (changed)
         {
@@ -141,19 +150,21 @@ public class ConfigWindow : Window, IDisposable
         }
     }
 
-    private static void OpenConfigFolder()
+    private static void OpenConfigFolder(string path)
     {
         try
         {
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
             {
-                FileName = Plugin.PluginInterface.GetPluginConfigDirectory(),
+                FileName = path,
                 UseShellExecute = true,
             });
         }
         catch (Exception ex)
         {
-            Plugin.Log.Error(ex, "Could not open the plugin config folder");
+            // Expected under Wine, where there is no shell handler to hand the folder to.
+            Plugin.Log.Warning(ex, "Could not open the plugin config folder");
+            Plugin.ChatGui.Print($"Glamour Assistant config folder: {path}");
         }
     }
 }
