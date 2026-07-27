@@ -18,11 +18,33 @@ public sealed class ContentFinderIndex
     private ContentFinderIndex(Dictionary<uint, ContentFinderCondition> byTerritory) =>
         this.byTerritory = byTerritory;
 
+    private const uint DungeonContentType = 2;
+    private const uint RaidContentType = 5;
+
+    /// <summary>ContentMemberType 4 is the 24-player alliance layout; 8-player raids use 3.</summary>
+    private const uint AllianceMemberType = 4;
+
     public bool TryGet(uint territoryId, out ContentFinderCondition condition) =>
         byTerritory.TryGetValue(territoryId, out condition);
 
     /// <summary>True when the territory is an instanced duty rather than an open-world zone.</summary>
     public bool IsDuty(uint territoryId) => byTerritory.ContainsKey(territoryId);
+
+    /// <summary>
+    /// Dungeons and alliance raids only - the content whose gear people actually farm for glamour.
+    /// </summary>
+    /// <remarks>
+    /// Trials, 8-player raids, ultimates, guildhests, deep dungeons and the rest are excluded.
+    /// Alliance raids share ContentType 5 with 8-player raids, so the party layout is what tells
+    /// them apart.
+    /// </remarks>
+    public bool IsSupportedDuty(uint territoryId) =>
+        byTerritory.TryGetValue(territoryId, out var condition) && IsSupported(condition);
+
+    public static bool IsSupported(ContentFinderCondition condition) =>
+        condition.ContentType.RowId == DungeonContentType ||
+        (condition.ContentType.RowId == RaidContentType &&
+         condition.ContentMemberType.RowId == AllianceMemberType);
 
     public static ContentFinderIndex Build()
     {

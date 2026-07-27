@@ -4,6 +4,15 @@ namespace GlamourAssistant.Core;
 
 public static class EquipSlots
 {
+    private const int MainHandOrder = 0;
+    private const int OffHandOrder = 1;
+
+    /// <summary>
+    /// Main hand and off hand together - off-hands drop alongside the weapon they pair with, so the
+    /// "skip weapons" filter covers both.
+    /// </summary>
+    public static bool IsWeaponSlot(int order) => order is MainHandOrder or OffHandOrder;
+
     /// <summary>Groups an item by the slot it occupies, in the order the character sheet uses.</summary>
     public static (int Order, string Name) Describe(EquipSlotCategory category)
     {

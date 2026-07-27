@@ -27,15 +27,19 @@ public static class MissingItems
         uint itemId,
         OwnershipView view,
         IReadOnlySet<uint> setsContainingItem,
-        OutfitOwnershipMode mode)
+        OutfitOwnershipMode mode,
+        CollectionScope scope = CollectionScope.Both)
     {
-        if (view.DresserDirect.Contains(itemId))
+        var checkDresser = scope != CollectionScope.ArmoireOnly;
+        var checkArmoire = scope != CollectionScope.DresserOnly;
+
+        if (checkDresser && view.DresserDirect.Contains(itemId))
             return OwnershipSource.Dresser;
 
-        if (view.Armoire.Contains(itemId))
+        if (checkArmoire && view.Armoire.Contains(itemId))
             return OwnershipSource.Armoire;
 
-        if (view.DresserOutfits.TryGetValue(itemId, out var storedIn) && storedIn.Count > 0)
+        if (checkDresser && view.DresserOutfits.TryGetValue(itemId, out var storedIn) && storedIn.Count > 0)
         {
             var satisfied = mode == OutfitOwnershipMode.AnyOutfit ||
                             setsContainingItem.All(storedIn.Contains);

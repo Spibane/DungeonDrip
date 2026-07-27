@@ -1,6 +1,7 @@
 using System;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
+using Dalamud.Interface.Utility;
 using Dalamud.Interface.Windowing;
 
 namespace GlamourAssistant.Windows;
@@ -25,7 +26,36 @@ public class ConfigWindow : Window, IDisposable
     {
         var changed = false;
 
+        using var tabs = Dalamud.Interface.Utility.Raii.ImRaii.TabBar("##settingsTabs");
+        if (!tabs.Success)
+            return;
+
+        using (var general = Dalamud.Interface.Utility.Raii.ImRaii.TabItem("General"))
+        {
+            if (general.Success)
+                changed |= DrawGeneralTab();
+        }
+
+        using (var data = Dalamud.Interface.Utility.Raii.ImRaii.TabItem("Data"))
+        {
+            if (data.Success)
+                changed |= DrawDataTab();
+        }
+
+        if (changed)
+        {
+            configuration.Save();
+            plugin.InvalidateReport();
+        }
+    }
+
+    private bool DrawGeneralTab()
+    {
+        var changed = false;
+
+        ImGui.Spacing();
         ImGui.TextColored(Muted, "Window");
+
         var autoOpen = configuration.AutoOpenOnDutyEnter;
         if (ImGui.Checkbox("Open automatically when I enter a duty", ref autoOpen))
         {
@@ -40,12 +70,25 @@ public class ConfigWindow : Window, IDisposable
             changed = true;
         }
 
+        var closeOnLeave = configuration.CloseWhenLeavingDuty;
+        if (ImGui.Checkbox("Close again when I leave the duty", ref closeOnLeave))
+        {
+            configuration.CloseWhenLeavingDuty = closeOnLeave;
+            changed = true;
+        }
+
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("A duty you pinned yourself stays open - only the automatic tracking closes.");
+
         var showOwned = configuration.ShowOwnedItems;
         if (ImGui.Checkbox("List pieces I already have, greyed out", ref showOwned))
         {
             configuration.ShowOwnedItems = showOwned;
             changed = true;
         }
+
+        ImGui.Spacing();
+        ImGui.TextColored(Muted, "What to list");
 
         var jobOnly = configuration.OnlyCurrentJobEquippable;
         if (ImGui.Checkbox("Only show gear my current job can wear", ref jobOnly))
@@ -54,48 +97,71 @@ public class ConfigWindow : Window, IDisposable
             changed = true;
         }
 
-        ImGui.Spacing();
-        ImGui.TextColored(Muted, "Loot roll window");
-
-        var companion = configuration.ShowLootCompanion;
-        if (ImGui.Checkbox("Show a companion list beside the Need/Greed window", ref companion))
+        var hideWeapons = configuration.HideWeapons;
+        if (ImGui.Checkbox("Skip weapons", ref hideWeapons))
         {
-            configuration.ShowLootCompanion = companion;
+            configuration.HideWeapons = hideWeapons;
             changed = true;
+        }
+
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Hides main hands and off-hands, which drop together.");
+
+        var grouping = configuration.Grouping;
+        ImGui.SetNextItemWidth(200 * ImGuiHelpers.GlobalScale);
+        if (ImGui.BeginCombo("Group the list by", grouping == MissingGrouping.Role ? "Role" : "Equipment slot"))
+        {
+            if (ImGui.Selectable("Equipment slot", grouping == MissingGrouping.Slot))
+            {
+                configuration.Grouping = MissingGrouping.Slot;
+                changed = true;
+            }
+
+            if (ImGui.Selectable("Role that can roll Need", grouping == MissingGrouping.Role))
+            {
+                configuration.Grouping = MissingGrouping.Role;
+                changed = true;
+            }
+
+            ImGui.EndCombo();
         }
 
         if (ImGui.IsItemHovered())
         {
             ImGui.SetTooltip(
-                "A separate window pinned to the side of the roll window, marking what you do not own.\n" +
-                "It never draws into the game's own loot window, so it cannot fight with plugins that do\n" +
-                "(Allagan Tools, Simple Tweaks, VanillaPlus, Collections).");
-        }
-
-        if (companion)
-        {
-            var side = configuration.LootCompanionSide;
-            ImGui.SetNextItemWidth(160 * Dalamud.Interface.Utility.ImGuiHelpers.GlobalScale);
-            if (ImGui.BeginCombo("Side", side.ToString()))
-            {
-                foreach (var option in Enum.GetValues<LootCompanionSide>())
-                {
-                    if (ImGui.Selectable(option.ToString(), side == option))
-                    {
-                        configuration.LootCompanionSide = option;
-                        changed = true;
-                    }
-                }
-
-                ImGui.EndCombo();
-            }
+                "Role grouping buckets pieces by who is allowed to roll Need, which is what you want\n" +
+                "when claiming during a run. Headings can be collapsed and stay that way.");
         }
 
         ImGui.Spacing();
         ImGui.TextColored(Muted, "What counts as owned");
 
+        var scope = configuration.Scope;
+        ImGui.SetNextItemWidth(200 * ImGuiHelpers.GlobalScale);
+        if (ImGui.BeginCombo("Compare against", ScopeLabel(scope)))
+        {
+            foreach (var option in Enum.GetValues<CollectionScope>())
+            {
+                if (ImGui.Selectable(ScopeLabel(option), scope == option))
+                {
+                    configuration.Scope = option;
+                    changed = true;
+                }
+            }
+
+            ImGui.EndCombo();
+        }
+
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip(
+                "The list only ever shows pieces the chosen store can actually hold. Most Armoire\n" +
+                "items can live in either place, so Armoire-only is a narrower view of the same gear -\n" +
+                "recent dungeon sets qualify, older ones are Dresser-only.");
+        }
+
         var countInventory = configuration.CountInventoryAndEquipped;
-        if (ImGui.Checkbox("Bags, armoury chest, equipped gear and saddlebags", ref countInventory))
+        if (ImGui.Checkbox("Also count bags, armoury, equipped gear and saddlebags", ref countInventory))
         {
             configuration.CountInventoryAndEquipped = countInventory;
             changed = true;
@@ -132,10 +198,55 @@ public class ConfigWindow : Window, IDisposable
         }
 
         ImGui.Spacing();
+        ImGui.TextColored(Muted, "Loot roll window");
+
+        var companion = configuration.ShowLootCompanion;
+        if (ImGui.Checkbox("Show a companion list beside the Need/Greed window", ref companion))
+        {
+            configuration.ShowLootCompanion = companion;
+            changed = true;
+        }
+
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip(
+                "A separate window pinned to the side of the roll window, marking what you do not own.\n" +
+                "It never draws into the game's own loot window, so it cannot fight with plugins that do\n" +
+                "(Allagan Tools, Simple Tweaks, VanillaPlus, Collections).");
+        }
+
+        if (companion)
+        {
+            var side = configuration.LootCompanionSide;
+            ImGui.SetNextItemWidth(200 * ImGuiHelpers.GlobalScale);
+            if (ImGui.BeginCombo("Side", side.ToString()))
+            {
+                foreach (var option in Enum.GetValues<LootCompanionSide>())
+                {
+                    if (ImGui.Selectable(option.ToString(), side == option))
+                    {
+                        configuration.LootCompanionSide = option;
+                        changed = true;
+                    }
+                }
+
+                ImGui.EndCombo();
+            }
+        }
+
+        ImGui.Spacing();
+        return changed;
+    }
+
+    private bool DrawDataTab()
+    {
+        var changed = false;
+
+        ImGui.Spacing();
         ImGui.TextColored(Muted, "Collection snapshot");
 
         var staleDays = configuration.StaleAfterDays;
-        ImGui.SetNextItemWidth(160 * Dalamud.Interface.Utility.ImGuiHelpers.GlobalScale);
+        ImGui.SetNextItemWidth(200 * ImGuiHelpers.GlobalScale);
         if (ImGui.SliderInt("Warn when dresser data is older than (days)", ref staleDays, 1, 60))
         {
             configuration.StaleAfterDays = staleDays;
@@ -145,6 +256,18 @@ public class ConfigWindow : Window, IDisposable
         ImGui.TextWrapped(
             "The game clears Glamour Dresser data every time you change zone and only loads the Armoire " +
             "when you open it, so Glamour Assistant remembers the last time it saw them.");
+
+        var ownership = plugin.Ownership;
+        ImGui.TextColored(Muted, ownership.HasDresserData
+            ? $"Dresser: {ownership.DresserSlotsUsed} slots, read {ownership.DresserUpdatedUtc:yyyy-MM-dd HH:mm} UTC."
+            : "Dresser: never read.");
+
+        ImGui.TextColored(Muted, ownership.ArmoireUpdatedUtc == null
+            ? "Armoire: never read."
+            : $"Armoire: read {ownership.ArmoireUpdatedUtc:yyyy-MM-dd HH:mm} UTC.");
+
+        if (ImGui.Button("Re-read now"))
+            ownership.RequestRefresh();
 
         ImGui.Spacing();
         ImGui.Separator();
@@ -164,6 +287,7 @@ public class ConfigWindow : Window, IDisposable
             plugin.LootData.CheckForUpdates(force: true);
 
         ImGui.Spacing();
+        ImGui.Separator();
         ImGui.TextColored(Muted, "Console Games Wiki");
 
         var useWiki = configuration.UseWikiSource;
@@ -212,6 +336,7 @@ public class ConfigWindow : Window, IDisposable
         }
 
         ImGui.Spacing();
+        ImGui.Separator();
         ImGui.TextColored(Muted, "Learning from what you see drop");
 
         var learn = configuration.LearnDropsFromLoot;
@@ -241,10 +366,17 @@ public class ConfigWindow : Window, IDisposable
                 learned.Clear();
         }
 
-        ImGui.Spacing();
         ImGui.TextWrapped(
             "Learned drops are written to learned-loot.json in the same format as loot-overrides.json, " +
             "so you can promote them by hand or contribute them upstream.");
+
+        ImGui.Spacing();
+        ImGui.Separator();
+        ImGui.TextColored(Muted, "Files");
+
+        ImGui.TextWrapped(
+            "Missing drops for a very recent dungeon? Add them to loot-overrides.json in the config " +
+            "folder and reload the plugin.");
 
         // Shown as text as well as a button: under Wine the shell handler usually cannot open a
         // folder, and on Linux this path is the easiest way to inspect the caches by hand.
@@ -258,12 +390,16 @@ public class ConfigWindow : Window, IDisposable
         if (ImGui.Button("Copy path"))
             ImGui.SetClipboardText(configPath);
 
-        if (changed)
-        {
-            configuration.Save();
-            plugin.InvalidateReport();
-        }
+        ImGui.Spacing();
+        return changed;
     }
+
+    private static string ScopeLabel(CollectionScope scope) => scope switch
+    {
+        CollectionScope.DresserOnly => "Glamour Dresser only",
+        CollectionScope.ArmoireOnly => "Armoire only",
+        _ => "Glamour Dresser and Armoire",
+    };
 
     private static void OpenConfigFolder(string path)
     {

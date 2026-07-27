@@ -43,6 +43,8 @@ public sealed class LootDataService : IDisposable
     private readonly string configDirectory;
     private readonly LearnedLootStore learned;
     private readonly WikiLootSource wiki;
+    private readonly Core.ContentFinderIndex duties;
+    private readonly Core.StorageEligibility storage;
     private readonly HttpClient http;
     private readonly CancellationTokenSource cancellation = new();
     private readonly object sync = new();
@@ -53,11 +55,18 @@ public sealed class LootDataService : IDisposable
     private int seenLearnedRevision = -1;
     private int seenWikiRevision = -1;
 
-    public LootDataService(string configDirectory, LearnedLootStore learned, WikiLootSource wiki)
+    public LootDataService(
+        string configDirectory,
+        LearnedLootStore learned,
+        WikiLootSource wiki,
+        Core.ContentFinderIndex duties,
+        Core.StorageEligibility storage)
     {
         this.configDirectory = configDirectory;
         this.learned = learned;
         this.wiki = wiki;
+        this.duties = duties;
+        this.storage = storage;
 
         http = new HttpClient(new HttpClientHandler
         {
@@ -125,7 +134,7 @@ public sealed class LootDataService : IDisposable
 
         try
         {
-            Data = DungeonLootData.Build(incoming, configDirectory, learned, wiki);
+            Data = DungeonLootData.Build(incoming, configDirectory, learned, wiki, duties, storage);
             State = LootDataState.Ready;
             Revision++;
 

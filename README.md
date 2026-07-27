@@ -4,7 +4,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-0.3.0-black)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.5.0-black)](./CHANGELOG.md)
 [![Status](https://img.shields.io/badge/status-Alpha-orange)](./CHANGELOG.md)
 [![Changelog](https://img.shields.io/badge/changelog-blue)](./CHANGELOG.md)
 
@@ -59,7 +59,9 @@ have them loaded, persists that per character, and reports how old the snapshot 
 
 ## Features
 
-- Detects the duty you zone into and lists only the glamour-able gear you do not yet have.
+- Detects the duty you zone into and lists only the glamour-able gear you do not yet have, closing
+  again when you leave.
+- Covers **dungeons and alliance raids only** — the content whose gear people actually farm.
 - Looks up **any** duty without entering it, from a searchable list or `/glamassist <duty name>`.
 - Counts a piece as owned when it is in the dresser directly, inside a stored **outfit set**, or in
   the Armoire. Bags, armoury chest, equipped gear and saddlebags are opt-in.
@@ -68,14 +70,16 @@ have them loaded, persists that per character, and reports how old the snapshot 
 - Refreshes the loot dataset on every plugin load, revalidated with `If-None-Match` so unchanged
   data costs two `304`s.
 - Falls back to the on-disk dataset when offline, and says so in the window.
-- Filters loot lists down to equippable, non-soul-crystal items, dropping the orchestrion rolls,
-  Triple Triad cards, materials and job coffers that share the same drop lists.
+- Lists only pieces that can genuinely be **kept**, dropping the materia, orchestrion rolls, cards
+  and coffers that share the same drop lists.
 - **Learns from what you see drop**, including rolls other party members win, and merges it into the
   duty's list.
 - **Fills gaps from the Console Games Wiki**, which documents new dungeons the primary dataset has
   barely touched — the Clyteum goes from 1 listed drop to a full table.
 - **Marks unowned items beside the loot roll window** in a companion window that never touches the
   game's own UI nodes, so it cannot fight plugins that do.
+- **Groups by equipment slot or by who can roll Need**, with collapsible headings that stay
+  collapsed between sessions.
 
 ## Commands
 
@@ -91,18 +95,70 @@ have them loaded, persists that per character, and reports how old the snapshot 
 
 All settings live in the in-game window (`/glamassist config`).
 
-| Setting | Default | Notes |
-| --- | --- | --- |
-| Open automatically when I enter a duty | on | Pops the window on zoning in |
-| ...but not when I already have everything | on | Suppresses the pop-up at 0 missing |
-| List pieces I already have, greyed out | off | |
-| Only show gear my current job can wear | off | Re-evaluated when you switch job |
-| Count bags / armoury / equipped / saddlebags | off | A drop in your bag is not collected yet |
-| Outfit-set ownership | Any | See below |
-| Warn when dresser data is older than | 7 days | |
-| Record gear that drops in duties | on | See below |
-| Fill gaps from the wiki | on | See below |
-| Companion list beside the loot window | on | Side: Auto / Left / Right |
+Settings are split across two tabs: **General** for what the window shows and how ownership is
+judged, **Data** for the collection snapshot and the loot sources behind it.
+
+| Setting | Tab | Default | Notes |
+| --- | --- | --- | --- |
+| Open automatically when I enter a duty | General | on | Pops the window on zoning in |
+| ...but not when I already have everything | General | on | Suppresses the pop-up at 0 missing |
+| Close again when I leave the duty | General | on | A duty you pinned yourself stays open |
+| List pieces I already have, greyed out | General | off | |
+| Only show gear my current job can wear | General | off | Re-evaluated when you switch job |
+| Skip weapons | General | off | Main hands and off-hands, which drop together |
+| Group the list by | General | Slot | Equipment slot, or role that can roll Need |
+| Compare against | General | Both | Dresser, Armoire, or both |
+| Count bags / armoury / equipped / saddlebags | General | off | A drop in your bag is not collected yet |
+| Outfit-set ownership | General | Any | See below |
+| Companion list beside the loot window | General | on | Side: Auto / Left / Right |
+| Warn when dresser data is older than | Data | 7 days | |
+| Record gear that drops in duties | Data | on | See below |
+| Fill gaps from the wiki | Data | on | See below |
+
+### Grouping and collapsing
+
+Headings collapse with a click and stay collapsed between sessions. Two groupings:
+
+- **Equipment slot** — head, body, hands and so on.
+- **Role that can roll Need** — Tank, Healer, Melee DPS, Physical Ranged, Magical Ranged, for
+  claiming during a run. The toolbar button switches between them without opening settings.
+
+Roles come from the jobs that can equip each piece. `ClassJob.Role` alone lumps Bard in with Black
+Mage, so `PrimaryStat` splits physical ranged (DEX) from casters (INT) — no hardcoded job lists.
+Pieces that genuinely span roles say so: "of Aiming" accessories show as *Melee DPS / Physical
+Ranged*, because NIN and VPR really can roll on them alongside BRD, MCH and DNC.
+
+### What counts as owned, and what can be kept at all
+
+**Compare against** picks the storage that decides it: the Glamour Dresser, the Armoire, or both.
+The list then only shows pieces that store can actually hold.
+
+The two stores **overlap** — most Armoire items can live in either place, so this is not an
+either/or. Everything wearable goes in the Dresser; the `Cabinet` sheet is the authoritative list of
+the subset the Armoire also accepts.
+
+Which items the Armoire accepts is read in full from the game's `Cabinet` sheet every time the
+plugin loads. **Nothing is hardcoded** — not a level, not an expansion, not a set name — so when
+Square Enix adds gear to the Armoire, a game patch is all it takes and the plugin follows on the
+next start. Eligibility is never written to disk either: the caches hold raw item ids and are
+re-judged against the current sheet on load, so existing data reclassifies itself too.
+
+As a snapshot of how that looked when this was written — descriptive, not a rule — every Dawntrail
+dungeon set was in the Armoire and no Endwalker or earlier one was, putting the line between equip
+Lv90 and Lv91. The Lv89–90 entries that did exist were job artifact gear and crafter tool sets
+rather than dungeon drops. Expect that to move.
+
+One known gap: relic weapons cannot go in the Dresser and no sheet column marks them. They are not
+dungeon drops, so it does not affect what is listed here.
+
+### Which duties are covered
+
+Dungeons and alliance raids only — 103 and 18 respectively at the time of writing. Trials, 8-player
+raids, ultimates, guildhests, deep dungeons and everything else are excluded, which is 508 of the
+629 duty territories the game defines.
+
+Alliance raids share `ContentType` 5 with 8-player raids, so the party layout tells them apart:
+`ContentMemberType` 4 is the 24-player alliance, 3 is a full party.
 
 ### Outfit-set ownership
 
