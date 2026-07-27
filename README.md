@@ -4,7 +4,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-0.5.0-black)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.6.0-black)](./CHANGELOG.md)
 [![Status](https://img.shields.io/badge/status-Alpha-orange)](./CHANGELOG.md)
 [![Changelog](https://img.shields.io/badge/changelog-blue)](./CHANGELOG.md)
 
@@ -120,13 +120,30 @@ judged, **Data** for the collection snapshot and the loot sources behind it.
 Headings collapse with a click and stay collapsed between sessions. Two groupings:
 
 - **Equipment slot** — head, body, hands and so on.
-- **Role that can roll Need** — Tank, Healer, Melee DPS, Physical Ranged, Magical Ranged, for
-  claiming during a run. The toolbar button switches between them without opening settings.
+- **Role that can roll Need** — for claiming during a run. The toolbar button switches between them
+  without opening settings.
 
-Roles come from the jobs that can equip each piece. `ClassJob.Role` alone lumps Bard in with Black
-Mage, so `PrimaryStat` splits physical ranged (DEX) from casters (INT) — no hardcoded job lists.
-Pieces that genuinely span roles say so: "of Aiming" accessories show as *Melee DPS / Physical
-Ranged*, because NIN and VPR really can roll on them alongside BRD, MCH and DNC.
+Roles come from the jobs that can equip each piece, never from a hardcoded job list. `ClassJob.Role`
+alone lumps Bard in with Black Mage, so `PrimaryStat` splits physical ranged (DEX) from casters
+(INT).
+
+**Melee is not one bucket.** Maiming, Striking and Scouting go to different jobs and share nothing,
+so melee is split by the job set the game itself lists on the item:
+
+| Heading | Gear type | Category |
+| --- | --- | --- |
+| Melee DPS (DRG RPR) | Maiming | 76 |
+| Melee DPS (MNK SAM) | Striking | 65 |
+| Melee DPS (NIN VPR) | Scouting | 103 |
+| Melee DPS (MNK DRG SAM RPR) | Slaying accessories | 84 |
+
+Tanks and healers stay whole because their armour and accessories genuinely share one category, so
+this splits exactly where the game splits. A new job lands in the right heading on its own — Viper
+needed no code. Base classes are dropped from the labels via `JobIndex`, so it reads "DRG RPR"
+rather than "LNC DRG RPR".
+
+Pieces that span roles say so: "of Aiming" accessories show as *Melee DPS / Physical Ranged*,
+because NIN and VPR really can roll on them alongside BRD, MCH and DNC.
 
 ### What counts as owned, and what can be kept at all
 

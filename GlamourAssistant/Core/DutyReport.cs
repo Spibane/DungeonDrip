@@ -80,7 +80,7 @@ public sealed class DutyReportBuilder(
                 itemId, ownership, outfits.SetsContaining(itemId), configuration.OutfitOwnership,
                 configuration.Scope);
 
-            var (roleOrder, roleGroup) = JobRoleIndex.Describe(jobRoles.RolesFor(item.ClassJobCategory.RowId));
+            var (roleOrder, roleGroup) = jobRoles.GroupFor(item.ClassJobCategory.RowId);
 
             results.Add(new ReportItem(
                 itemId,

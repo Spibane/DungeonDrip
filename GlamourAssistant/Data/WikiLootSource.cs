@@ -85,8 +85,10 @@ public sealed class WikiLootSource : IDisposable
             Timeout = TimeSpan.FromSeconds(20),
         };
 
+        // Version read from the assembly so this identifier cannot drift out of date.
+        var version = typeof(WikiLootSource).Assembly.GetName().Version?.ToString(3) ?? "0";
         http.DefaultRequestHeaders.UserAgent.ParseAdd(
-            "GlamourAssistant/0.3 (Dalamud plugin; https://github.com/Spibane/GlamourAssistant)");
+            $"GlamourAssistant/{version} (Dalamud plugin; https://github.com/Spibane/GlamourAssistant)");
 
         Load();
     }

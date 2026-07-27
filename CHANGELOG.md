@@ -1,5 +1,10 @@
 # Changelog
 
+### v0.6.0 - 2026-07-27
+- Changed role grouping to split melee into its actual gear types instead of one bucket: Maiming (DRG RPR), Striking (MNK SAM), Scouting (NIN VPR) and the shared Slaying accessories. The split comes from the job set the game lists on each item, so a new job lands in the right heading with no code change; tanks and healers stay whole because their armour and accessories really do share a category
+- Changed melee headings to drop base classes, reading "DRG RPR" rather than "LNC DRG RPR"
+- Removed the inline provenance markers from the item list; that detail is already in the hover tooltip
+
 ### v0.5.0 - 2026-07-27
 - Added an option, on by default, to close the window again when you leave a duty; a duty you pinned yourself stays open
 - **BREAKING:** Restricted coverage to dungeons and alliance raids (103 and 18 duties). Trials, 8-player raids, ultimates, guildhests and deep dungeons are no longer tracked, and drops are no longer learned in them
