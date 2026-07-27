@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using DungeonDrip.Data;
 using DungeonDrip.Game;
 using Lumina.Excel.Sheets;
@@ -37,10 +36,9 @@ public sealed class DutyReportBuilder(
     DutyCatalog catalog,
     OutfitCatalog outfits,
     JobRoleIndex jobRoles,
-    StorageEligibility storage)
+    StorageEligibility storage,
+    JobFilter jobFilter)
 {
-    private readonly Dictionary<(uint Category, uint Job), bool> jobFilterCache = [];
-
     public DutyReport? Build(uint territoryId, OwnershipView ownership, Configuration configuration)
     {
         if (!loot.TryGetItems(territoryId, out var itemIds))
@@ -60,7 +58,7 @@ public sealed class DutyReportBuilder(
             if (!storage.MatchesScope(storage.Of(item), configuration.Scope))
                 continue;
 
-            if (configuration.OnlyCurrentJobEquippable && !CurrentJobCanEquip(item))
+            if (configuration.OnlyCurrentJobEquippable && !jobFilter.CanEquip(item))
             {
                 hiddenByJob++;
                 continue;
@@ -109,34 +107,5 @@ public sealed class DutyReportBuilder(
             results.Count,
             hiddenByJob,
             hiddenWeapons);
-    }
-
-    /// <summary>
-    /// ClassJobCategory exposes one boolean column per job abbreviation, so the check is a reflected
-    /// property read - cached, because it runs once per item per frame otherwise.
-    /// </summary>
-    private bool CurrentJobCanEquip(Item item)
-    {
-        var playerState = Plugin.PlayerState;
-        if (!playerState.IsLoaded || !playerState.ClassJob.IsValid)
-            return true;
-
-        var jobRow = playerState.ClassJob.RowId;
-        var categoryRow = item.ClassJobCategory.RowId;
-
-        if (jobFilterCache.TryGetValue((categoryRow, jobRow), out var cached))
-            return cached;
-
-        var allowed = true;
-        if (item.ClassJobCategory.IsValid)
-        {
-            var abbreviation = playerState.ClassJob.Value.Abbreviation.ExtractText();
-            var property = typeof(ClassJobCategory).GetProperty(abbreviation, BindingFlags.Public | BindingFlags.Instance);
-            if (property != null && property.GetValue(item.ClassJobCategory.Value) is bool value)
-                allowed = value;
-        }
-
-        jobFilterCache[(categoryRow, jobRow)] = allowed;
-        return allowed;
     }
 }

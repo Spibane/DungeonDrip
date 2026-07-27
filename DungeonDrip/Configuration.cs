@@ -58,16 +58,16 @@ public class Configuration : IPluginConfiguration
 
     public OutfitOwnershipMode OutfitOwnership { get; set; } = OutfitOwnershipMode.AnyOutfit;
 
-    /// <summary>Show owned pieces greyed out alongside the missing ones.</summary>
+    /// <summary>Show owned pieces greyed out alongside the missing ones, in every gear list.</summary>
     public bool ShowOwnedItems { get; set; }
 
     /// <summary>Call out which role has the most still missing, above the list.</summary>
     public bool ShowRoleSummary { get; set; } = true;
 
-    /// <summary>Restrict the list to gear the current job can actually wear.</summary>
+    /// <summary>Restrict every gear list to what the current job can actually wear.</summary>
     public bool OnlyCurrentJobEquippable { get; set; }
 
-    /// <summary>Leave main-hand weapons out of the list.</summary>
+    /// <summary>Leave weapons and off-hands out of every gear list.</summary>
     public bool HideWeapons { get; set; }
 
     /// <summary>Which storage is compared against.</summary>
@@ -99,9 +99,6 @@ public class Configuration : IPluginConfiguration
 
     /// <summary>Which side of the vendor window the panel sits on. Auto flips if space is tight.</summary>
     public LootCompanionSide VendorPanelSide { get; set; } = LootCompanionSide.Auto;
-
-    /// <summary>List pieces you already have, greyed out, alongside the ones you do not.</summary>
-    public bool VendorShowOwnedItems { get; set; } = true;
 
     /// <summary>Group the vendor panel by equipment slot rather than listing it flat.</summary>
     public bool VendorGroupBySlot { get; set; } = true;

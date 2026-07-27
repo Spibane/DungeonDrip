@@ -60,21 +60,27 @@ never means "you already have this".
 
 | Marker | Colour | Meaning |
 | --- | --- | --- |
-| star | gold | Not collected |
+| x | gold | Not collected |
 | tick | grey | In the Glamour Dresser |
-| layers | grey | Part of a stored outfit set |
+| layers | grey | In a stored outfit set that still has gaps |
+| star | green | In an outfit set you have completed |
 | archive box | grey | In the Armoire |
 | briefcase | grey | Carried or equipped |
 | question mark | amber | No dresser data — nothing can honestly be said either way |
 
-**A stale snapshot turns the gold star amber, not the grey ticks.** Dresser contents are
+The star means a finished outfit and nothing else. Everything you own is drawn quietly in grey, so
+the only two things that catch the eye are the gold x on what you are missing and the green star on
+a set you have completed.
+
+**A stale snapshot turns the gold x amber, not the grey ticks.** Dresser contents are
 near-monotonic: you add glamours far more often than you remove them, so an old snapshot's "you own
-this" almost always still holds, while its "you don't" is exactly what goes out of date. Amber on a
-star means *probably new, but worth checking*.
+this" almost always still holds, while its "you don't" is exactly what goes out of date. Amber on an
+x means *probably new, but worth checking*.
 
 The panel lists whatever the vendor is currently showing. Switching a category or tab re-reads it;
 scrolling does not change it. It reads the shop window's position and stock but never draws into it,
-so it cannot fight with plugins that do.
+so it cannot fight with plugins that do. It is pinned where you cannot drag it, so fold it to its
+title bar when it is in the way.
 
 Covered: gil vendors and Calamity Salvagers, item-exchange counters, currency and scrip exchanges,
 Grand Company quartermasters, free-item counters and the Firmament. Anything else simply gets no
@@ -94,23 +100,26 @@ panel — run `/dungeondrip shop` there and report the addon name it prints.
 
 ## Settings
 
+Settings are split by what they affect. **General** holds the rules every gear list obeys — the duty
+window, the loot-roll companion and the vendor panel alike. **Duties** and **Vendors** hold only
+what is specific to that surface.
+
 | Setting | Tab | Default |
 | --- | --- | --- |
-| Open automatically on entering a duty | General | on |
-| ...unless nothing is missing | General | on |
-| Close again on leaving the duty | General | on |
 | List owned pieces, greyed out | General | off |
-| Call out the role with the most missing | General | on |
 | Only show gear the current job can wear | General | off |
 | Skip weapons, main hands and off-hands | General | off |
-| Group the list by slot or by role | General | slot |
 | Compare against Dresser, Armoire or both | General | both |
 | Also count bags, armoury, equipped, saddlebags | General | off |
 | Outfit-set ownership: any set, or all sets | General | any |
-| Companion list beside the loot window | General | on |
-| Panel beside vendor windows | General | on |
-| List vendor stock you already have | General | on |
-| Group the vendor panel by slot | General | on |
+| Open automatically on entering a duty | Duties | on |
+| ...unless nothing is missing | Duties | on |
+| Close again on leaving the duty | Duties | on |
+| Call out the role with the most missing | Duties | on |
+| Group the list by slot or by role | Duties | slot |
+| Companion list beside the loot window | Duties | on |
+| Panel beside vendor windows | Vendors | on |
+| Group the vendor panel by slot | Vendors | on |
 | Warn when dresser data is older than | Data | 7 days |
 | Record gear that drops in duties | Data | on |
 | Fill gaps from the wiki | Data | on |

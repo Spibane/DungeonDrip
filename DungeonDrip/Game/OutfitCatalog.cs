@@ -18,19 +18,70 @@ public sealed class OutfitCatalog
     public const int SlotCount = 11;
 
     private readonly Dictionary<uint, HashSet<uint>> setsByPiece;
+    private readonly Dictionary<uint, HashSet<uint>> piecesBySet;
 
-    private OutfitCatalog(Dictionary<uint, HashSet<uint>> setsByPiece) => this.setsByPiece = setsByPiece;
+    private OutfitCatalog(
+        Dictionary<uint, HashSet<uint>> setsByPiece,
+        Dictionary<uint, HashSet<uint>> piecesBySet)
+    {
+        this.setsByPiece = setsByPiece;
+        this.piecesBySet = piecesBySet;
+    }
 
     /// <summary>Every outfit set that lists <paramref name="itemId"/> as one of its pieces.</summary>
     public IReadOnlySet<uint> SetsContaining(uint itemId) =>
         setsByPiece.TryGetValue(itemId, out var sets) ? sets : EmptySet;
+
+    /// <summary>Every piece the given outfit set is made of.</summary>
+    public IReadOnlySet<uint> PiecesOf(uint setId) =>
+        piecesBySet.TryGetValue(setId, out var pieces) ? pieces : EmptySet;
+
+    /// <summary>
+    /// Whether any stored outfit set holding this piece has every one of its slots filled.
+    /// </summary>
+    /// <remarks>
+    /// The distinction worth drawing for a completionist: a set can sit in the dresser for a long
+    /// time with gaps in it, and knowing a piece belongs to one that is actually finished is a
+    /// different piece of news from knowing it is merely accounted for.
+    /// </remarks>
+    public bool IsInCompletedSet(uint itemId, OwnershipView view)
+    {
+        if (!view.DresserOutfits.TryGetValue(itemId, out var holders))
+            return false;
+
+        foreach (var setId in holders)
+        {
+            if (IsComplete(setId, view))
+                return true;
+        }
+
+        return false;
+    }
+
+    private bool IsComplete(uint setId, OwnershipView view)
+    {
+        var pieces = PiecesOf(setId);
+        if (pieces.Count == 0)
+            return false;
+
+        foreach (var piece in pieces)
+        {
+            // The dresser reader only records a piece against a set when that slot is genuinely
+            // unlocked, so membership here is the same question as "is this slot filled".
+            if (!view.DresserOutfits.TryGetValue(piece, out var owners) || !owners.Contains(setId))
+                return false;
+        }
+
+        return true;
+    }
 
     private static readonly HashSet<uint> EmptySet = [];
 
     public static OutfitCatalog Build()
     {
         var sheet = Plugin.DataManager.GetExcelSheet<MirageStoreSetItem>();
-        var map = new Dictionary<uint, HashSet<uint>>();
+        var byPiece = new Dictionary<uint, HashSet<uint>>();
+        var bySet = new Dictionary<uint, HashSet<uint>>();
 
         foreach (var row in sheet)
         {
@@ -40,14 +91,19 @@ public sealed class OutfitCatalog
                 if (piece == 0)
                     continue;
 
-                if (!map.TryGetValue(piece, out var sets))
-                    map[piece] = sets = [];
+                if (!byPiece.TryGetValue(piece, out var sets))
+                    byPiece[piece] = sets = [];
 
                 sets.Add(row.RowId);
+
+                if (!bySet.TryGetValue(row.RowId, out var pieces))
+                    bySet[row.RowId] = pieces = [];
+
+                pieces.Add(piece);
             }
         }
 
-        return new OutfitCatalog(map);
+        return new OutfitCatalog(byPiece, bySet);
     }
 
     public static uint GetSlotItemId(MirageStoreSetItem row, int slot) => slot switch
