@@ -1,10 +1,10 @@
-<h1 align="center">👗 Glamour Assistant</h1>
+<h1 align="center">💧 Dungeon Drip</h1>
 
 <h2 align="center"><strong>Shows which dungeon glamour pieces are still missing from your Glamour Dresser and Armoire</strong></h2>
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-0.6.0-black)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.8.0-black)](./CHANGELOG.md)
 [![Status](https://img.shields.io/badge/status-Alpha-orange)](./CHANGELOG.md)
 [![Changelog](https://img.shields.io/badge/changelog-blue)](./CHANGELOG.md)
 
@@ -62,7 +62,7 @@ have them loaded, persists that per character, and reports how old the snapshot 
 - Detects the duty you zone into and lists only the glamour-able gear you do not yet have, closing
   again when you leave.
 - Covers **dungeons and alliance raids only** — the content whose gear people actually farm.
-- Looks up **any** duty without entering it, from a searchable list or `/glamassist <duty name>`.
+- Looks up **any** duty without entering it, from a searchable list or `/dungeondrip <duty name>`.
 - Counts a piece as owned when it is in the dresser directly, inside a stored **outfit set**, or in
   the Armoire. Bags, armoury chest, equipped gear and saddlebags are opt-in.
 - Handles partially-filled outfit sets by asking the client which slots are populated
@@ -83,17 +83,21 @@ have them loaded, persists that per character, and reports how old the snapshot 
 
 ## Commands
 
+Short aliases are only registered if no other plugin already owns them — `/dd` is DailyDuty's, and
+Dalamud silently refuses a duplicate, so a clash would look like a bug here. Settings → General
+shows which commands actually got claimed on your install.
+
 | Command | What it does |
 | --- | --- |
-| `/glamassist` | Toggle the window (`/gla` also works) |
-| `/glamassist <duty name>` | Pin the window to that duty; ambiguous names open the picker |
-| `/glamassist config` | Settings |
-| `/glamassist refresh` | Re-read the dresser and armoire now |
-| `/glamassist update` | Force a re-download of the loot dataset |
+| `/dungeondrip` | Toggle the window (`/gla` also works) |
+| `/dungeondrip <duty name>` | Pin the window to that duty; ambiguous names open the picker |
+| `/dungeondrip config` | Settings |
+| `/dungeondrip refresh` | Re-read the dresser and armoire now |
+| `/dungeondrip update` | Force a re-download of the loot dataset |
 
 ## Configuration
 
-All settings live in the in-game window (`/glamassist config`).
+All settings live in the in-game window (`/dungeondrip config`).
 
 Settings are split across two tabs: **General** for what the window shows and how ownership is
 judged, **Data** for the collection snapshot and the loot sources behind it.
@@ -185,6 +189,19 @@ can belong to several sets, so there are two readings:
 - **Any** (default) — owned as soon as one stored outfit contains it.
 - **All** — owned only once every outfit set listing that piece is stored, with that slot filled.
 
+Hovering a piece lists the sets it belongs to and where each stands, in three states rather than
+two:
+
+| | Meaning |
+| --- | --- |
+| *stored, includes this piece* | Nothing to do |
+| *stored, but this slot is empty* | You own the outfit — top it up rather than hunting the whole set |
+| *not stored* | You do not have that outfit |
+
+The middle state is the one worth having: without it a half-filled set looks identical to one you do
+not own, and the fix is completely different. In practice a piece belongs to at most three sets, so
+the tooltip stays short.
+
 ### Filling gaps from the Console Games Wiki
 
 The primary dataset lags badly on brand-new dungeons — Mistwake listed 2 drops and the Clyteum 1,
@@ -246,7 +263,7 @@ All live in the Dalamud plugin config folder:
 ## Package Structure
 
 ```
-GlamourAssistant/
+DungeonDrip/
 ├── Plugin.cs                    # services, territory tracking, report cache, commands
 ├── Configuration.cs
 ├── Data/
@@ -291,7 +308,7 @@ the game with Dalamud once, nothing extra is needed:
 | macOS (XIV on Mac) | `~/Library/Application Support/XIV on Mac/dalamud/Hooks/dev/` |
 
 ```bash
-dotnet build GlamourAssistant.sln -c Release
+dotnet build DungeonDrip.sln -c Release
 ```
 
 With no XIVLauncher present — CI, or compile-checking on a dev machine — extract
@@ -299,7 +316,7 @@ With no XIVLauncher present — CI, or compile-checking on a dev machine — ext
 overrides all of the above:
 
 ```bash
-DALAMUD_HOME=/path/to/dalamud dotnet build GlamourAssistant.sln -c Release
+DALAMUD_HOME=/path/to/dalamud dotnet build DungeonDrip.sln -c Release
 ```
 
 ### Output paths
@@ -309,17 +326,17 @@ places:
 
 | Build command | Plugin DLL |
 | --- | --- |
-| `dotnet build GlamourAssistant.sln -c Release` | `GlamourAssistant\bin\x64\Release\GlamourAssistant.dll` |
-| `dotnet build GlamourAssistant\GlamourAssistant.csproj -c Release` | `GlamourAssistant\bin\Release\GlamourAssistant.dll` |
+| `dotnet build DungeonDrip.sln -c Release` | `DungeonDrip\bin\x64\Release\DungeonDrip.dll` |
+| `dotnet build DungeonDrip\DungeonDrip.csproj -c Release` | `DungeonDrip\bin\Release\DungeonDrip.dll` |
 
-The `...\Release\GlamourAssistant\latest.zip` beside it is DalamudPackager's *distributable* — that
+The `...\Release\DungeonDrip\latest.zip` beside it is DalamudPackager's *distributable* — that
 folder holds only the zip and the manifest, so it is not what you load for testing.
 
 ### Loading it in-game — Windows
 
-1. `/xlsettings` → **Experimental** → add the **full path to `GlamourAssistant.dll`** (the file, not
+1. `/xlsettings` → **Experimental** → add the **full path to `DungeonDrip.dll`** (the file, not
    its folder) under Dev Plugin Locations. This is only needed once.
-2. `/xlplugins` → **Dev Tools → Installed Dev Plugins** → enable **Glamour Assistant**.
+2. `/xlplugins` → **Dev Tools → Installed Dev Plugins** → enable **Dungeon Drip**.
 3. After a rebuild, reload it from that same Dev Plugins list — no game restart needed.
 
 ### Loading it in-game — Linux (XIVLauncher.Core)
@@ -329,17 +346,17 @@ Wine-visible (`Z:\home\you\...`, since Wine maps `/` to `Z:`). Avoid that entire
 `devPlugins` folder, which Dalamud scans automatically:
 
 ```bash
-mkdir -p ~/.xlcore/devPlugins/GlamourAssistant && cp GlamourAssistant/bin/x64/Release/GlamourAssistant.{dll,json,deps.json} ~/.xlcore/devPlugins/GlamourAssistant/
+mkdir -p ~/.xlcore/devPlugins/DungeonDrip && cp DungeonDrip/bin/x64/Release/DungeonDrip.{dll,json,deps.json} ~/.xlcore/devPlugins/DungeonDrip/
 ```
 
-Then `/xlplugins` → **Dev Tools → Installed Dev Plugins** → enable **Glamour Assistant**. Re-run the
+Then `/xlplugins` → **Dev Tools → Installed Dev Plugins** → enable **Dungeon Drip**. Re-run the
 copy after each rebuild and hit reload there.
 
 The runtime files are plain text and directly inspectable, which is the easiest way to confirm the
 data pipeline while testing:
 
 ```bash
-ls -la ~/.xlcore/pluginConfigs/GlamourAssistant/
+ls -la ~/.xlcore/pluginConfigs/DungeonDrip/
 ```
 
 Note that **Open config folder** in settings generally fails under Wine — there is no shell handler
