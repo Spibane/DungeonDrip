@@ -1,0 +1,274 @@
+using System;
+using System.Numerics;
+using Dalamud.Bindings.ImGui;
+using Dalamud.Game.Text.SeStringHandling;
+using Dalamud.Interface.Textures;
+using Dalamud.Interface.Utility;
+using Dalamud.Interface.Utility.Raii;
+using Dalamud.Interface.Windowing;
+using GlamourAssistant.Core;
+
+namespace GlamourAssistant.Windows;
+
+public class MissingItemsWindow : Window, IDisposable
+{
+    private static readonly Vector4 Warning = new(1.00f, 0.71f, 0.20f, 1f);
+    private static readonly Vector4 Good = new(0.45f, 0.85f, 0.45f, 1f);
+    private static readonly Vector4 Muted = new(0.60f, 0.60f, 0.60f, 1f);
+
+    private readonly Plugin plugin;
+
+    private string dutyFilter = string.Empty;
+    private bool pickerOpen;
+
+    public MissingItemsWindow(Plugin plugin)
+        : base("Glamour Assistant###GlamourAssistantMain")
+    {
+        this.plugin = plugin;
+        SizeConstraints = new WindowSizeConstraints
+        {
+            MinimumSize = new Vector2(420, 320),
+            MaximumSize = new Vector2(float.MaxValue, float.MaxValue),
+        };
+    }
+
+    public void Dispose() { }
+
+    /// <summary>Opens the window with the picker already filtered, for <c>/glamassist &lt;name&gt;</c>.</summary>
+    public void OpenPicker(string filter)
+    {
+        dutyFilter = filter;
+        pickerOpen = true;
+        IsOpen = true;
+    }
+
+    public override void PreDraw()
+    {
+        var report = plugin.Report;
+        var title = report == null ? "Glamour Assistant" : report.Name;
+        WindowName = $"{title}###GlamourAssistantMain";
+    }
+
+    public override void Draw()
+    {
+        DrawToolbar();
+
+        if (plugin.Duties == null)
+        {
+            ImGui.Spacing();
+            ImGui.TextColored(Warning, plugin.LootData.StatusMessage);
+            ImGui.TextWrapped(
+                "The dungeon loot list is downloaded rather than shipped with the plugin, so it stays " +
+                "current. This only takes a moment the first time.");
+
+            if (ImGui.Button("Try again"))
+                plugin.LootData.CheckForUpdates(force: true);
+
+            return;
+        }
+
+        DrawFreshnessBanner();
+
+        if (pickerOpen)
+        {
+            DrawDutyPicker();
+            ImGui.Separator();
+        }
+
+        var report = plugin.Report;
+        if (report == null)
+        {
+            ImGui.Spacing();
+            ImGui.TextWrapped(
+                "No loot data for your current location. Pick a duty above to look one up, or zone into a dungeon.");
+            return;
+        }
+
+        DrawSummary(report);
+        ImGui.Separator();
+        DrawItems(report);
+    }
+
+    private void DrawToolbar()
+    {
+        if (ImGui.Button(pickerOpen ? "Hide duty list" : "Look up a duty"))
+            pickerOpen = !pickerOpen;
+
+        ImGui.SameLine();
+
+        if (plugin.IsPinned)
+        {
+            if (ImGui.Button("Follow current duty"))
+                plugin.Unpin();
+
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Stop showing the duty you picked and go back to tracking wherever you are.");
+        }
+        else
+        {
+            ImGui.BeginDisabled();
+            ImGui.Button("Following current duty");
+            ImGui.EndDisabled();
+        }
+
+        ImGui.SameLine();
+        if (ImGui.Button("Refresh collection"))
+            plugin.Ownership.RequestRefresh();
+
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Re-read the Glamour Dresser and Armoire, if the game currently has them loaded.");
+
+        ImGui.SameLine();
+        if (ImGui.Button("Settings"))
+            plugin.ToggleConfigUi();
+    }
+
+    private void DrawFreshnessBanner()
+    {
+        var tracker = plugin.Ownership;
+
+        if (!tracker.HasDresserData)
+        {
+            ImGui.TextColored(Warning,
+                "No Glamour Dresser data yet - open a Glamour Dresser once so the plugin can read it.");
+            return;
+        }
+
+        if (tracker.IsDresserStale)
+        {
+            var age = DateTime.UtcNow - tracker.DresserUpdatedUtc!.Value;
+            ImGui.TextColored(Warning,
+                $"Glamour Dresser snapshot is {Describe(age)} old - open your dresser to refresh it.");
+        }
+        else
+        {
+            var age = DateTime.UtcNow - tracker.DresserUpdatedUtc!.Value;
+            ImGui.TextColored(Muted, $"Dresser: {tracker.DresserSlotsUsed} slots, read {Describe(age)} ago.");
+        }
+
+        if (tracker.ArmoireUpdatedUtc == null)
+        {
+            ImGui.TextColored(Muted, "Armoire has never been read - open it at an inn to include it.");
+        }
+    }
+
+    private void DrawDutyPicker()
+    {
+        ImGui.Spacing();
+        ImGui.SetNextItemWidth(-1);
+        ImGui.InputTextWithHint("##dutyFilter", "Search duties by name...", ref dutyFilter, 128);
+
+        using var child = ImRaii.Child("dutyList", new Vector2(-1, 180 * ImGuiHelpers.GlobalScale), true);
+        if (!child.Success || plugin.Duties == null)
+            return;
+
+        var selected = plugin.SelectedTerritory;
+        foreach (var entry in plugin.Duties.Search(dutyFilter))
+        {
+            var label = entry.Level > 0
+                ? $"{entry.Name}  (Lv. {entry.Level}, {entry.ItemCount} pieces)"
+                : $"{entry.Name}  ({entry.ItemCount} pieces)";
+
+            if (ImGui.Selectable($"{label}##{entry.TerritoryId}", selected == entry.TerritoryId))
+            {
+                plugin.PinTerritory(entry.TerritoryId);
+                pickerOpen = false;
+            }
+        }
+    }
+
+    private static void DrawSummary(DutyReport report)
+    {
+        ImGui.Spacing();
+        if (report.TotalCount == 0)
+        {
+            ImGui.TextColored(Muted, "No glamour-able gear listed for this duty.");
+            return;
+        }
+
+        if (report.MissingCount == 0)
+            ImGui.TextColored(Good, $"You have all {report.TotalCount} pieces from this duty.");
+        else
+            ImGui.Text($"Missing {report.MissingCount} of {report.TotalCount} pieces.");
+
+        if (report.HiddenByJobFilter > 0)
+            ImGui.TextColored(Muted, $"{report.HiddenByJobFilter} hidden by the current-job filter.");
+    }
+
+    private void DrawItems(DutyReport report)
+    {
+        var showOwned = plugin.Configuration.ShowOwnedItems;
+
+        using var child = ImRaii.Child("itemList", Vector2.Zero, false);
+        if (!child.Success)
+            return;
+
+        var currentSlot = string.Empty;
+        var drewAnything = false;
+
+        foreach (var item in report.Items)
+        {
+            if (item.IsOwned && !showOwned)
+                continue;
+
+            if (item.SlotName != currentSlot)
+            {
+                currentSlot = item.SlotName;
+                ImGui.Spacing();
+                ImGui.TextColored(Muted, currentSlot);
+                ImGui.Separator();
+            }
+
+            DrawItemRow(item);
+            drewAnything = true;
+        }
+
+        if (!drewAnything && report.TotalCount > 0)
+            ImGui.TextColored(Good, "Nothing missing here.");
+    }
+
+    private void DrawItemRow(ReportItem item)
+    {
+        var iconSize = new Vector2(28, 28) * ImGuiHelpers.GlobalScale;
+        var icon = Plugin.TextureProvider.GetFromGameIcon(new GameIconLookup(item.IconId)).GetWrapOrDefault();
+
+        if (icon != null)
+            ImGui.Image(icon.Handle, iconSize);
+        else
+            ImGui.Dummy(iconSize);
+
+        ImGui.SameLine();
+        ImGui.AlignTextToFramePadding();
+
+        if (item.IsOwned)
+            ImGui.TextColored(Muted, item.Name);
+        else
+            ImGui.Text(item.Name);
+
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip(
+                $"{item.Name}\niLvl {item.ItemLevel}\n{MissingItems.Describe(item.Source)}\n\nRight-click for options.");
+        }
+
+        using var context = ImRaii.ContextPopupItem($"##ctx{item.ItemId}");
+        if (!context.Success)
+            return;
+
+        if (ImGui.Selectable("Link in chat"))
+        {
+            Plugin.ChatGui.Print(new SeStringBuilder().AddItemLink(item.ItemId, false).Build());
+        }
+
+        if (ImGui.Selectable("Copy name"))
+            ImGui.SetClipboardText(item.Name);
+    }
+
+    private static string Describe(TimeSpan age) => age switch
+    {
+        { TotalMinutes: < 1 } => "less than a minute",
+        { TotalHours: < 1 } => $"{(int)age.TotalMinutes} minute(s)",
+        { TotalDays: < 1 } => $"{(int)age.TotalHours} hour(s)",
+        _ => $"{(int)age.TotalDays} day(s)",
+    };
+}
