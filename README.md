@@ -4,7 +4,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-0.1.0-black)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.3.0-black)](./CHANGELOG.md)
 [![Status](https://img.shields.io/badge/status-Alpha-orange)](./CHANGELOG.md)
 [![Changelog](https://img.shields.io/badge/changelog-blue)](./CHANGELOG.md)
 
@@ -70,6 +70,12 @@ have them loaded, persists that per character, and reports how old the snapshot 
 - Falls back to the on-disk dataset when offline, and says so in the window.
 - Filters loot lists down to equippable, non-soul-crystal items, dropping the orchestrion rolls,
   Triple Triad cards, materials and job coffers that share the same drop lists.
+- **Learns from what you see drop**, including rolls other party members win, and merges it into the
+  duty's list.
+- **Fills gaps from the Console Games Wiki**, which documents new dungeons the primary dataset has
+  barely touched — the Clyteum goes from 1 listed drop to a full table.
+- **Marks unowned items beside the loot roll window** in a companion window that never touches the
+  game's own UI nodes, so it cannot fight plugins that do.
 
 ## Commands
 
@@ -94,6 +100,9 @@ All settings live in the in-game window (`/glamassist config`).
 | Count bags / armoury / equipped / saddlebags | off | A drop in your bag is not collected yet |
 | Outfit-set ownership | Any | See below |
 | Warn when dresser data is older than | 7 days | |
+| Record gear that drops in duties | on | See below |
+| Fill gaps from the wiki | on | See below |
+| Companion list beside the loot window | on | Side: Auto / Left / Right |
 
 ### Outfit-set ownership
 
@@ -103,13 +112,45 @@ can belong to several sets, so there are two readings:
 - **Any** (default) — owned as soon as one stored outfit contains it.
 - **All** — owned only once every outfit set listing that piece is stored, with that slot filled.
 
+### Filling gaps from the Console Games Wiki
+
+The primary dataset lags badly on brand-new dungeons — Mistwake listed 2 drops and the Clyteum 1,
+against 60–80 for older content, and Garland Tools returns identical counts. The
+[FFXIV Console Games Wiki](https://ffxiv.consolegameswiki.com) documents both in full.
+
+So when you view a duty, the plugin looks up that one page and merges its loot table in, marking
+those entries *(wiki)*. It reads item **names** out of the page's `Drops table row` templates and
+resolves them against the game's own Item sheet, so a name the game does not know is counted and
+skipped rather than guessed at.
+
+It is strictly additive and hedged at every step:
+
+- One page per duty, on demand — never a bulk crawl.
+- Cached 14 days; a re-check compares the page revision before re-parsing.
+- Misses cached 3 days, so an undocumented duty is not re-fetched constantly.
+- One request at a time, minimum 2s apart, 20s timeout, response size capped.
+- Any failure leaves the primary dataset untouched and is recorded so it backs off.
+- Redirects are followed — `ContentFinderCondition` spells "Toto–Rak" with an en dash while the
+  article uses a hyphen, and MediaWiki's parse endpoint does not follow redirects unless asked.
+
+Not every page is templated the same way; a few (Alzadaal's Legacy, for one) yield nothing, in which
+case the primary dataset still applies. Turn it off or clear the cache in settings.
+
+### Learning from observed drops
+
+The wiki covers documented content; this covers everything else, including a dungeon released
+yesterday. The plugin watches loot chat while you are in a duty and records any glamour-able gear it sees,
+including rolls won by other party members. Item ids come straight out of the chat message's item
+link, so there is no text parsing and no localisation problem. New sightings merge into that duty's
+list immediately, and are marked *(seen here)* so you can tell them from downloaded data.
+
+Nothing is uploaded anywhere. Sightings go to `learned-loot.json` in the **same format as
+`loot-overrides.json`**, so an entry can be promoted to a hand-maintained override, or contributed
+upstream, by copying it across. Turn it off or wipe the record in settings.
+
 ### Loot overrides
 
-Upstream lags on brand-new dungeons. At the time of writing the newest few had a handful of drops
-recorded (Mistwake: 2, the Clyteum: 1) against 60–80 for older ones; Garland Tools returns the same
-counts, so there is no better free source.
-
-To patch a duty yourself, drop a `loot-overrides.json` into the plugin config folder
+To patch a duty by hand, drop a `loot-overrides.json` into the plugin config folder
 (**Settings → Open config folder**) and reload. It is additive, keyed by territory id:
 
 ```json
@@ -120,11 +161,13 @@ To patch a duty yourself, drop a `loot-overrides.json` into the plugin config fo
 
 ### Files written
 
-Both live in the Dalamud plugin config folder:
+All live in the Dalamud plugin config folder:
 
 | File | Contents |
 | --- | --- |
 | `dungeon-loot-cache.json` | Downloaded dataset plus the upstream ETags |
+| `wiki-loot-cache.json` | Per-duty wiki lookups, with page titles and revisions |
+| `learned-loot.json` | Drops this client has watched fall, per territory |
 | `ownership-<contentId>.json` | Per-character dresser/armoire snapshot and its timestamps |
 
 ## Package Structure
@@ -135,22 +178,28 @@ GlamourAssistant/
 ├── Configuration.cs
 ├── Data/
 │   ├── LootDataService.cs       # download, ETag revalidation, transform, disk cache
-│   ├── DungeonLootData.cs       # map → territory, gear filter, overrides merge
+│   ├── DungeonLootData.cs       # map → territory, gear filter, source merge + provenance
+│   ├── WikiLootSource.cs        # per-duty wiki lookup, parse, cache, backoff
+│   ├── LearnedLootStore.cs      # drops observed first-hand, persisted
 │   └── LootModels.cs            # cache + upstream DTOs
 ├── Game/
 │   ├── DresserReader.cs         # prism box + outfit-set expansion
 │   ├── ArmoireReader.cs         # Cabinet sheet reverse map
 │   ├── InventoryReader.cs       # bags / armoury / equipped / saddlebags
+│   ├── LootObserver.cs          # records gear seen dropping in a duty
 │   ├── OutfitCatalog.cs         # MirageStoreSetItem membership + slot order
 │   ├── OwnershipTracker.cs      # per-character snapshot, staleness, persistence
 │   └── ItemId.cs                # HQ / collectable offset normalisation
 ├── Core/
 │   ├── MissingItems.cs          # the ownership decision, Dalamud-free
 │   ├── DutyReport.cs            # territory + ownership → the drawn list
-│   ├── DutyCatalog.cs           # named, sorted duty list for lookup
+│   ├── DutyCatalog.cs           # duty list for lookup, ordered by level
+│   ├── ContentFinderIndex.cs    # territory → duty name; "am I in a duty"
+│   ├── ItemNameIndex.cs         # item name → row id, for wiki name resolution
 │   └── EquipSlots.cs
 └── Windows/
     ├── MissingItemsWindow.cs    # picker, pin, freshness banner, item list
+    ├── LootCompanionWindow.cs   # read-only list pinned beside the Need/Greed window
     └── ConfigWindow.cs
 ```
 
@@ -230,8 +279,23 @@ also prints the path to chat.
 `windows-latest`, fetching the Dalamud dev distribution and exporting `DALAMUD_HOME` so no game
 install is needed, then uploads the packaged plugin folder as an artifact.
 
+## The loot roll window
+
+While a Need/Greed roll is up, a small companion window rides beside it marking which pieces you do
+not own.
+
+It is a **separate window**, not a recolouring of the game's loot list. Several popular plugins
+(Allagan Tools, Simple Tweaks, VanillaPlus, Collections) already write to game addon nodes, and two
+plugins setting the same node's colour is a genuine conflict — whoever writes last in a frame wins,
+and a refresh can revert either. This reads the addon's item list and screen position and writes
+nothing into it, so there is nothing to collide with, and it survives the addon's node layout
+changing in a patch.
+
+Because a roll is time-critical and you cannot go and check, a stale or missing dresser snapshot
+suppresses the verdict and says so rather than showing a confident guess.
+
 ## Not implemented
 
 - Retainer inventories — the client cannot read them unless you are at a retainer.
 - Per-boss attribution of drops.
-- Learning drops from the loot window to close the upstream data gap on new dungeons.
+- Recolouring the game's own loot window (deliberately avoided — see below).

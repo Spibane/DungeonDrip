@@ -41,6 +41,8 @@ public sealed class LootDataService : IDisposable
     private const string CacheFileName = "dungeon-loot-cache.json";
 
     private readonly string configDirectory;
+    private readonly LearnedLootStore learned;
+    private readonly WikiLootSource wiki;
     private readonly HttpClient http;
     private readonly CancellationTokenSource cancellation = new();
     private readonly object sync = new();
@@ -48,10 +50,14 @@ public sealed class LootDataService : IDisposable
     private LootCacheFile? cache;
     private LootCacheFile? pending;
     private Task? inFlight;
+    private int seenLearnedRevision = -1;
+    private int seenWikiRevision = -1;
 
-    public LootDataService(string configDirectory)
+    public LootDataService(string configDirectory, LearnedLootStore learned, WikiLootSource wiki)
     {
         this.configDirectory = configDirectory;
+        this.learned = learned;
+        this.wiki = wiki;
 
         http = new HttpClient(new HttpClientHandler
         {
@@ -105,12 +111,21 @@ public sealed class LootDataService : IDisposable
             pending = null;
         }
 
+        // A newly observed drop or wiki lookup changes the merged result without changing the
+        // download, so rebuild from the cache we already hold.
+        var supplementsChanged = learned.Revision != seenLearnedRevision || wiki.Revision != seenWikiRevision;
+        if (incoming == null && supplementsChanged && cache != null)
+            incoming = cache;
+
         if (incoming == null)
             return;
 
+        seenLearnedRevision = learned.Revision;
+        seenWikiRevision = wiki.Revision;
+
         try
         {
-            Data = DungeonLootData.Build(incoming, configDirectory);
+            Data = DungeonLootData.Build(incoming, configDirectory, learned, wiki);
             State = LootDataState.Ready;
             Revision++;
 

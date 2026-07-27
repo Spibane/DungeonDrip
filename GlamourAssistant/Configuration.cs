@@ -14,6 +14,13 @@ public enum OutfitOwnershipMode
     AllOutfits,
 }
 
+public enum LootCompanionSide
+{
+    Auto,
+    Left,
+    Right,
+}
+
 public class Configuration : IPluginConfiguration
 {
     public int Version { get; set; } = 1;
@@ -37,6 +44,18 @@ public class Configuration : IPluginConfiguration
 
     /// <summary>Age at which the cached Glamour Dresser snapshot starts warning you.</summary>
     public int StaleAfterDays { get; set; } = 7;
+
+    /// <summary>Record gear seen dropping in a duty, to fill gaps the upstream dataset has.</summary>
+    public bool LearnDropsFromLoot { get; set; } = true;
+
+    /// <summary>Look duties up on the FFXIV Console Games Wiki, which covers new content far better.</summary>
+    public bool UseWikiSource { get; set; } = true;
+
+    /// <summary>Show a companion window beside the loot roll window listing what you still need.</summary>
+    public bool ShowLootCompanion { get; set; } = true;
+
+    /// <summary>Which side of the loot window the companion sits on. Auto flips if space is tight.</summary>
+    public LootCompanionSide LootCompanionSide { get; set; } = LootCompanionSide.Auto;
 
     public void Save() => Plugin.PluginInterface.SavePluginConfig(this);
 }

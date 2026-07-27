@@ -7,6 +7,7 @@ using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
 using GlamourAssistant.Core;
+using GlamourAssistant.Data;
 
 namespace GlamourAssistant.Windows;
 
@@ -245,24 +246,52 @@ public class MissingItemsWindow : Window, IDisposable
         else
             ImGui.Text(item.Name);
 
-        if (ImGui.IsItemHovered())
+        // Hover and the context popup both bind to the *last* item drawn, so both have to be taken
+        // against the name before anything else goes on this row.
+        var hovered = ImGui.IsItemHovered();
+
+        using (var context = ImRaii.ContextPopupItem($"##ctx{item.ItemId}"))
+        {
+            if (context.Success)
+            {
+                if (ImGui.Selectable("Link in chat"))
+                    Plugin.ChatGui.Print(new SeStringBuilder().AddItemLink(item.ItemId, false).Build());
+
+                if (ImGui.Selectable("Copy name"))
+                    ImGui.SetClipboardText(item.Name);
+            }
+        }
+
+        var marker = ProvenanceMarker(item.Provenance);
+        if (marker != null)
+        {
+            ImGui.SameLine();
+            ImGui.TextColored(Muted, marker);
+        }
+
+        if (hovered)
         {
             ImGui.SetTooltip(
-                $"{item.Name}\niLvl {item.ItemLevel}\n{MissingItems.Describe(item.Source)}\n\nRight-click for options.");
+                $"{item.Name}\niLvl {item.ItemLevel}\n{MissingItems.Describe(item.Source)}" +
+                $"\n{ProvenanceDescription(item.Provenance)}\n\nRight-click for options.");
         }
-
-        using var context = ImRaii.ContextPopupItem($"##ctx{item.ItemId}");
-        if (!context.Success)
-            return;
-
-        if (ImGui.Selectable("Link in chat"))
-        {
-            Plugin.ChatGui.Print(new SeStringBuilder().AddItemLink(item.ItemId, false).Build());
-        }
-
-        if (ImGui.Selectable("Copy name"))
-            ImGui.SetClipboardText(item.Name);
     }
+
+    private static string? ProvenanceMarker(LootProvenance provenance) => provenance switch
+    {
+        LootProvenance.Learned => "(seen here)",
+        LootProvenance.Wiki => "(wiki)",
+        LootProvenance.Override => "(override)",
+        _ => null,
+    };
+
+    private static string ProvenanceDescription(LootProvenance provenance) => provenance switch
+    {
+        LootProvenance.Learned => "Not in the downloaded list - recorded because you saw it drop here.",
+        LootProvenance.Wiki => "Not in the downloaded list - read off the Console Games Wiki.",
+        LootProvenance.Override => "Added by your loot-overrides.json.",
+        _ => "Listed by the downloaded dataset.",
+    };
 
     private static string Describe(TimeSpan age) => age switch
     {

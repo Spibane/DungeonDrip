@@ -44,29 +44,15 @@ public sealed class DutyCatalog
         return Entries.Where(e => e.Name.Contains(filter.Trim(), StringComparison.OrdinalIgnoreCase));
     }
 
-    public static DutyCatalog Build(DungeonLootData loot)
+    public static DutyCatalog Build(DungeonLootData loot, ContentFinderIndex conditions)
     {
-        // ContentFinderCondition is the only sheet that names a duty the way players do. Several rows
-        // can point at one territory (unrestricted party variants and the like); the duty-finder row
-        // carries the canonical name.
-        var conditions = new Dictionary<uint, ContentFinderCondition>();
-        foreach (var row in Plugin.DataManager.GetExcelSheet<ContentFinderCondition>())
-        {
-            var territory = row.TerritoryType.RowId;
-            if (territory == 0 || row.Name.IsEmpty)
-                continue;
-
-            if (!conditions.TryGetValue(territory, out var existing) || (row.IsInDutyFinder && !existing.IsInDutyFinder))
-                conditions[territory] = row;
-        }
-
         var entries = new List<DutyEntry>();
         foreach (var territoryId in loot.Territories)
         {
             if (!loot.TryGetItems(territoryId, out var items))
                 continue;
 
-            if (conditions.TryGetValue(territoryId, out var cfc))
+            if (conditions.TryGet(territoryId, out var cfc))
             {
                 entries.Add(new DutyEntry(
                     territoryId,
@@ -92,13 +78,18 @@ public sealed class DutyCatalog
             }
         }
 
+        // Highest level first, so current content is at the top where it is wanted. Duties with no
+        // duty-finder row have no level, so they sink to the bottom rather than leading the list.
         entries.Sort((a, b) =>
         {
-            var byExpansion = a.ExpansionOrder.CompareTo(b.ExpansionOrder);
-            if (byExpansion != 0) return byExpansion;
+            var aLevel = a.Level == 0 ? int.MinValue : a.Level;
+            var bLevel = b.Level == 0 ? int.MinValue : b.Level;
 
-            var byLevel = a.Level.CompareTo(b.Level);
-            return byLevel != 0 ? byLevel : string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase);
+            var byLevel = bLevel.CompareTo(aLevel);
+            if (byLevel != 0) return byLevel;
+
+            var byExpansion = a.ExpansionOrder.CompareTo(b.ExpansionOrder);
+            return byExpansion != 0 ? byExpansion : string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase);
         });
 
         return new DutyCatalog(entries);
