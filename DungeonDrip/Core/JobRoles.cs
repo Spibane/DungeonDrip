@@ -48,6 +48,23 @@ public sealed class JobRoleIndex
 
     private static readonly (int Order, string Label) Unknown = (UnknownOrder, "Anyone");
 
+    /// <summary>
+    /// Order roles appear in within a shared heading, primary owner first.
+    /// </summary>
+    /// <remarks>
+    /// Melee comes last because the case that actually occurs is "of Aiming": a ranged gear line
+    /// that NIN and VPR happen to share, so it should read Physical Ranged / Melee DPS rather than
+    /// implying the pieces are melee gear.
+    /// </remarks>
+    private static readonly LootRole[] SharedLabelOrder =
+    [
+        LootRole.Tank,
+        LootRole.Healer,
+        LootRole.PhysicalRanged,
+        LootRole.MagicalRanged,
+        LootRole.Melee,
+    ];
+
     private readonly Dictionary<uint, (int Order, string Label)> groupByCategory;
 
     private JobRoleIndex(Dictionary<uint, (int Order, string Label)> groupByCategory) =>
@@ -152,7 +169,7 @@ public sealed class JobRoleIndex
         {
             return roles.Count == Enum.GetValues<LootRole>().Length
                 ? (AnyRoleOrder, "Any role")
-                : (MixedOrder, string.Join(" / ", roles.OrderBy(r => (int)r).Select(NameOf)));
+                : (MixedOrder, string.Join(" / ", roles.OrderBy(r => Array.IndexOf(SharedLabelOrder, r)).Select(NameOf)));
         }
 
         var role = roles.First();

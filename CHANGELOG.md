@@ -1,5 +1,8 @@
 # Changelog
 
+### v0.9.1 - 2026-07-27
+- Changed shared role headings to name the primary owner first, so "of Aiming" reads as "Physical Ranged / Melee DPS" rather than implying the pieces are melee gear
+
 ### v0.9.0 - 2026-07-27
 - Added a line above the list naming whichever role still needs the most from this duty, with the full per-role breakdown on hover. Counts by role even when the list is grouped by slot, reports ties as ties, and can be turned off in Settings > General
 
