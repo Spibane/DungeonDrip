@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
+using Dalamud.Interface.Components;
 using Dalamud.Interface.Textures;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
@@ -32,7 +33,7 @@ namespace DungeonDrip.Windows;
 /// </remarks>
 public sealed unsafe class VendorPanelWindow : Window, IDisposable
 {
-    private static readonly Vector4 Missing = new(1.00f, 0.85f, 0.40f, 1f);
+    private static readonly Vector4 NotOwned = new(0.94f, 0.38f, 0.38f, 1f);
     private static readonly Vector4 Owned = new(0.55f, 0.55f, 0.55f, 1f);
     private static readonly Vector4 Warning = new(1.00f, 0.71f, 0.20f, 1f);
     private static readonly Vector4 Complete = new(0.45f, 0.85f, 0.45f, 1f);
@@ -60,7 +61,7 @@ public sealed unsafe class VendorPanelWindow : Window, IDisposable
     public VendorPanelWindow(Plugin plugin)
         // Collapsible on purpose: it is pinned where the user cannot move it, so folding it to the
         // title bar is the only way to get it out of the way without turning the feature off.
-        : base("Vendor drip###DungeonDripVendorPanel",
+        : base("Vendor Drip###DungeonDripVendorPanel",
                ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoMove |
                ImGuiWindowFlags.AlwaysAutoResize | ImGuiWindowFlags.NoFocusOnAppearing |
                ImGuiWindowFlags.NoNav)
@@ -124,6 +125,14 @@ public sealed unsafe class VendorPanelWindow : Window, IDisposable
         if (stock == null)
             return;
 
+        if (DrawToolbar())
+        {
+            plugin.Configuration.Save();
+
+            // These are shared with the duty list, so flipping one here has to rebuild that too.
+            plugin.InvalidateReport();
+        }
+
         var ownership = plugin.Ownership;
         var stale = ownership.IsDresserStale;
 
@@ -164,6 +173,59 @@ public sealed unsafe class VendorPanelWindow : Window, IDisposable
 
         foreach (var group in groups)
             DrawGroup(group, options.GroupBySlot, stale);
+    }
+
+    /// <summary>
+    /// The two filters worth flipping mid-shop, as buttons rather than a trip to Settings.
+    /// </summary>
+    /// <remarks>
+    /// They write the shared settings rather than vendor-only copies, which is the point: standing
+    /// at a vendor is exactly when you find out you wanted "everything" instead of "my job", and
+    /// having to remember which of two similarly-named toggles governs this window is the confusion
+    /// the settings tabs were reorganised to end. The button shows the state it is in, not the state
+    /// it would move to, so it reads as an indicator you can also press.
+    /// </remarks>
+    private bool DrawToolbar()
+    {
+        var configuration = plugin.Configuration;
+        var changed = false;
+
+        var showOwned = configuration.ShowOwnedItems;
+        if (ImGuiComponents.IconButton("##vendorOwned", showOwned ? FontAwesomeIcon.Eye : FontAwesomeIcon.EyeSlash))
+        {
+            configuration.ShowOwnedItems = !showOwned;
+            changed = true;
+        }
+
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip(showOwned
+                ? "Showing pieces you already have. Click to list only what you are missing."
+                : "Hiding pieces you already have. Click to list them too.");
+        }
+
+        ImGui.SameLine();
+
+        var jobOnly = configuration.OnlyCurrentJobEquippable;
+        if (ImGuiComponents.IconButton("##vendorJob", jobOnly ? FontAwesomeIcon.User : FontAwesomeIcon.Users))
+        {
+            configuration.OnlyCurrentJobEquippable = !jobOnly;
+            changed = true;
+        }
+
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip(jobOnly
+                ? "Showing only what your current job can wear. Click to show every job."
+                : "Showing gear for every job. Click to show only your current job.");
+        }
+
+        ImGui.SameLine();
+        ImGui.AlignTextToFramePadding();
+        ImGui.TextColored(Owned, "These also apply to the duty list.");
+
+        ImGui.Separator();
+        return changed;
     }
 
     private void DrawGroup(SlotGroup group, bool bySlot, bool stale)
@@ -209,15 +271,17 @@ public sealed unsafe class VendorPanelWindow : Window, IDisposable
     private static void DrawRow(VendorRow row, bool stale)
     {
         var uncertain = VendorMarkers.IsUncertain(row.Marker, stale);
-        var colour = uncertain
-            ? Warning
-            : row.Marker == VendorMarker.NotCollected
-                ? Missing
-                : Owned;
 
-        // A finished outfit is the one piece of good news the panel carries, so the star gets a
-        // colour of its own while the row itself stays as quiet as the rest of what you own.
-        var glyphColour = row.Marker == VendorMarker.OutfitComplete ? Complete : colour;
+        // The glyph carries the whole state; the name only says whether you need the thing. That
+        // split is why the name is left at the theme's own colour rather than tinted - plain white
+        // reads as "this is the list", and any tint on it competes with the glyph for meaning.
+        var glyphColour = row.Marker switch
+        {
+            VendorMarker.OutfitComplete => Complete,
+            VendorMarker.NotCollected => uncertain ? Warning : NotOwned,
+            VendorMarker.Unknown => Warning,
+            _ => Owned,
+        };
 
         ImGui.AlignTextToFramePadding();
 
@@ -237,7 +301,13 @@ public sealed unsafe class VendorPanelWindow : Window, IDisposable
 
         ImGui.SameLine();
         ImGui.AlignTextToFramePadding();
-        ImGui.TextColored(colour, row.Name);
+
+        if (row.Marker == VendorMarker.NotCollected)
+            ImGui.Text(row.Name);
+        else if (row.Marker == VendorMarker.Unknown)
+            ImGui.TextColored(Warning, row.Name);
+        else
+            ImGui.TextColored(Owned, row.Name);
 
         if (!ImGui.IsItemHovered())
             return;

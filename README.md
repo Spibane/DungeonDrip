@@ -60,7 +60,7 @@ never means "you already have this".
 
 | Marker | Colour | Meaning |
 | --- | --- | --- |
-| x | gold | Not collected |
+| x | red | Not collected |
 | tick | grey | In the Glamour Dresser |
 | layers | grey | In a stored outfit set that still has gaps |
 | star | green | In an outfit set you have completed |
@@ -68,14 +68,19 @@ never means "you already have this".
 | briefcase | grey | Carried or equipped |
 | question mark | amber | No dresser data — nothing can honestly be said either way |
 
-The star means a finished outfit and nothing else. Everything you own is drawn quietly in grey, so
-the only two things that catch the eye are the gold x on what you are missing and the green star on
-a set you have completed.
+The marker carries the state and the name only says whether you need the thing: pieces you are
+missing are named in plain white, everything you already own is greyed out. The star means a
+finished outfit and nothing else, so the only two things that catch the eye are the red x and the
+green star.
 
-**A stale snapshot turns the gold x amber, not the grey ticks.** Dresser contents are
+**A stale snapshot turns the red x amber, not the grey ticks.** Dresser contents are
 near-monotonic: you add glamours far more often than you remove them, so an old snapshot's "you own
 this" almost always still holds, while its "you don't" is exactly what goes out of date. Amber on an
 x means *probably new, but worth checking*.
+
+Two buttons at the top of the panel flip the filters you are most likely to want mid-shop — whether
+owned pieces are listed, and whether the list is restricted to your current job. Both write the
+shared settings, so they change the duty list too, and the panel says so.
 
 The panel lists whatever the vendor is currently showing. Switching a category or tab re-reads it;
 scrolling does not change it. It reads the shop window's position and stock but never draws into it,
