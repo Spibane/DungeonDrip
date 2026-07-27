@@ -41,6 +41,11 @@ public sealed unsafe class VendorPanelWindow : Window, IDisposable
     private const float GapPixels = 6f;
     private const string CollapsePrefix = "vendor:";
 
+    /// <summary>Used until the stock has been measured, and as a floor afterwards.</summary>
+    private const float FallbackWidth = 260f;
+
+    private const string SharedNote = "Also applies to the duty list.";
+
     private readonly Plugin plugin;
 
     /// <summary>Resolved in DrawConditions and reused for the rest of the frame.</summary>
@@ -52,24 +57,33 @@ public sealed unsafe class VendorPanelWindow : Window, IDisposable
     private ViewOptions groupedWith;
     private int hiddenByFilter;
 
-    /// <summary>
-    /// Our own width, measured at the end of the last frame. PreDraw runs before this window's
-    /// Begin, so ImGui's current-window queries are not ours to ask there.
-    /// </summary>
-    private float lastWidth = 240f;
+    /// <summary>Width the longest name in the current stock needs, measured when it changes.</summary>
+    private float contentWidth = FallbackWidth;
+    private VendorStock? measuredFrom;
+
+    /// <summary>What PreDraw last asked for, so a size we chose is not mistaken for a drag.</summary>
+    private Vector2 appliedSize;
+    private Vector2 lastSize;
+    private bool resizing;
 
     public VendorPanelWindow(Plugin plugin)
         // Collapsible on purpose: it is pinned where the user cannot move it, so folding it to the
         // title bar is the only way to get it out of the way without turning the feature off.
+        // Resizable for the same reason - it cannot be dragged somewhere with more room, so the
+        // only way out of a list that overruns the screen is to make the window smaller.
         : base("Vendor Drip###DungeonDripVendorPanel",
-               ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoMove |
-               ImGuiWindowFlags.AlwaysAutoResize | ImGuiWindowFlags.NoFocusOnAppearing |
-               ImGuiWindowFlags.NoNav)
+               ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoFocusOnAppearing | ImGuiWindowFlags.NoNav)
     {
         this.plugin = plugin;
         RespectCloseHotkey = false;
         ShowCloseButton = false;
         DisableWindowSounds = true;
+
+        SizeConstraints = new WindowSizeConstraints
+        {
+            MinimumSize = new Vector2(180, 120),
+            MaximumSize = new Vector2(float.MaxValue, float.MaxValue),
+        };
     }
 
     public void Dispose() { }
@@ -81,7 +95,18 @@ public sealed unsafe class VendorPanelWindow : Window, IDisposable
         // A vendor selling nothing wearable gets no panel at all. An empty panel at the potion
         // merchant is noise, and "/dungeondrip shop" is there for anyone wondering whether the
         // feature is alive.
-        return stock is { Rows.Count: > 0 };
+        if (stock is not { Rows.Count: > 0 })
+            return false;
+
+        // Measured here rather than in Draw because PreDraw is what needs the answer, and it runs
+        // first - measuring later would size each shop's panel to the previous shop's longest name.
+        if (!ReferenceEquals(measuredFrom, stock))
+        {
+            measuredFrom = stock;
+            Measure(stock);
+        }
+
+        return true;
     }
 
     public override void PreDraw()
@@ -96,23 +121,38 @@ public sealed unsafe class VendorPanelWindow : Window, IDisposable
 
         var width = unit->GetScaledWidth(true);
         var height = unit->GetScaledHeight(true);
-        var ownWidth = lastWidth;
+        var display = ImGui.GetIO().DisplaySize;
 
-        var side = plugin.Configuration.VendorPanelSide;
+        // Matching the shop's height is what stops a long stock list running off the bottom of the
+        // screen, and it happens to line the two windows up. A size the user dragged to wins.
+        var configuration = plugin.Configuration;
+        var desired = configuration is { VendorPanelWidth: > 0, VendorPanelHeight: > 0 }
+            ? new Vector2(configuration.VendorPanelWidth, configuration.VendorPanelHeight)
+            : new Vector2(contentWidth, height);
+
+        desired.X = Math.Clamp(desired.X, 180f, display.X);
+        desired.Y = Math.Clamp(desired.Y, 120f, display.Y);
+
+        Size = desired;
+        SizeCondition = ImGuiCond.Appearing;
+        appliedSize = desired;
+
+        var side = configuration.VendorPanelSide;
         var toRight = side switch
         {
             LootCompanionSide.Left => false,
             LootCompanionSide.Right => true,
-            _ => unit->X + width + GapPixels + ownWidth <= ImGui.GetIO().DisplaySize.X,
+            _ => unit->X + width + GapPixels + desired.X <= display.X,
         };
 
         var x = toRight
             ? unit->X + width + GapPixels
-            : unit->X - ownWidth - GapPixels;
+            : unit->X - desired.X - GapPixels;
 
-        // Keep it on screen even if the shop is jammed against an edge.
-        x = Math.Clamp(x, 0f, Math.Max(0f, ImGui.GetIO().DisplaySize.X - ownWidth));
-        var y = Math.Clamp((float)unit->Y, 0f, Math.Max(0f, ImGui.GetIO().DisplaySize.Y - height));
+        // Keep it on screen even if the shop is jammed against an edge. Clamped against our own
+        // height rather than the shop's, since ours is the one that can overrun.
+        x = Math.Clamp(x, 0f, Math.Max(0f, display.X - desired.X));
+        var y = Math.Clamp((float)unit->Y, 0f, Math.Max(0f, display.Y - desired.Y));
 
         Position = new Vector2(x, y);
         PositionCondition = ImGuiCond.Always;
@@ -120,7 +160,7 @@ public sealed unsafe class VendorPanelWindow : Window, IDisposable
 
     public override void Draw()
     {
-        lastWidth = ImGui.GetWindowWidth();
+        RememberUserResize();
 
         if (stock == null)
             return;
@@ -171,8 +211,45 @@ public sealed unsafe class VendorPanelWindow : Window, IDisposable
             return;
         }
 
+        // Everything above stays put; only the list scrolls, so the warning about stale data and
+        // the filter buttons cannot be scrolled out of reach.
+        using var list = ImRaii.Child("vendorList", Vector2.Zero, false);
+        if (!list.Success)
+            return;
+
         foreach (var group in groups)
             DrawGroup(group, options.GroupBySlot, stale);
+    }
+
+    /// <summary>
+    /// Stores a size the user dragged to, so it is not thrown away the next time a shop opens.
+    /// </summary>
+    /// <remarks>
+    /// Saved on mouse release rather than per frame, because a drag changes the size on every one
+    /// of them and writing the config file sixty times a second to record an in-progress gesture
+    /// would be absurd. A size matching what PreDraw just asked for is ours, not theirs.
+    /// </remarks>
+    private void RememberUserResize()
+    {
+        var size = ImGui.GetWindowSize();
+
+        if (size != lastSize)
+        {
+            lastSize = size;
+            resizing = true;
+        }
+
+        if (!resizing || ImGui.IsMouseDown(ImGuiMouseButton.Left))
+            return;
+
+        resizing = false;
+
+        if (Vector2.Distance(size, appliedSize) < 1f)
+            return;
+
+        plugin.Configuration.VendorPanelWidth = size.X;
+        plugin.Configuration.VendorPanelHeight = size.Y;
+        plugin.Configuration.Save();
     }
 
     /// <summary>
@@ -200,8 +277,8 @@ public sealed unsafe class VendorPanelWindow : Window, IDisposable
         if (ImGui.IsItemHovered())
         {
             ImGui.SetTooltip(showOwned
-                ? "Showing pieces you already have. Click to list only what you are missing."
-                : "Hiding pieces you already have. Click to list them too.");
+                ? "Showing pieces you already have. Click to list only what you are missing.\n" + SharedNote
+                : "Hiding pieces you already have. Click to list them too.\n" + SharedNote);
         }
 
         ImGui.SameLine();
@@ -216,8 +293,8 @@ public sealed unsafe class VendorPanelWindow : Window, IDisposable
         if (ImGui.IsItemHovered())
         {
             ImGui.SetTooltip(jobOnly
-                ? "Showing only what your current job can wear. Click to show every job."
-                : "Showing gear for every job. Click to show only your current job.");
+                ? "Showing only what your current job can wear. Click to show every job.\n" + SharedNote
+                : "Showing gear for every job. Click to show only your current job.\n" + SharedNote);
         }
 
         ImGui.SameLine();
@@ -232,13 +309,26 @@ public sealed unsafe class VendorPanelWindow : Window, IDisposable
         if (ImGui.IsItemHovered())
         {
             ImGui.SetTooltip(hideWeapons
-                ? "Hiding weapons and off-hands. Click to list them."
-                : "Listing weapons and off-hands. Click to hide them.");
+                ? "Hiding weapons and off-hands. Click to list them.\n" + SharedNote
+                : "Listing weapons and off-hands. Click to hide them.\n" + SharedNote);
         }
 
-        ImGui.SameLine();
-        ImGui.AlignTextToFramePadding();
-        ImGui.TextColored(Owned, "These also apply to the duty list.");
+        // Only offered once there is something to undo, so the default toolbar stays three buttons
+        // wide. Without it a drag is a one-way door - nothing else restores the tracking.
+        if (configuration is { VendorPanelWidth: > 0, VendorPanelHeight: > 0 })
+        {
+            ImGui.SameLine();
+
+            if (ImGuiComponents.IconButton("##vendorSize", FontAwesomeIcon.ArrowsAltV))
+            {
+                configuration.VendorPanelWidth = 0;
+                configuration.VendorPanelHeight = 0;
+                changed = true;
+            }
+
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Using a size you set. Click to match the vendor window again.");
+        }
 
         ImGui.Separator();
         return changed;
@@ -407,6 +497,33 @@ public sealed unsafe class VendorPanelWindow : Window, IDisposable
 
         groups.RemoveAll(group => group.Rows.Count == 0);
         groups.Sort((a, b) => a.Order.CompareTo(b.Order));
+    }
+
+    /// <summary>
+    /// How wide the panel has to be for the longest item name to fit.
+    /// </summary>
+    /// <remarks>
+    /// The window used to size itself to its content, which is what let a long list run off the
+    /// bottom of the screen. Fixing the height means fixing the width too, and a width guessed at
+    /// a constant would clip exactly the names that are hardest to recognise from their first half.
+    /// Measured here rather than per frame because it only changes when the stock does.
+    /// </remarks>
+    private void Measure(VendorStock fresh)
+    {
+        var widest = 0f;
+        foreach (var row in fresh.Rows)
+            widest = Math.Max(widest, ImGui.CalcTextSize(row.Name).X);
+
+        var style = ImGui.GetStyle();
+
+        // Marker, item icon and the spacing around them, plus room for the scrollbar the list will
+        // have whenever the stock is taller than the shop window.
+        var furniture = (44f * ImGuiHelpers.GlobalScale) +
+                        (style.ItemSpacing.X * 2) +
+                        (style.WindowPadding.X * 2) +
+                        style.ScrollbarSize;
+
+        contentWidth = Math.Max(FallbackWidth, widest + furniture);
     }
 
     /// <summary>Everything that changes the shape of the list, compared by value in one go.</summary>

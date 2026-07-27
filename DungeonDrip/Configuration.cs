@@ -100,6 +100,15 @@ public class Configuration : IPluginConfiguration
     /// <summary>Which side of the vendor window the panel sits on. Auto flips if space is tight.</summary>
     public LootCompanionSide VendorPanelSide { get; set; } = LootCompanionSide.Auto;
 
+    /// <summary>
+    /// Size the user dragged the vendor panel to. Zero means follow the vendor window's height and
+    /// fit the width to the longest name, which is the default and what the reset button restores.
+    /// </summary>
+    public float VendorPanelWidth { get; set; }
+
+    /// <inheritdoc cref="VendorPanelWidth"/>
+    public float VendorPanelHeight { get; set; }
+
     /// <summary>Group the vendor panel by equipment slot rather than listing it flat.</summary>
     public bool VendorGroupBySlot { get; set; } = true;
 
