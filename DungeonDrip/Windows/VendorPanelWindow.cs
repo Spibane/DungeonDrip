@@ -35,6 +35,7 @@ public sealed unsafe class VendorPanelWindow : Window, IDisposable
     private static readonly Vector4 Missing = new(1.00f, 0.85f, 0.40f, 1f);
     private static readonly Vector4 Owned = new(0.55f, 0.55f, 0.55f, 1f);
     private static readonly Vector4 Warning = new(1.00f, 0.71f, 0.20f, 1f);
+    private static readonly Vector4 Complete = new(0.45f, 0.85f, 0.45f, 1f);
 
     private const float GapPixels = 6f;
     private const string CollapsePrefix = "vendor:";
@@ -44,11 +45,11 @@ public sealed unsafe class VendorPanelWindow : Window, IDisposable
     /// <summary>Resolved in DrawConditions and reused for the rest of the frame.</summary>
     private VendorStock? stock;
 
-    /// <summary>Regrouping only happens when the stock or the owned filter actually changes.</summary>
+    /// <summary>Regrouping only happens when the stock or the view options actually change.</summary>
     private readonly List<SlotGroup> groups = [];
     private VendorStock? groupedFrom;
-    private bool groupedShowingOwned;
-    private bool groupedBySlot;
+    private ViewOptions groupedWith;
+    private int hiddenByFilter;
 
     /// <summary>
     /// Our own width, measured at the end of the last frame. PreDraw runs before this window's
@@ -57,8 +58,10 @@ public sealed unsafe class VendorPanelWindow : Window, IDisposable
     private float lastWidth = 240f;
 
     public VendorPanelWindow(Plugin plugin)
-        : base("Already collected###DungeonDripVendorPanel",
-               ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoCollapse |
+        // Collapsible on purpose: it is pinned where the user cannot move it, so folding it to the
+        // title bar is the only way to get it out of the way without turning the feature off.
+        : base("Vendor drip###DungeonDripVendorPanel",
+               ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoMove |
                ImGuiWindowFlags.AlwaysAutoResize | ImGuiWindowFlags.NoFocusOnAppearing |
                ImGuiWindowFlags.NoNav)
     {
@@ -140,19 +143,27 @@ public sealed unsafe class VendorPanelWindow : Window, IDisposable
             ImGui.Separator();
         }
 
-        var showOwned = plugin.Configuration.VendorShowOwnedItems;
-        var bySlot = plugin.Configuration.VendorGroupBySlot;
+        // The list filters are deliberately the same ones the duty window uses, so "only what my job
+        // can wear" means one thing across the plugin rather than two.
+        var options = new ViewOptions(
+            plugin.Configuration.ShowOwnedItems,
+            plugin.Configuration.OnlyCurrentJobEquippable,
+            plugin.Configuration.HideWeapons,
+            plugin.Configuration.VendorGroupBySlot);
 
-        Regroup(stock, showOwned, bySlot);
+        Regroup(stock, options);
 
         if (groups.Count == 0)
         {
-            ImGui.TextColored(Owned, "Nothing new here.");
+            ImGui.TextColored(Owned, hiddenByFilter > 0
+                ? "Nothing left after your filters."
+                : "Nothing new here.");
+
             return;
         }
 
         foreach (var group in groups)
-            DrawGroup(group, bySlot, stale);
+            DrawGroup(group, options.GroupBySlot, stale);
     }
 
     private void DrawGroup(SlotGroup group, bool bySlot, bool stale)
@@ -204,11 +215,15 @@ public sealed unsafe class VendorPanelWindow : Window, IDisposable
                 ? Missing
                 : Owned;
 
+        // A finished outfit is the one piece of good news the panel carries, so the star gets a
+        // colour of its own while the row itself stays as quiet as the rest of what you own.
+        var glyphColour = row.Marker == VendorMarker.OutfitComplete ? Complete : colour;
+
         ImGui.AlignTextToFramePadding();
 
         // Fixed width so the names line up regardless of which glyph each row carries.
         using (Plugin.PluginInterface.UiBuilder.IconFontFixedWidthHandle.Push())
-            ImGui.TextColored(colour, Glyph(row.Marker).ToIconString());
+            ImGui.TextColored(glyphColour, Glyph(row.Marker).ToIconString());
 
         ImGui.SameLine();
 
@@ -230,41 +245,61 @@ public sealed unsafe class VendorPanelWindow : Window, IDisposable
         using var tooltip = ImRaii.Tooltip();
         ImGui.Text(row.Name);
         ImGui.TextColored(Owned, $"iLvl {row.ItemLevel}");
-        ImGui.TextColored(colour, VendorMarkers.Describe(row.Marker));
+        ImGui.TextColored(glyphColour, VendorMarkers.Describe(row.Marker));
 
         if (uncertain && row.Marker == VendorMarker.NotCollected)
             ImGui.TextColored(Warning, "Your dresser snapshot predates this - check before buying.");
     }
 
+    /// <remarks>
+    /// The star marks a finished outfit and nothing else. It used to mark "not collected", which
+    /// read backwards - a star is a reward everywhere else in the game, so putting it against the
+    /// pieces you are missing made the panel look like it was congratulating you on the gaps.
+    /// </remarks>
     private static FontAwesomeIcon Glyph(VendorMarker marker) => marker switch
     {
         VendorMarker.Dresser => FontAwesomeIcon.Check,
         VendorMarker.Outfit => FontAwesomeIcon.LayerGroup,
+        VendorMarker.OutfitComplete => FontAwesomeIcon.Star,
         VendorMarker.Armoire => FontAwesomeIcon.Archive,
         VendorMarker.Inventory => FontAwesomeIcon.Briefcase,
-        VendorMarker.NotCollected => FontAwesomeIcon.Star,
+        VendorMarker.NotCollected => FontAwesomeIcon.Times,
         _ => FontAwesomeIcon.Question,
     };
 
-    private void Regroup(VendorStock fresh, bool showOwned, bool bySlot)
+    private void Regroup(VendorStock fresh, ViewOptions options)
     {
-        if (ReferenceEquals(groupedFrom, fresh) && groupedShowingOwned == showOwned && groupedBySlot == bySlot)
+        if (ReferenceEquals(groupedFrom, fresh) && groupedWith == options)
             return;
 
         groupedFrom = fresh;
-        groupedShowingOwned = showOwned;
-        groupedBySlot = bySlot;
+        groupedWith = options;
         groups.Clear();
+        hiddenByFilter = 0;
 
         var byLabel = new Dictionary<string, SlotGroup>();
 
         foreach (var row in fresh.Rows)
         {
-            var hidden = !showOwned && row.Marker is not (VendorMarker.NotCollected or VendorMarker.Unknown);
+            // Dropped outright rather than counted against a heading: these say nothing about your
+            // collection, only that you asked not to see them.
+            if (options.HideWeapons && EquipSlots.IsWeaponSlot(row.SlotOrder))
+            {
+                hiddenByFilter++;
+                continue;
+            }
+
+            if (options.JobOnly && !row.JobEquippable)
+            {
+                hiddenByFilter++;
+                continue;
+            }
+
+            var hidden = !options.ShowOwned && row.IsOwned;
 
             // One bucket when flat, so the same drawing path serves both layouts.
-            var label = bySlot ? row.SlotName : string.Empty;
-            var order = bySlot ? row.SlotOrder : 0;
+            var label = options.GroupBySlot ? row.SlotName : string.Empty;
+            var order = options.GroupBySlot ? row.SlotOrder : 0;
 
             if (!byLabel.TryGetValue(label, out var group))
             {
@@ -287,6 +322,13 @@ public sealed unsafe class VendorPanelWindow : Window, IDisposable
         groups.RemoveAll(group => group.Rows.Count == 0);
         groups.Sort((a, b) => a.Order.CompareTo(b.Order));
     }
+
+    /// <summary>Everything that changes the shape of the list, compared by value in one go.</summary>
+    private readonly record struct ViewOptions(
+        bool ShowOwned,
+        bool JobOnly,
+        bool HideWeapons,
+        bool GroupBySlot);
 
     private sealed class SlotGroup(string label, int order)
     {

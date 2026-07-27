@@ -40,8 +40,10 @@ public sealed unsafe class LootCompanionWindow : Window, IDisposable
     private float lastWidth = 220f;
 
     public LootCompanionWindow(Plugin plugin)
+        // Collapsible on purpose: it is pinned where the user cannot move it, so folding it to the
+        // title bar is the only way to get it out of the way without turning the feature off.
         : base("Still needed###DungeonDripLootCompanion",
-               ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoCollapse |
+               ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoMove |
                ImGuiWindowFlags.AlwaysAutoResize | ImGuiWindowFlags.NoFocusOnAppearing |
                ImGuiWindowFlags.NoNav)
     {

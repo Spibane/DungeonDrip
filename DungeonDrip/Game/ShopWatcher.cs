@@ -17,7 +17,11 @@ public sealed record VendorRow(
     ushort ItemLevel,
     int SlotOrder,
     string SlotName,
-    VendorMarker Marker);
+    VendorMarker Marker,
+    bool JobEquippable)
+{
+    public bool IsOwned => Marker is not (VendorMarker.NotCollected or VendorMarker.Unknown);
+}
 
 /// <summary>Everything the panel needs about the vendor currently in front of the player.</summary>
 public sealed record VendorStock(
@@ -282,12 +286,17 @@ public sealed class ShopWatcher : IDisposable
         if (kind == StorageKind.None || !storage.MatchesScope(kind, plugin.Configuration.Scope))
             return null;
 
+        var view = plugin.Ownership.Current;
         var source = MissingItems.Resolve(
             itemId,
-            plugin.Ownership.Current,
+            view,
             plugin.Outfits.SetsContaining(itemId),
             plugin.Configuration.OutfitOwnership,
             plugin.Configuration.Scope);
+
+        // Only worth asking for a piece that is actually held in a set - the answer is meaningless
+        // otherwise, and walking a set's pieces is not free.
+        var completed = source == OwnershipSource.Outfit && plugin.Outfits.IsInCompletedSet(itemId, view);
 
         var (slotOrder, slotName) = EquipSlots.Describe(item.EquipSlotCategory.Value);
 
@@ -298,7 +307,8 @@ public sealed class ShopWatcher : IDisposable
             (ushort)item.LevelItem.RowId,
             slotOrder,
             slotName,
-            VendorMarkers.For(source, plugin.Ownership.HasDresserData));
+            VendorMarkers.For(source, plugin.Ownership.HasDresserData, completed),
+            plugin.JobFilter.CanEquip(item));
     }
 
     private MarkerContext CaptureContext() => new(
@@ -306,7 +316,8 @@ public sealed class ShopWatcher : IDisposable
         plugin.Ownership.HasDresserData,
         plugin.Configuration.Scope,
         plugin.Configuration.OutfitOwnership,
-        plugin.Configuration.CountInventoryAndEquipped);
+        plugin.Configuration.CountInventoryAndEquipped,
+        Plugin.PlayerState.IsLoaded ? Plugin.PlayerState.ClassJob.RowId : 0);
 
     private unsafe void WarnOnce(ShopAddonDescriptor descriptor, AtkUnitBase* unit)
     {
@@ -348,12 +359,15 @@ public sealed class ShopWatcher : IDisposable
     /// </summary>
     /// <remarks>
     /// Staleness is deliberately absent: it changes how a marker is drawn, not which marker it is,
-    /// so the panel applies it at draw time and an aging snapshot never rebuilds the cache.
+    /// so the panel applies it at draw time and an aging snapshot never rebuilds the cache. The
+    /// current job is here rather than at draw time because whether a piece is wearable is baked
+    /// into the row, so switching job has to re-resolve.
     /// </remarks>
     private readonly record struct MarkerContext(
         int OwnershipRevision,
         bool HasDresserData,
         CollectionScope Scope,
         OutfitOwnershipMode OutfitMode,
-        bool CountInventory);
+        bool CountInventory,
+        uint ClassJob);
 }

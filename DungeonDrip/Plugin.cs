@@ -46,6 +46,9 @@ public sealed class Plugin : IDalamudPlugin
     /// <summary>Which store can hold a given piece.</summary>
     public StorageEligibility Storage => storage;
 
+    /// <summary>Shared so every gear list agrees on what the current job can wear.</summary>
+    public JobFilter JobFilter => jobFilter;
+
     /// <summary>Chat commands that were actually claimed at load.</summary>
     public CommandRegistration Commands => commands;
 
@@ -57,6 +60,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly ContentFinderIndex contentFinder;
     private readonly JobRoleIndex jobRoles;
     private readonly StorageEligibility storage;
+    private readonly JobFilter jobFilter = new();
     private readonly LootObserver lootObserver;
     private readonly ShopWatcher shopWatcher;
     private readonly HttpFetcher http = new();
@@ -199,7 +203,7 @@ public sealed class Plugin : IDalamudPlugin
         {
             seenLootRevision = LootData.Revision;
             Duties = DutyCatalog.Build(LootData.Data, contentFinder);
-            reportBuilder = new DutyReportBuilder(LootData.Data, Duties, outfits, jobRoles, storage);
+            reportBuilder = new DutyReportBuilder(LootData.Data, Duties, outfits, jobRoles, storage, jobFilter);
             reportDirty = true;
         }
 
