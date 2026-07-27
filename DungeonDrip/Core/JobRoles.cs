@@ -6,8 +6,26 @@ using Lumina.Excel.Sheets;
 
 namespace DungeonDrip.Core;
 
-/// <summary>A heading in the role-grouped list, and where it sorts.</summary>
-public readonly record struct RoleGroup(int Order, string Label);
+/// <summary>
+/// A heading in the role-grouped list, and where it sorts.
+/// </summary>
+/// <param name="JobKey">
+/// Space-separated jobs for a melee gear-type heading, empty otherwise. Lets callers tell that
+/// "MNK DRG SAM RPR" covers "MNK SAM" without parsing the display label. Kept as a string so the
+/// record still compares by value.
+/// </param>
+public readonly record struct RoleGroup(int Order, string Label, string JobKey)
+{
+    /// <summary>True when this heading's jobs are all served by <paramref name="other"/> as well.</summary>
+    public bool IsCoveredBy(RoleGroup other)
+    {
+        if (JobKey.Length == 0 || other.JobKey.Length == 0 || JobKey == other.JobKey)
+            return false;
+
+        var covering = other.JobKey.Split(' ');
+        return JobKey.Split(' ').All(job => covering.Contains(job));
+    }
+}
 
 public enum LootRole
 {
@@ -49,7 +67,7 @@ public sealed class JobRoleIndex
     private const int AnyRoleOrder = 9000;
     private const int UnknownOrder = 9900;
 
-    private static readonly RoleGroup Unknown = new(UnknownOrder, "Anyone");
+    private static readonly RoleGroup Unknown = new(UnknownOrder, "Anyone", string.Empty);
     private static readonly IReadOnlyList<RoleGroup> UnknownOnly = [Unknown];
 
     /// <summary>
@@ -183,7 +201,7 @@ public sealed class JobRoleIndex
             return UnknownOnly;
 
         if (roles.Count == Enum.GetValues<LootRole>().Length)
-            return [new RoleGroup(AnyRoleOrder, "Any role")];
+            return [new RoleGroup(AnyRoleOrder, "Any role", string.Empty)];
 
         var groups = new List<RoleGroup>();
         foreach (var role in roles.OrderBy(r => Array.IndexOf(SharedLabelOrder, r)))
@@ -192,10 +210,10 @@ public sealed class JobRoleIndex
             {
                 groups.Add(role switch
                 {
-                    LootRole.Tank => new RoleGroup(TankOrder, "Tank"),
-                    LootRole.Healer => new RoleGroup(HealerOrder, "Healer"),
-                    LootRole.PhysicalRanged => new RoleGroup(PhysicalRangedOrder, "Physical Ranged"),
-                    _ => new RoleGroup(MagicalRangedOrder, "Magical Ranged"),
+                    LootRole.Tank => new RoleGroup(TankOrder, "Tank", string.Empty),
+                    LootRole.Healer => new RoleGroup(HealerOrder, "Healer", string.Empty),
+                    LootRole.PhysicalRanged => new RoleGroup(PhysicalRangedOrder, "Physical Ranged", string.Empty),
+                    _ => new RoleGroup(MagicalRangedOrder, "Magical Ranged", string.Empty),
                 });
 
                 continue;
@@ -204,7 +222,8 @@ public sealed class JobRoleIndex
             var set = LabelJobs(present.Where(job => job.Role == LootRole.Melee).ToList());
             groups.Add(new RoleGroup(
                 meleeOrder.TryGetValue(set, out var order) ? order : MeleeOrderBase,
-                $"Melee DPS ({set})"));
+                $"Melee DPS ({set})",
+                set));
         }
 
         return groups;
