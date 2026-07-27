@@ -301,13 +301,6 @@ public class MissingItemsWindow : Window, IDisposable
             }
         }
 
-        var marker = ProvenanceMarker(item.Provenance);
-        if (marker != null)
-        {
-            ImGui.SameLine();
-            ImGui.TextColored(Muted, marker);
-        }
-
         if (hovered)
         {
             ImGui.SetTooltip(
@@ -315,14 +308,6 @@ public class MissingItemsWindow : Window, IDisposable
                 $"\n{ProvenanceDescription(item.Provenance)}\n\nRight-click for options.");
         }
     }
-
-    private static string? ProvenanceMarker(LootProvenance provenance) => provenance switch
-    {
-        LootProvenance.Learned => "(seen here)",
-        LootProvenance.Wiki => "(wiki)",
-        LootProvenance.Override => "(override)",
-        _ => null,
-    };
 
     private static string ProvenanceDescription(LootProvenance provenance) => provenance switch
     {
