@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Dalamud.NET.Sdk/15.0.0">
+  <PropertyGroup>
+    <Version>0.1.0.0</Version>
+    <Description>Lists dungeon gear you are missing from your Glamour Dresser and Armoire.</Description>
+    <PackageProjectUrl>https://github.com/Spibane/GlamourAssistant</PackageProjectUrl>
+    <IsPackable>false</IsPackable>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+</Project>

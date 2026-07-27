@@ -1,0 +1,38 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # The Dalamud SDK compiles against the assemblies shipped with XIVLauncher, which no CI
+      # runner has. The dev distribution is the same set of files.
+      - name: Fetch Dalamud
+        run: |
+          Invoke-WebRequest -Uri https://goatcorp.github.io/dalamud-distrib/latest.zip -OutFile dalamud.zip
+          Expand-Archive -Path dalamud.zip -DestinationPath dalamud
+          echo "DALAMUD_HOME=$env:GITHUB_WORKSPACE\dalamud" >> $env:GITHUB_ENV
+
+      - name: Build
+        run: dotnet build GlamourAssistant.sln -c Release --nologo
+
+      # DalamudPackager writes the installable zip here; the platform folder depends on how
+      # MSBuild resolved the solution configuration.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GlamourAssistant
+          if-no-files-found: error
+          path: |
+            GlamourAssistant/bin/Release/GlamourAssistant/
+            GlamourAssistant/bin/x64/Release/GlamourAssistant/
