@@ -1,10 +1,10 @@
 <h1 align="center">Dungeon Drip</h1>
 
-<h2 align="center"><strong>Finds the dungeon glamour pieces missing from a Glamour Dresser and Armoire</strong></h2>
+<h2 align="center"><strong>Knows what glamour you already own, and says so wherever the game shows you gear</strong></h2>
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-0.9.5-black)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.10.0-black)](./CHANGELOG.md)
 [![Status](https://img.shields.io/badge/status-Alpha-orange)](./CHANGELOG.md)
 [![Changelog](https://img.shields.io/badge/changelog-blue)](./CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-AGPL--3.0--or--later-663366)](./LICENSE)
@@ -16,9 +16,13 @@
 
 </div>
 
-On entering a dungeon or alliance raid, Dungeon Drip lists the gear that drops there and is not yet
-in the Glamour Dresser or Armoire. Any duty can also be looked up without entering it, and while a
-Need/Greed roll is open a companion window beside it marks the pieces still missing.
+Dungeon Drip keeps track of what is in your Glamour Dresser and Armoire, and answers the same
+question at each point where you might pick something up.
+
+On entering a dungeon or alliance raid it lists the gear that drops there and is not yet collected.
+Any duty can also be looked up without entering it. While a Need/Greed roll is open, a companion
+window beside it marks the pieces still missing. And at a vendor, a panel beside the shop lists the
+glamour gear it stocks, marked by where you already have each piece.
 
 ## Architecture
 
@@ -31,19 +35,62 @@ Need/Greed roll is open a companion window beside it marks the pieces still miss
   │ loot-overrides.json  by hand │          │                      opt-in  │
   └──────────────┬───────────────┘          └───────────────┬──────────────┘
                  │ merged, keyed by territory               │ snapshot per character
-                 └─────────────────┬────────────────────────┘
-                                   ▼
-                         missing = drops − owned
-                                   │
-                   ┌───────────────┴───────────────┐
-                   ▼                               ▼
-              main window                  companion window beside
-        (grouped by slot or role)             the Need/Greed roll
+                 └─────────────────┬────────────────────────┤
+                                   ▼                        │
+                         missing = drops − owned            │
+                                   │                        │
+                   ┌───────────────┴───────────────┐        └────────────┐
+                   ▼                               ▼                     ▼
+              main window                  companion window beside   panel beside
+        (grouped by slot or role)             the Need/Greed roll     vendor stock
 ```
+
+The vendor panel branches straight off the collection: it asks only "do I have this?", so it needs
+no loot data and works for any shop, not just the ones that stock duty gear.
 
 **The Glamour Dresser needs opening now and then.** The game wipes dresser data on every zone change
 and only loads the Armoire on demand, so nothing is readable from inside a dungeon. Dungeon Drip
 works from the last snapshot it managed to take, per character, and the window reports its age.
+
+## At vendors
+
+Open a shop and a panel appears beside it, listing only stock that can be kept as a glamour.
+Materials, dyes and food are left out entirely, so an unmarked row in the shop never means "you
+already have this".
+
+| Marker | Colour | Meaning |
+| --- | --- | --- |
+| x | red | Not collected |
+| tick | grey | In the Glamour Dresser |
+| layers | grey | In a stored outfit set that still has gaps |
+| star | green | In an outfit set you have completed |
+| archive box | grey | In the Armoire |
+| briefcase | grey | Carried or equipped |
+| question mark | amber | No dresser data — nothing can honestly be said either way |
+
+The marker carries the state; the name only says whether you need the thing. Missing pieces are
+named in plain white and everything you own is greyed out, so the only two things that catch the eye
+are the red x and the green star.
+
+**A stale snapshot turns the red x amber, not the grey ticks.** Dresser contents are near-monotonic:
+you add glamours far more often than you remove them, so an old snapshot's "you own this" almost
+always still holds, while its "you don't" is exactly what goes out of date. Amber on an x means
+*probably new, but worth checking*.
+
+Three buttons at the top flip the list filters without a trip to Settings — whether owned pieces are
+listed, whether the list is held to your current job, and whether weapons are included. They write
+the shared settings, so they change the duty list too, and each tooltip says so.
+
+The panel lists whatever the vendor is currently showing: switching a category or tab re-reads it,
+scrolling does not. It opens at the shop window's height with the list scrolling inside so a long
+list cannot run off the screen, and its width fits the longest name. Drag it to any size and that
+size is remembered; a fourth button appears while a custom size is in use, to go back to matching the
+shop. It is pinned where you cannot move it, so fold it to its title bar when it is in the way.
+
+It reads the shop window's position and stock but never draws into it, so it cannot fight with
+plugins that do. Covered: gil vendors and Calamity Salvagers, item-exchange counters, currency and
+scrip exchanges, Grand Company quartermasters, free-item counters and the Firmament. Anything else
+gets no panel — run `/dungeondrip shop` there and report the addon name it prints.
 
 ## Commands
 
@@ -55,30 +102,37 @@ works from the last snapshot it managed to take, per character, and the window r
 | `/dungeondrip config` | Settings |
 | `/dungeondrip refresh` | Re-read the dresser and armoire |
 | `/dungeondrip update` | Re-download the loot data |
+| `/dungeondrip shop` | Identify the open vendor window, for reporting one that is not covered |
 
 ## Settings
 
+Settings are split by what they affect. **General** holds the rules every gear list obeys — the duty
+window, the loot-roll companion and the vendor panel alike. **Duties** and **Vendors** hold only
+what is specific to that surface.
+
 | Setting | Tab | Default |
 | --- | --- | --- |
-| Open automatically on entering a duty | General | on |
-| ...unless nothing is missing | General | on |
-| Close again on leaving the duty | General | on |
 | List owned pieces, greyed out | General | off |
-| Call out the role with the most missing | General | on |
 | Only show gear the current job can wear | General | off |
 | Skip weapons, main hands and off-hands | General | off |
-| Group the list by slot or by role | General | slot |
 | Compare against Dresser, Armoire or both | General | both |
 | Also count bags, armoury, equipped, saddlebags | General | off |
 | Outfit-set ownership: any set, or all sets | General | any |
-| Companion list beside the loot window | General | on |
+| Open automatically on entering a duty | Duties | on |
+| ...unless nothing is missing | Duties | on |
+| Close again on leaving the duty | Duties | on |
+| Call out the role with the most missing | Duties | on |
+| Group the list by slot or by role | Duties | slot |
+| Companion list beside the loot window | Duties | on |
+| Panel beside vendor windows | Vendors | on |
+| Group the vendor panel by slot | Vendors | on |
 | Warn when dresser data is older than | Data | 7 days |
 | Record gear that drops in duties | Data | on |
 | Fill gaps from the wiki | Data | on |
 
-Labels above are shortened from the in-game wording. Coverage is dungeons and alliance raids;
-trials, 8-player raids, deep dungeons and the rest are not tracked, and only pieces the chosen store
-can actually hold are listed.
+Labels above are shortened from the in-game wording. Everywhere the plugin lists gear, only pieces
+the chosen store can actually hold are shown. Duty coverage is dungeons and alliance raids; trials,
+8-player raids, deep dungeons and the rest are not tracked.
 
 ## Grouping
 

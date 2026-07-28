@@ -1,5 +1,21 @@
 # Changelog
 
+### v0.10.0 - 2026-07-28
+- **A new panel now appears beside vendor windows by default.** Turn it off under Settings > Vendors if you would rather it did not
+- Added vendor collection markers. Open a shop and a panel rides beside it listing the glamour gear that vendor stocks, each piece marked by where you already have it: a red x for not collected, a tick for the Glamour Dresser, layers for a stored outfit set with gaps, a green star for an outfit you have completed, a box for the Armoire, a case for carried or equipped. Anything that cannot be kept as a glamour is left out entirely, so an unmarked shop row never reads as "you already have this"
+- Covers gil vendors and Calamity Salvagers, item-exchange counters, currency and scrip exchanges, Grand Company quartermasters, free-item counters and the Firmament. Anything else gets no panel rather than a wrong one
+- The panel opens at the shop window's height with the list scrolling inside, and its width fits the longest item name. Drag it to any size and that size is remembered; a fourth button appears while a custom size is in use, to go back to matching the shop
+- Three buttons at the top of the panel flip the list filters without a trip to Settings: whether owned pieces are listed, whether the list is held to your current job, and whether weapons are included
+- The panel degrades rather than refusing when the dresser snapshot is old: a stale snapshot turns the "not collected" marker amber and leaves the "you have this" markers alone. Dresser contents are near-monotonic, so an old snapshot's positives hold up far better than its negatives
+- Like the loot-roll companion, the panel reads the shop window but never draws into it, so it cannot collide with plugins that write to those nodes
+- Added `/dungeondrip shop`, which names the open vendor window so an uncovered one can be reported
+- Changed the settings window from one General tab into General, Duties and Vendors, so each setting sits under the surface it affects. General holds the rules every gear list obeys, and both other tabs say so
+- Changed "list owned pieces", "only gear my job can wear" and "skip weapons" to govern the vendor panel as well as the duty list, with one shared job check rather than two that could disagree
+- Changed the loot-roll companion to be collapsible. It is pinned where you cannot drag it, so folding it to the title bar is the only way to get it out of the way without switching the feature off
+- Changed the plugin's framing to match what it does. The collection is the engine and duty loot is one question asked of it; vendors are the third place that question gets answered, after the duty list and the loot-roll companion
+- Changed four copies of the window colour constants into one palette, three copies of the item icon-and-name row into one helper, and the two pinned panels' duplicate placement maths into one. The two greys that had drifted a shade apart doing the same job are now a single colour
+- Removed a record that had lost both its fields to disuse, four empty disposers and their call sites, and two members nothing read
+
 ### v0.9.5 - 2026-07-28
 - Added the GNU AGPL v3.0-or-later licence, with the SPDX expression and copyright recorded in the project file
 - Added AI-DECLARATION.md (spec 0.1.2) declaring how much of this codebase was AI-authored, what the human decided and tested, and the caveats that follow
