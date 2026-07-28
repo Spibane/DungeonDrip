@@ -1,15 +1,13 @@
 using System;
-using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Utility;
+using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
 
 namespace DungeonDrip.Windows;
 
-public class ConfigWindow : Window, IDisposable
+public class ConfigWindow : Window
 {
-    private static readonly Vector4 Muted = new(0.60f, 0.60f, 0.60f, 1f);
-
     private readonly Plugin plugin;
     private readonly Configuration configuration;
 
@@ -20,35 +18,34 @@ public class ConfigWindow : Window, IDisposable
         configuration = plugin.Configuration;
     }
 
-    public void Dispose() { }
 
     public override void Draw()
     {
         var changed = false;
 
-        using var tabs = Dalamud.Interface.Utility.Raii.ImRaii.TabBar("##settingsTabs");
+        using var tabs = ImRaii.TabBar("##settingsTabs");
         if (!tabs.Success)
             return;
 
-        using (var general = Dalamud.Interface.Utility.Raii.ImRaii.TabItem("General"))
+        using (var general = ImRaii.TabItem("General"))
         {
             if (general.Success)
                 changed |= DrawGeneralTab();
         }
 
-        using (var duties = Dalamud.Interface.Utility.Raii.ImRaii.TabItem("Duties"))
+        using (var duties = ImRaii.TabItem("Duties"))
         {
             if (duties.Success)
                 changed |= DrawDutiesTab();
         }
 
-        using (var vendors = Dalamud.Interface.Utility.Raii.ImRaii.TabItem("Vendors"))
+        using (var vendors = ImRaii.TabItem("Vendors"))
         {
             if (vendors.Success)
                 changed |= DrawVendorsTab();
         }
 
-        using (var data = Dalamud.Interface.Utility.Raii.ImRaii.TabItem("Data"))
+        using (var data = ImRaii.TabItem("Data"))
         {
             if (data.Success)
                 changed |= DrawDataTab();
@@ -66,8 +63,8 @@ public class ConfigWindow : Window, IDisposable
         var changed = false;
 
         ImGui.Spacing();
-        ImGui.TextColored(Muted, "What to list");
-        ImGui.TextColored(Muted, "Applies everywhere: the duty window, the loot roll list and vendors.");
+        ImGui.TextColored(Palette.Muted, "What to list");
+        ImGui.TextColored(Palette.Muted, "Applies everywhere: the duty window, the loot roll list and vendors.");
         ImGui.Spacing();
 
         var showOwned = configuration.ShowOwnedItems;
@@ -95,8 +92,8 @@ public class ConfigWindow : Window, IDisposable
             ImGui.SetTooltip("Hides main hands and off-hands, which drop together.");
 
         ImGui.Spacing();
-        ImGui.TextColored(Muted, "What counts as owned");
-        ImGui.TextColored(Muted, "Also applies everywhere.");
+        ImGui.TextColored(Palette.Muted, "What counts as owned");
+        ImGui.TextColored(Palette.Muted, "Also applies everywhere.");
         ImGui.Spacing();
 
         var scope = configuration.Scope;
@@ -165,7 +162,7 @@ public class ConfigWindow : Window, IDisposable
 
         // Worth showing: a short alias is skipped when another plugin already owns it, and silently
         // missing commands would otherwise look like a bug here.
-        ImGui.TextColored(Muted, $"Commands: {string.Join("  ", plugin.Commands.Registered)}");
+        ImGui.TextColored(Palette.Muted, $"Commands: {string.Join("  ", plugin.Commands.Registered)}");
 
         ImGui.Spacing();
         return changed;
@@ -176,7 +173,7 @@ public class ConfigWindow : Window, IDisposable
         var changed = false;
 
         ImGui.Spacing();
-        ImGui.TextColored(Muted, "Duty window");
+        ImGui.TextColored(Palette.Muted, "Duty window");
 
         var autoOpen = configuration.AutoOpenOnDutyEnter;
         if (ImGui.Checkbox("Open automatically when I enter a duty", ref autoOpen))
@@ -244,7 +241,7 @@ public class ConfigWindow : Window, IDisposable
         }
 
         ImGui.Spacing();
-        ImGui.TextColored(Muted, "Loot roll window");
+        ImGui.TextColored(Palette.Muted, "Loot roll window");
 
         var companion = configuration.ShowLootCompanion;
         if (ImGui.Checkbox("Show a companion list beside the Need/Greed window", ref companion))
@@ -289,7 +286,7 @@ public class ConfigWindow : Window, IDisposable
         var changed = false;
 
         ImGui.Spacing();
-        ImGui.TextColored(Muted, "Vendor panel");
+        ImGui.TextColored(Palette.Muted, "Vendor panel");
 
         var vendorPanel = configuration.ShowVendorPanel;
         if (ImGui.Checkbox("Show a panel beside vendor windows", ref vendorPanel))
@@ -332,7 +329,7 @@ public class ConfigWindow : Window, IDisposable
             }
 
             ImGui.Spacing();
-            ImGui.TextColored(Muted, "What the markers mean");
+            ImGui.TextColored(Palette.Muted, "What the markers mean");
             ImGui.BulletText("x - not collected");
             ImGui.BulletText("tick - in the Glamour Dresser");
             ImGui.BulletText("layers - in a stored outfit set that still has gaps");
@@ -340,8 +337,8 @@ public class ConfigWindow : Window, IDisposable
             ImGui.BulletText("box - in the Armoire");
             ImGui.BulletText("case - carried or equipped");
             ImGui.BulletText("? - no dresser data, so nothing can be said either way");
-            ImGui.TextColored(Muted, "An old dresser snapshot turns the x amber, not the ticks:");
-            ImGui.TextColored(Muted, "what it says you own stays true far longer than what it says you lack.");
+            ImGui.TextColored(Palette.Muted, "An old dresser snapshot turns the x amber, not the ticks:");
+            ImGui.TextColored(Palette.Muted, "what it says you own stays true far longer than what it says you lack.");
         }
 
         DrawSharedSettingsNote();
@@ -357,8 +354,8 @@ public class ConfigWindow : Window, IDisposable
     {
         ImGui.Spacing();
         ImGui.Separator();
-        ImGui.TextColored(Muted, "What to list and what counts as owned are on the General tab,");
-        ImGui.TextColored(Muted, "and apply here too.");
+        ImGui.TextColored(Palette.Muted, "What to list and what counts as owned are on the General tab,");
+        ImGui.TextColored(Palette.Muted, "and apply here too.");
         ImGui.Spacing();
     }
 
@@ -367,7 +364,7 @@ public class ConfigWindow : Window, IDisposable
         var changed = false;
 
         ImGui.Spacing();
-        ImGui.TextColored(Muted, "Collection snapshot");
+        ImGui.TextColored(Palette.Muted, "Collection snapshot");
 
         var staleDays = configuration.StaleAfterDays;
         ImGui.SetNextItemWidth(200 * ImGuiHelpers.GlobalScale);
@@ -382,11 +379,11 @@ public class ConfigWindow : Window, IDisposable
             "when you open it, so Dungeon Drip remembers the last time it saw them.");
 
         var ownership = plugin.Ownership;
-        ImGui.TextColored(Muted, ownership.HasDresserData
+        ImGui.TextColored(Palette.Muted, ownership.HasDresserData
             ? $"Dresser: {ownership.DresserSlotsUsed} slots, read {ownership.DresserUpdatedUtc:yyyy-MM-dd HH:mm} UTC."
             : "Dresser: never read.");
 
-        ImGui.TextColored(Muted, ownership.ArmoireUpdatedUtc == null
+        ImGui.TextColored(Palette.Muted, ownership.ArmoireUpdatedUtc == null
             ? "Armoire: never read."
             : $"Armoire: read {ownership.ArmoireUpdatedUtc:yyyy-MM-dd HH:mm} UTC.");
 
@@ -398,13 +395,13 @@ public class ConfigWindow : Window, IDisposable
 
         ImGui.Spacing();
         ImGui.Separator();
-        ImGui.TextColored(Muted, "Dungeon loot data");
+        ImGui.TextColored(Palette.Muted, "Dungeon loot data");
 
         ImGui.TextWrapped(plugin.LootData.StatusMessage);
 
         var data = plugin.LootData.Data;
         if (data != null)
-            ImGui.TextColored(Muted, $"{data.DutyCount} duties, downloaded {data.FetchedUtc:yyyy-MM-dd HH:mm} UTC.");
+            ImGui.TextColored(Palette.Muted, $"{data.DutyCount} duties, downloaded {data.FetchedUtc:yyyy-MM-dd HH:mm} UTC.");
 
         ImGui.TextWrapped(
             "The list is downloaded from FFXIV Teamcraft's public data every time the plugin loads, " +
@@ -415,7 +412,7 @@ public class ConfigWindow : Window, IDisposable
 
         ImGui.Spacing();
         ImGui.Separator();
-        ImGui.TextColored(Muted, "Console Games Wiki");
+        ImGui.TextColored(Palette.Muted, "Console Games Wiki");
 
         var useWiki = configuration.UseWikiSource;
         if (ImGui.Checkbox("Fill gaps from the wiki", ref useWiki))
@@ -435,7 +432,7 @@ public class ConfigWindow : Window, IDisposable
         if (useWiki)
         {
             var wiki = plugin.Wiki;
-            ImGui.TextColored(Muted, wiki.TotalItems == 0
+            ImGui.TextColored(Palette.Muted, wiki.TotalItems == 0
                 ? "No wiki lookups cached yet."
                 : $"{wiki.TotalItems} items cached across {wiki.DutiesWithData} duties.");
 
@@ -447,11 +444,11 @@ public class ConfigWindow : Window, IDisposable
                     : $"{entry.Items.Length} items from \"{entry.Title}\"" +
                       (entry.UnmatchedNames > 0 ? $", {entry.UnmatchedNames} names unrecognised" : string.Empty);
 
-                ImGui.TextColored(Muted, $"This duty: {detail}");
+                ImGui.TextColored(Palette.Muted, $"This duty: {detail}");
             }
             else if (wiki.IsBusy)
             {
-                ImGui.TextColored(Muted, "Looking this duty up...");
+                ImGui.TextColored(Palette.Muted, "Looking this duty up...");
             }
 
             if (ImGui.Button("Re-fetch this duty"))
@@ -464,7 +461,7 @@ public class ConfigWindow : Window, IDisposable
 
         ImGui.Spacing();
         ImGui.Separator();
-        ImGui.TextColored(Muted, "Learning from what you see drop");
+        ImGui.TextColored(Palette.Muted, "Learning from what you see drop");
 
         var learn = configuration.LearnDropsFromLoot;
         if (ImGui.Checkbox("Record gear that drops in duties", ref learn))
@@ -482,7 +479,7 @@ public class ConfigWindow : Window, IDisposable
         }
 
         var learned = plugin.LearnedLoot;
-        ImGui.TextColored(Muted, learned.ItemCount == 0
+        ImGui.TextColored(Palette.Muted, learned.ItemCount == 0
             ? "Nothing learned yet."
             : $"{learned.ItemCount} pieces learned across {learned.TerritoryCount} duties.");
 
@@ -499,7 +496,7 @@ public class ConfigWindow : Window, IDisposable
 
         ImGui.Spacing();
         ImGui.Separator();
-        ImGui.TextColored(Muted, "Files");
+        ImGui.TextColored(Palette.Muted, "Files");
 
         ImGui.TextWrapped(
             "Missing drops for a very recent dungeon? Add them to loot-overrides.json in the config " +
@@ -508,7 +505,7 @@ public class ConfigWindow : Window, IDisposable
         // Shown as text as well as a button: under Wine the shell handler usually cannot open a
         // folder, and on Linux this path is the easiest way to inspect the caches by hand.
         var configPath = Plugin.PluginInterface.GetPluginConfigDirectory();
-        ImGui.TextColored(Muted, configPath);
+        ImGui.TextColored(Palette.Muted, configPath);
 
         if (ImGui.Button("Open config folder"))
             OpenConfigFolder(configPath);

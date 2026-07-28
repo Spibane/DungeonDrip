@@ -41,35 +41,28 @@ public sealed class Plugin : IDalamudPlugin
     public DutyCatalog? Duties { get; private set; }
 
     /// <summary>Outfit-set membership, needed anywhere ownership is judged.</summary>
-    public OutfitCatalog Outfits => outfits;
+    public OutfitCatalog Outfits { get; }
 
     /// <summary>Which store can hold a given piece.</summary>
-    public StorageEligibility Storage => storage;
+    public StorageEligibility Storage { get; }
 
     /// <summary>Shared so every gear list agrees on what the current job can wear.</summary>
-    public JobFilter JobFilter => jobFilter;
+    public JobFilter JobFilter { get; } = new();
 
     /// <summary>Chat commands that were actually claimed at load.</summary>
-    public CommandRegistration Commands => commands;
+    public CommandRegistration Commands { get; }
 
     /// <summary>The vendor currently in front of the player, and what it is selling.</summary>
-    public ShopWatcher Shop => shopWatcher;
+    public ShopWatcher Shop { get; }
 
     private readonly WindowSystem windowSystem = new("DungeonDrip");
-    private readonly OutfitCatalog outfits;
     private readonly ContentFinderIndex contentFinder;
     private readonly JobRoleIndex jobRoles;
-    private readonly StorageEligibility storage;
-    private readonly JobFilter jobFilter = new();
     private readonly LootObserver lootObserver;
-    private readonly ShopWatcher shopWatcher;
     private readonly HttpFetcher http = new();
-    private readonly CommandRegistration commands;
 
     private readonly MissingItemsWindow mainWindow;
     private readonly ConfigWindow configWindow;
-    private readonly LootCompanionWindow lootCompanionWindow;
-    private readonly VendorPanelWindow vendorPanelWindow;
 
     private DutyReportBuilder? reportBuilder;
     private uint currentTerritory;
@@ -91,33 +84,33 @@ public sealed class Plugin : IDalamudPlugin
 
         var configDirectory = PluginInterface.GetPluginConfigDirectory();
 
-        outfits = OutfitCatalog.Build();
+        Outfits = OutfitCatalog.Build();
         contentFinder = ContentFinderIndex.Build();
         jobRoles = JobRoleIndex.Build();
-        storage = StorageEligibility.Build();
+        Storage = StorageEligibility.Build();
         Ownership = new OwnershipTracker(configDirectory, Configuration);
 
         LearnedLoot = new LearnedLootStore(configDirectory);
-        lootObserver = new LootObserver(Configuration, LearnedLoot, contentFinder, storage);
-        shopWatcher = new ShopWatcher(this);
+        lootObserver = new LootObserver(Configuration, LearnedLoot, contentFinder, Storage);
+        Shop = new ShopWatcher(this);
         Wiki = new WikiLootSource(configDirectory, Configuration, http);
 
         // Reads the on-disk copy immediately and starts an update check in the background, so a
         // returning user has data before the first frame and a first-time user gets it shortly after.
-        LootData = new LootDataService(configDirectory, LearnedLoot, Wiki, contentFinder, storage, http);
+        LootData = new LootDataService(configDirectory, LearnedLoot, Wiki, contentFinder, Storage, http);
 
         mainWindow = new MissingItemsWindow(this);
         configWindow = new ConfigWindow(this);
-        lootCompanionWindow = new LootCompanionWindow(this) { IsOpen = true };
-        vendorPanelWindow = new VendorPanelWindow(this) { IsOpen = true };
         windowSystem.AddWindow(mainWindow);
         windowSystem.AddWindow(configWindow);
-        windowSystem.AddWindow(lootCompanionWindow);
-        windowSystem.AddWindow(vendorPanelWindow);
+
+        // Always open; each decides for itself whether the addon it rides on is up.
+        windowSystem.AddWindow(new LootCompanionWindow(this) { IsOpen = true });
+        windowSystem.AddWindow(new VendorPanelWindow(this) { IsOpen = true });
 
         currentTerritory = ClientState.TerritoryType;
 
-        commands = new CommandRegistration(CommandName, CommandAliases, OnCommand);
+        Commands = new CommandRegistration(CommandName, CommandAliases, OnCommand);
 
         ClientState.TerritoryChanged += OnTerritoryChanged;
         Framework.Update += OnFrameworkUpdate;
@@ -135,17 +128,13 @@ public sealed class Plugin : IDalamudPlugin
         ClientState.TerritoryChanged -= OnTerritoryChanged;
 
         windowSystem.RemoveAllWindows();
-        mainWindow.Dispose();
-        configWindow.Dispose();
-        lootCompanionWindow.Dispose();
-        vendorPanelWindow.Dispose();
         lootObserver.Dispose();
-        shopWatcher.Dispose();
+        Shop.Dispose();
         LootData.Dispose();
         Wiki.Dispose();
         http.Dispose();
 
-        commands.Dispose();
+        Commands.Dispose();
     }
 
     public DutyReport? Report => report;
@@ -203,7 +192,7 @@ public sealed class Plugin : IDalamudPlugin
         {
             seenLootRevision = LootData.Revision;
             Duties = DutyCatalog.Build(LootData.Data, contentFinder);
-            reportBuilder = new DutyReportBuilder(LootData.Data, Duties, outfits, jobRoles, storage, jobFilter);
+            reportBuilder = new DutyReportBuilder(LootData.Data, Duties, Outfits, jobRoles, Storage, JobFilter);
             reportDirty = true;
         }
 
@@ -283,7 +272,7 @@ public sealed class Plugin : IDalamudPlugin
             // Turns "the panel does not work at this vendor" into a report that names the addon.
             case "shop":
             case "vendor":
-                ChatGui.Print(shopWatcher.Describe());
+                ChatGui.Print(Shop.Describe());
                 return;
 
             case "update":

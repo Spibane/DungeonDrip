@@ -23,12 +23,6 @@ public sealed record VendorRow(
     public bool IsOwned => Marker is not (VendorMarker.NotCollected or VendorMarker.Unknown);
 }
 
-/// <summary>Everything the panel needs about the vendor currently in front of the player.</summary>
-public sealed record VendorStock(
-    string AddonName,
-    IReadOnlyList<VendorRow> Rows,
-    int NotCollectedCount);
-
 /// <summary>
 /// Tracks which vendor window is open and what it is selling, and answers the ownership question
 /// for each piece of that stock.
@@ -61,7 +55,7 @@ public sealed class ShopWatcher : IDisposable
     private ShopAddonDescriptor? active;
     private string? loggedFor;
     private uint[] currentIds = [];
-    private VendorStock? stock;
+    private List<VendorRow>? stock;
     private MarkerContext context;
     private int framesUntilSweep;
 
@@ -86,7 +80,7 @@ public sealed class ShopWatcher : IDisposable
     /// The stock in front of the player, or null when there is no vendor open or it could not be
     /// read. Call once per frame.
     /// </summary>
-    public unsafe VendorStock? Resolve()
+    public unsafe IReadOnlyList<VendorRow>? Resolve()
     {
         if (!plugin.Configuration.ShowVendorPanel || Plugin.GameGui.GameUiHidden)
             return null;
@@ -165,7 +159,7 @@ public sealed class ShopWatcher : IDisposable
             : $"Dungeon Drip: could not read \"{name}\" - its layout has changed. Details in the log.";
     }
 
-    private VendorStock? Forget()
+    private List<VendorRow>? Forget()
     {
         stock = null;
         return null;
@@ -220,7 +214,7 @@ public sealed class ShopWatcher : IDisposable
         return true;
     }
 
-    private VendorStock Build(ShopAddonDescriptor descriptor, uint[] ids)
+    private List<VendorRow> Build(ShopAddonDescriptor descriptor, uint[] ids)
     {
         var rows = new List<VendorRow>(ids.Length);
         var seen = new HashSet<uint>(ids.Length);
@@ -259,7 +253,7 @@ public sealed class ShopWatcher : IDisposable
             Plugin.Log.Debug(summary);
         }
 
-        return new VendorStock(descriptor.AddonName, rows, notCollected);
+        return rows;
     }
 
     private VendorRow? Resolve(uint itemId)
