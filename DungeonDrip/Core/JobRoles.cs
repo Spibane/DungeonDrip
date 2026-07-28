@@ -36,6 +36,9 @@ public enum LootRole
     MagicalRanged,
 }
 
+/// <summary>A job you can queue a duty as, for naming one in advice.</summary>
+public readonly record struct JobOption(uint RowId, string Abbreviation);
+
 /// <summary>
 /// Buckets a piece by who is allowed to roll Need on it.
 /// </summary>
@@ -87,10 +90,18 @@ public sealed class JobRoleIndex
         LootRole.Melee,
     ];
 
-    private readonly Dictionary<uint, IReadOnlyList<RoleGroup>> groupByCategory;
+    private static readonly IReadOnlyList<JobOption> NoJobs = [];
 
-    private JobRoleIndex(Dictionary<uint, IReadOnlyList<RoleGroup>> groupByCategory) =>
+    private readonly Dictionary<uint, IReadOnlyList<RoleGroup>> groupByCategory;
+    private readonly Dictionary<uint, IReadOnlyList<JobOption>> jobsByCategory;
+
+    private JobRoleIndex(
+        Dictionary<uint, IReadOnlyList<RoleGroup>> groupByCategory,
+        Dictionary<uint, IReadOnlyList<JobOption>> jobsByCategory)
+    {
         this.groupByCategory = groupByCategory;
+        this.jobsByCategory = jobsByCategory;
+    }
 
     /// <summary>
     /// The headings a piece belongs under. Usually one, but gear shared across roles lands in each
@@ -99,7 +110,19 @@ public sealed class JobRoleIndex
     public IReadOnlyList<RoleGroup> GroupsFor(uint classJobCategoryRow) =>
         groupByCategory.TryGetValue(classJobCategoryRow, out var groups) ? groups : UnknownOnly;
 
-    private readonly record struct JobEntry(string Abbreviation, LootRole Role, bool IsFullJob);
+    /// <summary>
+    /// Named jobs that can wear - and so roll Need on - gear in this category.
+    /// </summary>
+    /// <remarks>
+    /// Where <see cref="GroupsFor"/> answers "which heading does this go under", this answers "who
+    /// exactly", which is what advice about queueing needs. Classes and the limited jobs are left
+    /// out because you cannot queue a roulette as one.
+    /// </remarks>
+    public IReadOnlyList<JobOption> JobsFor(uint classJobCategoryRow) =>
+        jobsByCategory.TryGetValue(classJobCategoryRow, out var jobs) ? jobs : NoJobs;
+
+    private readonly record struct JobEntry(
+        uint RowId, uint ParentRowId, string Abbreviation, LootRole Role, bool IsFullJob, bool IsLimited);
 
     public static JobRoleIndex Build()
     {
@@ -123,7 +146,11 @@ public sealed class JobRoleIndex
             if (role.HasValue)
             {
                 // JobIndex is 0 for the base classes, so labels can name Dragoon without Lancer.
-                jobs.Add(new JobEntry(abbreviation, role.Value, job.JobIndex > 0));
+                // ClassJobParent points a job at the class it grew out of, and is self-referential
+                // for a class - which is what lets Paladin claim gear the sheet only marks GLA.
+                jobs.Add(new JobEntry(
+                    job.RowId, job.ClassJobParent.RowId, abbreviation, role.Value,
+                    job.JobIndex > 0, job.IsLimitedJob));
             }
         }
 
@@ -159,15 +186,34 @@ public sealed class JobRoleIndex
             .Select((set, index) => (set, index))
             .ToDictionary(x => x.set, x => MeleeOrderBase + x.index);
 
+        // Jobs you can actually queue a roulette as: no classes, and no Blue Mage or Beastmaster.
+        // Left in sheet order, which is the game's own, so advice lists jobs the way the character
+        // sheet does rather than however a dictionary happened to fill.
+        var playable = jobs.Where(job => job.IsFullJob && !job.IsLimited).ToList();
+
         var groups = new Dictionary<uint, IReadOnlyList<RoleGroup>>();
+        var jobsByCategory = new Dictionary<uint, IReadOnlyList<JobOption>>();
         foreach (var (categoryRow, present) in members)
+        {
             groups[categoryRow] = Classify(present, meleeOrder);
 
-        Plugin.Log.Information(
-            $"Built job role index: {groups.Count} categories, {meleeSets.Count} melee gear types " +
-            $"({string.Join("; ", meleeSets)})");
+            // Old categories list only the classes ("GLA PGL MRD LNC ARC ROG MNK WAR DRG BRD NIN"
+            // is a real row), and low-level dungeon gear still uses them. Reading the parent as
+            // well as the job itself is what keeps Paladin out of a Leveling-roulette blind spot.
+            var rows = present.Select(job => job.RowId).ToHashSet();
+            jobsByCategory[categoryRow] =
+            [
+                .. playable
+                    .Where(job => rows.Contains(job.RowId) || rows.Contains(job.ParentRowId))
+                    .Select(job => new JobOption(job.RowId, job.Abbreviation))
+            ];
+        }
 
-        return new JobRoleIndex(groups);
+        Plugin.Log.Information(
+            $"Built job role index: {groups.Count} categories, {playable.Count} queueable jobs, " +
+            $"{meleeSets.Count} melee gear types ({string.Join("; ", meleeSets)})");
+
+        return new JobRoleIndex(groups, jobsByCategory);
     }
 
     private static bool IsMeleeOnly(List<JobEntry> jobs) => jobs.All(job => job.Role == LootRole.Melee);

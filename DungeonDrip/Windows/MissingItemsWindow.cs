@@ -20,6 +20,12 @@ public class MissingItemsWindow : Window
     private string dutyFilter = string.Empty;
     private bool pickerOpen;
 
+    /// <summary>Roulette advice asked for over a duty that has a list of its own.</summary>
+    private bool roulettesOpen;
+
+    /// <summary>What the last frame drew for, so a change of duty can take the panel back.</summary>
+    private uint lastTerritory;
+
     public MissingItemsWindow(Plugin plugin)
         : base("Dungeon Drip###DungeonDripMain")
     {
@@ -43,12 +49,20 @@ public class MissingItemsWindow : Window
     public override void PreDraw()
     {
         var report = plugin.Report;
-        var title = report == null ? "Dungeon Drip" : report.Name;
+        var title = report == null || roulettesOpen ? "Dungeon Drip" : report.Name;
         WindowName = $"{title}###DungeonDripMain";
     }
 
     public override void Draw()
     {
+        // Walking into a duty, or picking one, is a request to see that duty - so it takes the
+        // panel back from the roulette view rather than leaving it stuck on advice.
+        if (plugin.SelectedTerritory != lastTerritory)
+        {
+            lastTerritory = plugin.SelectedTerritory;
+            roulettesOpen = false;
+        }
+
         DrawToolbar();
 
         if (plugin.Duties == null)
@@ -79,6 +93,11 @@ public class MissingItemsWindow : Window
             ImGui.Spacing();
             ImGui.TextWrapped(
                 "No loot data for your current location. Pick a duty above to look one up, or zone into a dungeon.");
+        }
+
+        if (report == null || roulettesOpen)
+        {
+            DrawRouletteAdvice();
             return;
         }
 
@@ -108,6 +127,22 @@ public class MissingItemsWindow : Window
             ImGui.BeginDisabled();
             ImGui.Button("Following current duty");
             ImGui.EndDisabled();
+        }
+
+        // Only offered over a duty that has a list of its own. With nothing to go back to, the
+        // advice is already what the window is showing and the button would toggle nothing.
+        if (plugin.Report != null)
+        {
+            ImGui.SameLine();
+            if (ImGui.Button(roulettesOpen ? "Back to duty" : "Roulettes"))
+                roulettesOpen = !roulettesOpen;
+
+            if (ImGui.IsItemHovered())
+            {
+                ImGui.SetTooltip(roulettesOpen
+                    ? "Go back to what drops in the duty you are looking at."
+                    : "Show which job to queue each roulette as, without leaving this duty.");
+            }
         }
 
         ImGui.SameLine();
@@ -184,6 +219,118 @@ public class MissingItemsWindow : Window
                 pickerOpen = false;
             }
         }
+    }
+
+    /// <summary>
+    /// What to queue as. The window's whole content outside a duty, and reachable from inside one
+    /// through the toolbar.
+    /// </summary>
+    /// <remarks>
+    /// In a city the missing list has nothing to say, so this answers the question you would
+    /// otherwise have to walk into a dungeon to ask. Suppressed without a dresser snapshot, where
+    /// every piece would read as uncollected and the table would confidently recommend nonsense.
+    /// </remarks>
+    private void DrawRouletteAdvice()
+    {
+        if (!plugin.Ownership.HasDresserData || plugin.Roulettes.Count == 0)
+            return;
+
+        ImGui.Spacing();
+        ImGui.TextColored(Palette.Focus, "Queue a roulette on whichever job stands to gain the most:");
+        ImGui.Spacing();
+
+        using var table = ImRaii.Table(
+            "roulettes", 4, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingStretchProp);
+
+        if (!table.Success)
+            return;
+
+        ImGui.TableSetupColumn("Roulette", ImGuiTableColumnFlags.WidthStretch, 0.44f);
+        ImGui.TableSetupColumn("Queue as", ImGuiTableColumnFlags.WidthStretch, 0.22f);
+        ImGui.TableSetupColumn("New", ImGuiTableColumnFlags.WidthStretch, 0.16f);
+        ImGui.TableSetupColumn("Chance", ImGuiTableColumnFlags.WidthStretch, 0.18f);
+        ImGui.TableHeadersRow();
+
+        foreach (var advice in plugin.Roulettes)
+            DrawRouletteRow(advice);
+
+        ImGui.Spacing();
+        ImGui.TextWrapped("Chance is how much of the gear that job can roll on you have yet to collect.");
+    }
+
+    private static void DrawRouletteRow(RouletteAdvice advice)
+    {
+        ImGui.TableNextRow();
+        ImGui.TableNextColumn();
+
+        // Spans the row so the tooltip is reachable from anywhere along it, not just the name.
+        ImGui.Selectable($"{advice.Name}##roulette{advice.Name}", false, ImGuiSelectableFlags.SpanAllColumns);
+        var hovered = ImGui.IsItemHovered();
+
+        var best = advice.Jobs.Count > 0 ? advice.Jobs[0] : null;
+        if (best == null || best.Missing == 0)
+        {
+            ImGui.TableNextColumn();
+            ImGui.TextColored(best != null ? Palette.Good : Palette.Muted, best != null
+                ? "all collected"
+                : advice.DutyCount == 0 ? "no loot data" : $"needs Lv. {advice.RequiredLevel}");
+
+            if (hovered)
+                DrawRouletteTooltip(advice);
+
+            return;
+        }
+
+        // Roles wear the same armour, so the top spot is usually a several-way tie. Naming one job
+        // and counting the rest keeps the row short without pretending the others are worse.
+        var tied = advice.Jobs.Count(odds => odds.Missing == best.Missing && odds.Total == best.Total);
+
+        ImGui.TableNextColumn();
+        ImGui.TextColored(Palette.Focus, tied > 1 ? $"{best.Abbreviation}  +{tied - 1}" : best.Abbreviation);
+
+        ImGui.TableNextColumn();
+        ImGui.Text($"{best.Missing}");
+
+        ImGui.TableNextColumn();
+        ImGui.Text($"{best.Share * 100:0}%");
+
+        if (hovered)
+            DrawRouletteTooltip(advice);
+    }
+
+    private static void DrawRouletteTooltip(RouletteAdvice advice)
+    {
+        using var tooltip = ImRaii.Tooltip();
+
+        ImGui.Text(advice.Name);
+        ImGui.TextColored(Palette.Muted, advice.DutyCount == advice.PoolCount
+            ? $"All {advice.PoolCount} duties in this roulette, counted."
+            : $"{advice.DutyCount} of {advice.PoolCount} duties - no loot list for the rest.");
+
+        var worthwhile = advice.Jobs.Where(odds => odds.Missing > 0).ToList();
+        if (worthwhile.Count == 0)
+        {
+            ImGui.Spacing();
+
+            // Three ways to have nothing to say, and they want different answers from the reader.
+            if (advice.DutyCount == 0)
+                ImGui.TextColored(Palette.Muted, "Nothing here has a loot list yet.");
+            else if (advice.Jobs.Count == 0)
+                ImGui.TextColored(Palette.Muted, $"No job of yours is Lv. {advice.RequiredLevel} yet.");
+            else
+                ImGui.TextColored(Palette.Muted, "Nothing here you have not already collected.");
+
+            return;
+        }
+
+        ImGui.Spacing();
+        ImGui.TextColored(Palette.Muted, "Uncollected, by job:");
+        foreach (var odds in worthwhile)
+            ImGui.Text($"   {odds.Abbreviation,-4}  {odds.Missing,4} of {odds.Total,-4}  {odds.Share * 100,3:0}%");
+
+        ImGui.Spacing();
+        ImGui.TextColored(Palette.Muted, "Odds per piece you can roll on, not per run.");
+        ImGui.TextColored(Palette.Muted, "Assumes every duty in the roulette is unlocked.");
     }
 
     private static void DrawSummary(DutyReport report)

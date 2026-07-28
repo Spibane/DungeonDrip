@@ -4,7 +4,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-0.10.0-black)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.11.0-black)](./CHANGELOG.md)
 [![Status](https://img.shields.io/badge/status-Alpha-orange)](./CHANGELOG.md)
 [![Changelog](https://img.shields.io/badge/changelog-blue)](./CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-AGPL--3.0--or--later-663366)](./LICENSE)
@@ -23,6 +23,9 @@ On entering a dungeon or alliance raid it lists the gear that drops there and is
 Any duty can also be looked up without entering it. While a Need/Greed roll is open, a companion
 window beside it marks the pieces still missing. And at a vendor, a panel beside the shop lists the
 glamour gear it stocks, marked by where you already have each piece.
+
+Outside a duty the window turns the question round and names the job to queue each roulette as for
+the best odds of something new.
 
 ## Architecture
 
@@ -91,6 +94,35 @@ It reads the shop window's position and stock but never draws into it, so it can
 plugins that do. Covered: gil vendors and Calamity Salvagers, item-exchange counters, currency and
 scrip exchanges, Grand Company quartermasters, free-item counters and the Firmament. Anything else
 gets no panel — run `/dungeondrip shop` there and report the addon name it prints.
+
+## Roulettes
+
+Open the window outside a duty — or press **Roulettes** in the toolbar while looking at one — and it
+shows, per roulette, which job to queue as:
+
+| Roulette | Queue as | New | Chance |
+| --- | --- | --- | --- |
+| Expert | NIN +1 | 12 | 35% |
+| Level Cap Dungeons | WHM | 8 | 27% |
+
+**New** is how many uncollected pieces that job can roll Need on across the whole roulette.
+**Chance** is those as a share of everything it can roll on there — the odds that the next piece you
+can roll on is one you do not have. Jobs are ranked by chance, so a role the game hands less gear is
+not penalised for it; `+1` means another job ties exactly, which is usual, since a role's armour is
+shared. Hovering gives the full per-job breakdown.
+
+Only the roulettes whose gear the plugin tracks are listed: Expert, Level Cap Dungeons, Alliance
+Raids, High-level Dungeons and Leveling. Membership is read from each duty's own roulette flags and
+the names from the game's sheet, so a renamed or re-pooled roulette follows the patch.
+
+Two limits worth knowing. It counts per piece you can roll on, not per run — a duty hands out a
+handful of items, so this ranks jobs rather than predicting a drop. And it cannot see which duties
+you have unlocked, only whether your job is high enough, so a returning player's odds read
+optimistically. Jobs below the roulette's level requirement, and duties above your level, are left
+out.
+
+**Back to duty** returns to the drop list. Walking into a duty, or picking one from the list, does
+the same on its own — a duty you just entered is what the window is for.
 
 ## Commands
 
@@ -267,14 +299,15 @@ DungeonDrip/
 │   ├── MissingItems.cs          the ownership decision
 │   ├── DutyReport.cs            territory + ownership → the drawn list
 │   ├── DutyCatalog.cs           duty list for the picker
-│   ├── ContentFinderIndex.cs    duty names; which duties are covered
+│   ├── ContentFinderIndex.cs    duty names; coverage; roulette pools
+│   ├── RouletteAdvice.cs        which job to queue each roulette as
 │   ├── JobRoles.cs              who can roll Need on a piece
 │   ├── StorageEligibility.cs    what each store can hold
 │   ├── ItemNameIndex.cs         item name → id, for the wiki
 │   ├── EquipSlots.cs
 │   └── Format.cs
 └── Windows/
-    ├── MissingItemsWindow.cs    picker, freshness banner, item list
+    ├── MissingItemsWindow.cs    picker, freshness banner, item list, roulette advice
     ├── LootCompanionWindow.cs   read-only list beside the Need/Greed window
     └── ConfigWindow.cs
 ```

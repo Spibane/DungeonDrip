@@ -1,5 +1,12 @@
 # Changelog
 
+### v0.11.0 - 2026-07-28
+- Added roulette advice to the window when you are not in a duty: for Expert, Level Cap Dungeons, Alliance Raids, High-level Dungeons and Leveling, the job to queue as for the best odds of uncollected glamour, with the count and the share of what that job can roll on. Hovering gives the full per-job breakdown and how much of the roulette's pool has loot data. Ranked by share rather than raw count, so a job whose role is handed less gear is not penalised for it. Trials, Main Scenario, Guildhests, Normal Raids, Mentor and Frontline are absent - the plugin carries no loot for them
+- Added a **Roulettes** toolbar button, so the advice can be read from inside a duty without leaving its drop list; **Back to duty** returns, and entering or picking a duty does so on its own
+- Added job-level gating to that advice: jobs below the roulette's requirement, and duties above your level, are left out, since a roulette will not queue you into them. Duty unlocks are not readable, so the odds still assume an unlocked pool
+- Changed roulette membership to be read from each duty's own roulette flags rather than reconstructed from level bands, and the roulette names from the game's sheet, so renamed and re-pooled roulettes follow the patch
+- Changed the job index to resolve a job's parent class, so gear that old sheet rows mark for the class alone ("GLA PGL MRD LNC ARC ROG MNK WAR DRG BRD NIN" is a real row) now counts for the job that grew out of it. Low-level dungeon gear uses those rows heavily
+
 ### v0.10.0 - 2026-07-28
 - **A new panel now appears beside vendor windows by default.** Turn it off under Settings > Vendors if you would rather it did not
 - Added vendor collection markers. Open a shop and a panel rides beside it listing the glamour gear that vendor stocks, each piece marked by where you already have it: a red x for not collected, a tick for the Glamour Dresser, layers for a stored outfit set with gaps, a green star for an outfit you have completed, a box for the Armoire, a case for carried or equipped. Anything that cannot be kept as a glamour is left out entirely, so an unmarked shop row never reads as "you already have this"
