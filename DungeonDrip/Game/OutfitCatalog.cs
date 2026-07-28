@@ -40,9 +40,8 @@ public sealed class OutfitCatalog
     /// Whether any stored outfit set holding this piece has every one of its slots filled.
     /// </summary>
     /// <remarks>
-    /// The distinction worth drawing for a completionist: a set can sit in the dresser for a long
-    /// time with gaps in it, and knowing a piece belongs to one that is actually finished is a
-    /// different piece of news from knowing it is merely accounted for.
+    /// A set can sit in the dresser with gaps in it, so "finished" is different news from
+    /// "accounted for".
     /// </remarks>
     public bool IsInCompletedSet(uint itemId, OwnershipView view)
     {
@@ -66,8 +65,8 @@ public sealed class OutfitCatalog
 
         foreach (var piece in pieces)
         {
-            // The dresser reader only records a piece against a set when that slot is genuinely
-            // unlocked, so membership here is the same question as "is this slot filled".
+            // The reader only records a piece against a set when the slot is unlocked, so
+            // membership here answers "is this slot filled".
             if (!view.DresserOutfits.TryGetValue(piece, out var owners) || !owners.Contains(setId))
                 return false;
         }
