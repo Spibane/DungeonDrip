@@ -4,10 +4,10 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-0.11.0-black)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.11.0-121212)](./CHANGELOG.md)
 [![Status](https://img.shields.io/badge/status-Beta-yellow)](./CHANGELOG.md)
 [![Changelog](https://img.shields.io/badge/changelog-blue)](./CHANGELOG.md)
-[![License](https://img.shields.io/badge/license-AGPL--3.0--or--later-663366)](./LICENSE)
+[![License](https://img.shields.io/badge/license-AGPL--3.0-663366)](./LICENSE)
 [![AI](https://img.shields.io/badge/AI--DECLARATION-pair-ffedd5)](./AI-DECLARATION.md)
 
 [![C#](https://img.shields.io/badge/C%23-14-239120?logo=csharp&logoColor=white)](https://learn.microsoft.com/dotnet/csharp/)
