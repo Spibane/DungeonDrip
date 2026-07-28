@@ -58,16 +58,16 @@ public class Configuration : IPluginConfiguration
 
     public OutfitOwnershipMode OutfitOwnership { get; set; } = OutfitOwnershipMode.AnyOutfit;
 
-    /// <summary>Show owned pieces greyed out alongside the missing ones.</summary>
+    /// <summary>Show owned pieces greyed out alongside the missing ones, in every gear list.</summary>
     public bool ShowOwnedItems { get; set; }
 
     /// <summary>Call out which role has the most still missing, above the list.</summary>
     public bool ShowRoleSummary { get; set; } = true;
 
-    /// <summary>Restrict the list to gear the current job can actually wear.</summary>
+    /// <summary>Restrict every gear list to what the current job can actually wear.</summary>
     public bool OnlyCurrentJobEquippable { get; set; }
 
-    /// <summary>Leave main-hand weapons out of the list.</summary>
+    /// <summary>Leave weapons and off-hands out of every gear list.</summary>
     public bool HideWeapons { get; set; }
 
     /// <summary>Which storage is compared against.</summary>
@@ -93,6 +93,24 @@ public class Configuration : IPluginConfiguration
 
     /// <summary>Which side of the loot window the companion sits on. Auto flips if space is tight.</summary>
     public LootCompanionSide LootCompanionSide { get; set; } = LootCompanionSide.Auto;
+
+    /// <summary>Show a panel beside vendor windows marking which of their stock you already have.</summary>
+    public bool ShowVendorPanel { get; set; } = true;
+
+    /// <summary>Which side of the vendor window the panel sits on. Auto flips if space is tight.</summary>
+    public LootCompanionSide VendorPanelSide { get; set; } = LootCompanionSide.Auto;
+
+    /// <summary>
+    /// Size the user dragged the vendor panel to. Zero means follow the vendor window's height and
+    /// fit the width to the longest name, which is the default and what the reset button restores.
+    /// </summary>
+    public float VendorPanelWidth { get; set; }
+
+    /// <inheritdoc cref="VendorPanelWidth"/>
+    public float VendorPanelHeight { get; set; }
+
+    /// <summary>Group the vendor panel by equipment slot rather than listing it flat.</summary>
+    public bool VendorGroupBySlot { get; set; } = true;
 
     public void Save() => Plugin.PluginInterface.SavePluginConfig(this);
 }

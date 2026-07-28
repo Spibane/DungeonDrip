@@ -1,14 +1,16 @@
 {
   "Name": "Dungeon Drip",
   "Author": "Spibane",
-  "Punchline": "See which dungeon glamour pieces you still need.",
-  "Description": "Enter a dungeon (or look one up) and Dungeon Drip shows the gear that drops there which is not yet in your Glamour Dresser or Armoire.\n\nBecause the game wipes Glamour Dresser data on every zone change and only loads the Armoire on demand, the plugin caches your collection per character and tells you when that snapshot is getting old.",
+  "Punchline": "See which glamour pieces you still need, in duties and at vendors.",
+  "Description": "Enter a dungeon (or look one up) and Dungeon Drip shows the gear that drops there which is not yet in your Glamour Dresser or Armoire.\n\nOpen a vendor and a panel beside it lists the glamour gear that shop stocks, marked by where you already have each piece. Anything that cannot be kept as a glamour is left out.\n\nBecause the game wipes Glamour Dresser data on every zone change and only loads the Armoire on demand, the plugin caches your collection per character and tells you when that snapshot is getting old.",
   "RepoUrl": "https://github.com/Spibane/DungeonDrip",
   "Tags": [
     "glamour",
     "dresser",
     "armoire",
     "dungeon",
+    "vendor",
+    "shop",
     "collection"
   ],
   "CategoryTags": [
