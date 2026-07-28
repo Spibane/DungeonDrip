@@ -54,9 +54,9 @@ works from the last snapshot it managed to take, per character, and the window r
 
 ## At vendors
 
-Open a shop and a panel appears beside it, listing only the stock that can be kept as a glamour.
-Everything else — materials, dyes, food — is left out entirely, so an unmarked row in the shop
-never means "you already have this".
+Open a shop and a panel appears beside it, listing only stock that can be kept as a glamour.
+Materials, dyes and food are left out entirely, so an unmarked row in the shop never means "you
+already have this".
 
 | Marker | Colour | Meaning |
 | --- | --- | --- |
@@ -68,32 +68,29 @@ never means "you already have this".
 | briefcase | grey | Carried or equipped |
 | question mark | amber | No dresser data — nothing can honestly be said either way |
 
-The marker carries the state and the name only says whether you need the thing: pieces you are
-missing are named in plain white, everything you already own is greyed out. The star means a
-finished outfit and nothing else, so the only two things that catch the eye are the red x and the
-green star.
+The marker carries the state; the name only says whether you need the thing. Missing pieces are
+named in plain white and everything you own is greyed out, so the only two things that catch the eye
+are the red x and the green star.
 
-**A stale snapshot turns the red x amber, not the grey ticks.** Dresser contents are
-near-monotonic: you add glamours far more often than you remove them, so an old snapshot's "you own
-this" almost always still holds, while its "you don't" is exactly what goes out of date. Amber on an
-x means *probably new, but worth checking*.
+**A stale snapshot turns the red x amber, not the grey ticks.** Dresser contents are near-monotonic:
+you add glamours far more often than you remove them, so an old snapshot's "you own this" almost
+always still holds, while its "you don't" is exactly what goes out of date. Amber on an x means
+*probably new, but worth checking*.
 
-Three buttons at the top of the panel flip the list filters without a trip to Settings — whether
-owned pieces are listed, whether the list is held to your current job, and whether weapons are
-included. They write the shared settings, so they change the duty list too, and the panel says so.
+Three buttons at the top flip the list filters without a trip to Settings — whether owned pieces are
+listed, whether the list is held to your current job, and whether weapons are included. They write
+the shared settings, so they change the duty list too, and each tooltip says so.
 
-The panel lists whatever the vendor is currently showing. Switching a category or tab re-reads it;
-scrolling does not change it. It reads the shop window's position and stock but never draws into it,
-so it cannot fight with plugins that do.
+The panel lists whatever the vendor is currently showing: switching a category or tab re-reads it,
+scrolling does not. It opens at the shop window's height with the list scrolling inside so a long
+list cannot run off the screen, and its width fits the longest name. Drag it to any size and that
+size is remembered; a fourth button appears while a custom size is in use, to go back to matching the
+shop. It is pinned where you cannot move it, so fold it to its title bar when it is in the way.
 
-It opens the same height as the shop window, with the list scrolling inside, so a long stock list
-cannot run off the bottom of the screen. Drag it to any size you prefer and that size is remembered;
-a fourth button appears while a custom size is in use, to go back to matching the shop. It is pinned
-where you cannot move it, so fold it to its title bar when it is in the way.
-
-Covered: gil vendors and Calamity Salvagers, item-exchange counters, currency and scrip exchanges,
-Grand Company quartermasters, free-item counters and the Firmament. Anything else simply gets no
-panel — run `/dungeondrip shop` there and report the addon name it prints.
+It reads the shop window's position and stock but never draws into it, so it cannot fight with
+plugins that do. Covered: gil vendors and Calamity Salvagers, item-exchange counters, currency and
+scrip exchanges, Grand Company quartermasters, free-item counters and the Firmament. Anything else
+gets no panel — run `/dungeondrip shop` there and report the addon name it prints.
 
 ## Commands
 

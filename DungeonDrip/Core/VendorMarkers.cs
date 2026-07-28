@@ -2,11 +2,9 @@ namespace DungeonDrip.Core;
 
 /// <summary>What the vendor panel says about one piece of the stock in front of you.</summary>
 /// <remarks>
-/// Deliberately not <see cref="OwnershipSource"/>. That enum folds "definitely not collected" and
-/// "no idea, the dresser has never been read" into a single <see cref="OwnershipSource.None"/>,
-/// which is fine for the duty report - it refuses to draw at all without a snapshot - but is exactly
-/// the distinction a vendor needs to keep. Buying a piece you already own wastes gil; walking past
-/// one because the plugin guessed is worse.
+/// Not <see cref="OwnershipSource"/>, which folds "not collected" and "never read the dresser" into
+/// one value. The duty report can afford that because it refuses to draw without a snapshot; a
+/// vendor shows the list anyway, so it has to keep the two apart.
 /// </remarks>
 public enum VendorMarker
 {
@@ -29,8 +27,8 @@ public enum VendorMarker
 }
 
 /// <summary>
-/// Turns an ownership answer into what the vendor panel shows. Kept free of Dalamud and Lumina, like
-/// <see cref="MissingItems"/>, so the argument below can be read - and tested - on its own.
+/// Turns an ownership answer into what the vendor panel shows. Free of Dalamud and Lumina, like
+/// <see cref="MissingItems"/>, so it can be reasoned about on its own.
 /// </summary>
 public static class VendorMarkers
 {
@@ -39,9 +37,8 @@ public static class VendorMarkers
     /// </param>
     public static VendorMarker For(OwnershipSource source, bool hasDresserData, bool outfitCompleted = false)
     {
-        // Positive evidence stands on its own and needs no dresser snapshot behind it: inventory is
-        // re-read every tick, and an armoire result is only ever recorded when the game genuinely
-        // had the cabinet loaded.
+        // Positive evidence needs no dresser snapshot behind it: inventory is re-read every tick,
+        // and an armoire result is only recorded when the game had the cabinet loaded.
         var marker = source switch
         {
             OwnershipSource.Dresser => VendorMarker.Dresser,
@@ -62,16 +59,9 @@ public static class VendorMarkers
     /// Whether this marker should be drawn in the warning colour rather than its own.
     /// </summary>
     /// <remarks>
-    /// The staleness rule is inverted from the intuitive one, and it is worth stating why before
-    /// someone "fixes" it. Dresser contents are near-monotonic: you add glamours far more often than
-    /// you remove them. So an old snapshot's *positives* almost always still hold - if it said you
-    /// owned a coat last month, you own it now - while its *negatives* are precisely what rots, as
-    /// anything collected since the snapshot still reads as missing. The uncertain marker at a
-    /// vendor is therefore "not collected", not "owned".
-    ///
-    /// Near-monotonic, not strictly: restoring a piece to inventory does take it out of the dresser.
-    /// That error makes you skip something you actually need, which is mild and self-corrects the
-    /// next time you open a dresser.
+    /// Staleness marks "not collected", not "owned", which reads backwards until you see why:
+    /// dresser contents are near-monotonic, so an old snapshot's positives still hold while its
+    /// negatives are exactly what rots. Do not invert this.
     /// </remarks>
     public static bool IsUncertain(VendorMarker marker, bool dresserIsStale) =>
         marker == VendorMarker.Unknown ||

@@ -18,17 +18,13 @@ namespace DungeonDrip.Windows;
 /// already have each piece.
 /// </summary>
 /// <remarks>
-/// A panel rather than markers drawn onto the shop's own rows, for the same reason
-/// <see cref="LootCompanionWindow"/> is one: nothing is written into the addon, so there is nothing
-/// for another plugin to collide with. The stronger reason here is scrolling. Vendor lists are long
-/// and virtualised - the game recycles a handful of row widgets as you scroll - so an inline glyph
-/// has to stay pinned to a moving target, and the failure mode when it slips is a marker sitting
-/// beside the wrong item. That is worse than no feature at all: it tells you that you already own
-/// something and you walk away from it. A panel cannot misalign, because it never claims to point
-/// at a row.
+/// A panel rather than markers on the shop's own rows. Vendor lists are long and virtualised - the
+/// game recycles a handful of row widgets as you scroll - so an inline glyph has to stay pinned to a
+/// moving target, and a marker that slips onto the wrong item is worse than no feature at all. A
+/// panel cannot misalign because it never claims to point at a row.
 ///
-/// It lists whatever the vendor is currently showing, not what is currently on screen. Switching a
-/// category dropdown re-reads and the panel follows; scrolling does not change it.
+/// It lists what the vendor is currently showing, not what is on screen: a category change re-reads,
+/// scrolling does not.
 /// </remarks>
 public sealed unsafe class VendorPanelWindow : Window
 {
@@ -68,11 +64,9 @@ public sealed unsafe class VendorPanelWindow : Window
     /// <summary>Frames left for a resize we asked for to land, during which drags are not read.</summary>
     private int applying;
 
+    // Collapsible and resizable because it cannot be dragged: folding or shrinking it is the only
+    // way to get it out of the way short of switching the feature off.
     public VendorPanelWindow(Plugin plugin)
-        // Collapsible on purpose: it is pinned where the user cannot move it, so folding it to the
-        // title bar is the only way to get it out of the way without turning the feature off.
-        // Resizable for the same reason - it cannot be dragged somewhere with more room, so the
-        // only way out of a list that overruns the screen is to make the window smaller.
         : base("Vendor Drip###DungeonDripVendorPanel",
                ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoFocusOnAppearing | ImGuiWindowFlags.NoNav)
     {
@@ -99,8 +93,8 @@ public sealed unsafe class VendorPanelWindow : Window
         if (rows is not { Count: > 0 })
             return false;
 
-        // Measured here rather than in Draw because PreDraw is what needs the answer, and it runs
-        // first - measuring later would size each shop's panel to the previous shop's longest name.
+        // Here rather than in Draw because PreDraw consumes it and runs first; measuring later would
+        // size each shop's panel to the previous shop's longest name.
         if (!ReferenceEquals(measuredFrom, rows))
         {
             measuredFrom = rows;
@@ -122,8 +116,8 @@ public sealed unsafe class VendorPanelWindow : Window
 
         var display = ImGui.GetIO().DisplaySize;
 
-        // Matching the shop's height is what stops a long stock list running off the bottom of the
-        // screen, and it happens to line the two windows up. A size the user dragged to wins.
+        // Matching the shop's height keeps a long list on screen, and lines the two windows up.
+        // A size the user dragged to wins.
         var configuration = plugin.Configuration;
         var desired = configuration is { VendorPanelWidth: > 0, VendorPanelHeight: > 0 }
             ? new Vector2(configuration.VendorPanelWidth, configuration.VendorPanelHeight)
@@ -132,13 +126,10 @@ public sealed unsafe class VendorPanelWindow : Window
         desired.X = Math.Clamp(desired.X, MinWidth, display.X);
         desired.Y = Math.Clamp(desired.Y, MinHeight, display.Y);
 
-        // Appearing alone is not enough: it only lands while the window is coming up, so pressing
-        // reset - or walking to a taller vendor - did nothing visible until the panel happened to
-        // close and open again. Whenever what we want differs from what is on screen, insist on it.
-        //
-        // Not while the user has hold of the resize grip: mid-drag their size is not saved yet, so
-        // the tracked size still differs and insisting would snap the window out from under them on
-        // every frame of the gesture.
+        // Appearing only lands while a window is coming up, so on its own a reset would sit there
+        // until the panel next reappeared. Insist whenever the size we want is not the size on
+        // screen - except mid-drag, where the user's size is not saved yet and insisting would snap
+        // the window out from under them on every frame of the gesture.
         var moved = lastSize != Vector2.Zero && Vector2.Distance(desired, lastSize) > 1f;
         var theirs = resizing || ImGui.IsMouseDown(ImGuiMouseButton.Left);
 
@@ -149,8 +140,7 @@ public sealed unsafe class VendorPanelWindow : Window
         {
             SizeCondition = ImGuiCond.Always;
 
-            // Frames to let our own resize land before user drags are watched for again. Bounded
-            // so a size that can never settle exactly cannot wedge the capture off for good.
+            // Bounded, so a size that never settles exactly cannot wedge drag capture off for good.
             applying = 5;
         }
         else
@@ -180,8 +170,8 @@ public sealed unsafe class VendorPanelWindow : Window
         var ownership = plugin.Ownership;
         var stale = ownership.IsDresserStale;
 
-        // Unlike a loot roll, a vendor is a decision you can come back to, so this degrades rather
-        // than refusing: it says how much to trust itself and shows the list anyway.
+        // Unlike a loot roll, a vendor is a decision you can come back to, so this says how much to
+        // trust itself and shows the list anyway rather than refusing.
         if (!ownership.HasDresserData)
         {
             ImGui.TextColored(Palette.Warning, "No dresser data yet.");
@@ -196,8 +186,7 @@ public sealed unsafe class VendorPanelWindow : Window
             ImGui.Separator();
         }
 
-        // The list filters are deliberately the same ones the duty window uses, so "only what my job
-        // can wear" means one thing across the plugin rather than two.
+        // The same filters the duty window uses, so each means one thing across the plugin.
         var options = new ViewOptions(
             plugin.Configuration.ShowOwnedItems,
             plugin.Configuration.OnlyCurrentJobEquippable,
@@ -215,8 +204,7 @@ public sealed unsafe class VendorPanelWindow : Window
             return;
         }
 
-        // Everything above stays put; only the list scrolls, so the warning about stale data and
-        // the filter buttons cannot be scrolled out of reach.
+        // Only the list scrolls, so the buttons and the stale-data warning stay reachable.
         using var list = ImRaii.Child("vendorList", Vector2.Zero, false);
         if (!list.Success)
             return;
@@ -229,15 +217,11 @@ public sealed unsafe class VendorPanelWindow : Window
     /// Stores a size the user dragged to, so it is not thrown away the next time a shop opens.
     /// </summary>
     /// <remarks>
-    /// Saved on mouse release rather than per frame, because a drag changes the size on every one
-    /// of them and writing the config file sixty times a second to record an in-progress gesture
-    /// would be absurd.
+    /// Saved on release, not per frame: a drag changes the size on every one of them.
     ///
-    /// Telling our resizes from theirs needs a latch, not just a comparison. This runs before the
-    /// toolbar draws, so mistaking one of ours for a drag does not merely store a stray size - it
-    /// puts a custom size back in the config that the very same frame's toolbar then reads, which
-    /// is how pressing reset used to leave its own button behind: the window really had reverted,
-    /// and the button really was reporting a custom size, because this had just written one.
+    /// Telling our resizes from theirs needs the latch, not just a comparison. On the frame a resize
+    /// is requested the window has not moved yet, so a comparison reads as a drag - and since this
+    /// runs before the toolbar, a stray size written here is read back by the same frame's toolbar.
     /// </remarks>
     private void RememberUserResize()
     {
@@ -276,11 +260,9 @@ public sealed unsafe class VendorPanelWindow : Window
     /// The list filters, as buttons rather than a trip to Settings.
     /// </summary>
     /// <remarks>
-    /// They write the shared settings rather than vendor-only copies, which is the point: standing
-    /// at a vendor is exactly when you find out you wanted "everything" instead of "my job", and
-    /// having to remember which of two similarly-named toggles governs this window is the confusion
-    /// the settings tabs were reorganised to end. The button shows the state it is in, not the state
-    /// it would move to, so it reads as an indicator you can also press.
+    /// They write the shared settings rather than vendor-only copies: standing at a vendor is when
+    /// you find out you wanted "everything" instead of "my job". Each button shows the state it is
+    /// in, not the state it would move to, so it reads as an indicator you can also press.
     /// </remarks>
     private bool DrawToolbar()
     {
@@ -333,8 +315,7 @@ public sealed unsafe class VendorPanelWindow : Window
                 : "Listing weapons and off-hands. Click to hide them.\n" + SharedNote);
         }
 
-        // Only offered once there is something to undo, so the default toolbar stays three buttons
-        // wide. Without it a drag is a one-way door - nothing else restores the tracking.
+        // Only once there is something to undo. Without it a drag is a one-way door.
         if (configuration is { VendorPanelWidth: > 0, VendorPanelHeight: > 0 })
         {
             ImGui.SameLine();
@@ -398,9 +379,8 @@ public sealed unsafe class VendorPanelWindow : Window
     {
         var uncertain = VendorMarkers.IsUncertain(row.Marker, stale);
 
-        // The glyph carries the whole state; the name only says whether you need the thing. That
-        // split is why the name is left at the theme's own colour rather than tinted - plain white
-        // reads as "this is the list", and any tint on it competes with the glyph for meaning.
+        // The glyph carries the state; the name only says whether you need the thing. Hence the
+        // untinted name - any colour on it would compete with the glyph for meaning.
         var glyphColour = row.Marker switch
         {
             VendorMarker.OutfitComplete => Palette.Good,
@@ -438,9 +418,8 @@ public sealed unsafe class VendorPanelWindow : Window
     }
 
     /// <remarks>
-    /// The star marks a finished outfit and nothing else. It used to mark "not collected", which
-    /// read backwards - a star is a reward everywhere else in the game, so putting it against the
-    /// pieces you are missing made the panel look like it was congratulating you on the gaps.
+    /// The star marks a finished outfit and nothing else. A star is a reward everywhere else in the
+    /// game, so it must never land on the pieces you are missing.
     /// </remarks>
     private static FontAwesomeIcon Glyph(VendorMarker marker) => marker switch
     {
@@ -467,8 +446,8 @@ public sealed unsafe class VendorPanelWindow : Window
 
         foreach (var row in fresh)
         {
-            // Dropped outright rather than counted against a heading: these say nothing about your
-            // collection, only that you asked not to see them.
+            // Dropped, not counted: these say nothing about your collection, only that you asked
+            // not to see them.
             if (options.HideWeapons && EquipSlots.IsWeaponSlot(row.SlotOrder))
             {
                 hiddenByFilter++;
@@ -513,10 +492,8 @@ public sealed unsafe class VendorPanelWindow : Window
     /// How wide the panel has to be for the longest item name to fit.
     /// </summary>
     /// <remarks>
-    /// The window used to size itself to its content, which is what let a long list run off the
-    /// bottom of the screen. Fixing the height means fixing the width too, and a width guessed at
-    /// a constant would clip exactly the names that are hardest to recognise from their first half.
-    /// Measured here rather than per frame because it only changes when the stock does.
+    /// Fixing the height means fixing the width too, and a constant would clip exactly the long
+    /// names that are hardest to recognise from their first half.
     /// </remarks>
     private void Measure(IReadOnlyList<VendorRow> fresh)
     {
@@ -526,8 +503,7 @@ public sealed unsafe class VendorPanelWindow : Window
 
         var style = ImGui.GetStyle();
 
-        // Marker, item icon and the spacing around them, plus room for the scrollbar the list will
-        // have whenever the stock is taller than the shop window.
+        // Marker, icon and their spacing, plus room for the scrollbar a long list will have.
         var furniture = (44f * ImGuiHelpers.GlobalScale) +
                         (style.ItemSpacing.X * 2) +
                         (style.WindowPadding.X * 2) +

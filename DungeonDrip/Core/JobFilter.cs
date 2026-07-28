@@ -8,10 +8,9 @@ namespace DungeonDrip.Core;
 /// Whether the job the player is on right now can wear a given piece.
 /// </summary>
 /// <remarks>
-/// ClassJobCategory exposes one boolean column per job abbreviation rather than a list of jobs, so
-/// the check is a reflected property read. Cached by (category, job) because it would otherwise run
-/// once per item per frame, and shared by every surface that filters a gear list so the duty window
-/// and the vendor panel can never disagree about what the current job can wear.
+/// ClassJobCategory exposes one boolean column per job abbreviation rather than a list, so the check
+/// is a reflected property read, cached by (category, job). Shared by every gear list so they cannot
+/// disagree.
 /// </remarks>
 public sealed class JobFilter
 {
@@ -21,8 +20,7 @@ public sealed class JobFilter
     {
         var playerState = Plugin.PlayerState;
 
-        // Between characters, or on a job the sheet does not describe, filtering would hide
-        // everything. Showing too much is the safer failure.
+        // Between characters this would otherwise hide everything; showing too much is safer.
         if (!playerState.IsLoaded || !playerState.ClassJob.IsValid)
             return true;
 
