@@ -33,7 +33,7 @@ public sealed class OutfitCatalog
         setsByPiece.TryGetValue(itemId, out var sets) ? sets : EmptySet;
 
     /// <summary>Every piece the given outfit set is made of.</summary>
-    public IReadOnlySet<uint> PiecesOf(uint setId) =>
+    private IReadOnlySet<uint> PiecesOf(uint setId) =>
         piecesBySet.TryGetValue(setId, out var pieces) ? pieces : EmptySet;
 
     /// <summary>
