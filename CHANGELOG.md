@@ -14,6 +14,8 @@
 - Changed the plugin's framing to match what it does. The collection is the engine and duty loot is one question asked of it; vendors are the third place that question gets answered, after the duty list and the loot-roll companion
 - The vendor panel degrades rather than refusing when the dresser snapshot is old: a stale snapshot turns the "not collected" marker amber and leaves the "you have this" markers alone. Dresser contents are near-monotonic, so an old snapshot's positives hold up far better than its negatives
 - Like the loot-roll companion, the panel reads the shop window but never draws into it, so it cannot collide with plugins that write to those nodes
+- Changed four copies of the window colour constants into one palette, three copies of the item icon-and-name row into one helper, and the two pinned panels' duplicate placement maths into one. The two greys that had drifted a shade apart doing the same job are now a single colour
+- Removed a record that had lost both its fields to disuse, four empty disposers and their call sites, and two members nothing read
 
 ### v0.9.5 - 2026-07-28
 - Added the GNU AGPL v3.0-or-later licence, with the SPDX expression and copyright recorded in the project file

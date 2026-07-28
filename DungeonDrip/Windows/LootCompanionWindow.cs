@@ -1,8 +1,6 @@
 using System;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
-using Dalamud.Interface.Textures;
-using Dalamud.Interface.Utility;
 using Dalamud.Interface.Windowing;
 using Dalamud.Utility;
 using FFXIVClientStructs.FFXIV.Client.UI;
@@ -23,14 +21,8 @@ namespace DungeonDrip.Windows;
 /// and screen position and draws nothing into it, so by construction there is nothing to collide
 /// with. It also survives the addon's node layout changing in a patch.
 /// </remarks>
-public sealed unsafe class LootCompanionWindow : Window, IDisposable
+public sealed unsafe class LootCompanionWindow : Window
 {
-    private static readonly Vector4 Missing = new(1.00f, 0.85f, 0.40f, 1f);
-    private static readonly Vector4 Owned = new(0.55f, 0.55f, 0.55f, 1f);
-    private static readonly Vector4 Warning = new(1.00f, 0.71f, 0.20f, 1f);
-
-    private const float GapPixels = 6f;
-
     private readonly Plugin plugin;
 
     /// <summary>
@@ -53,7 +45,6 @@ public sealed unsafe class LootCompanionWindow : Window, IDisposable
         DisableWindowSounds = true;
     }
 
-    public void Dispose() { }
 
     /// <summary>Only draws while the roll window is actually up and holding items.</summary>
     public override bool DrawConditions()
@@ -72,28 +63,12 @@ public sealed unsafe class LootCompanionWindow : Window, IDisposable
             return;
 
         var unit = &addon->AtkUnitBase;
-        var width = unit->GetScaledWidth(true);
-        var height = unit->GetScaledHeight(true);
 
-        var ownWidth = lastWidth;
+        // This one auto-sizes, so its own height is not knowable here; the roll window's height is
+        // the closest stand-in for keeping the bottom edge on screen.
+        var ownSize = new Vector2(lastWidth, unit->GetScaledHeight(true));
 
-        var side = plugin.Configuration.LootCompanionSide;
-        var toRight = side switch
-        {
-            LootCompanionSide.Left => false,
-            LootCompanionSide.Right => true,
-            _ => unit->X + width + GapPixels + ownWidth <= ImGui.GetIO().DisplaySize.X,
-        };
-
-        var x = toRight
-            ? unit->X + width + GapPixels
-            : unit->X - ownWidth - GapPixels;
-
-        // Keep it on screen even if the loot window is jammed against an edge.
-        x = Math.Clamp(x, 0f, Math.Max(0f, ImGui.GetIO().DisplaySize.X - ownWidth));
-        var y = Math.Clamp((float)unit->Y, 0f, Math.Max(0f, ImGui.GetIO().DisplaySize.Y - height));
-
-        Position = new Vector2(x, y);
+        Position = AddonAnchor.Beside(unit, plugin.Configuration.LootCompanionSide, ownSize);
         PositionCondition = ImGuiCond.Always;
     }
 
@@ -111,15 +86,15 @@ public sealed unsafe class LootCompanionWindow : Window, IDisposable
         // presented as fact - say so instead of showing a confident guess.
         if (!ownership.HasDresserData)
         {
-            ImGui.TextColored(Warning, "No dresser data.");
-            ImGui.TextColored(Warning, "Open your Glamour Dresser.");
+            ImGui.TextColored(Palette.Warning, "No dresser data.");
+            ImGui.TextColored(Palette.Warning, "Open your Glamour Dresser.");
             return;
         }
 
         if (ownership.IsDresserStale)
         {
-            ImGui.TextColored(Warning, "Dresser data is stale -");
-            ImGui.TextColored(Warning, "these may be wrong.");
+            ImGui.TextColored(Palette.Warning, "Dresser data is stale -");
+            ImGui.TextColored(Palette.Warning, "these may be wrong.");
             ImGui.Separator();
         }
 
@@ -152,26 +127,17 @@ public sealed unsafe class LootCompanionWindow : Window, IDisposable
         }
 
         if (!anyMissing)
-            ImGui.TextColored(Owned, "Nothing new here.");
+            ImGui.TextColored(Palette.Muted, "Nothing new here.");
     }
 
     private static void DrawRow(Item item, bool owned)
     {
-        var iconSize = new Vector2(20, 20) * ImGuiHelpers.GlobalScale;
-        var icon = Plugin.TextureProvider.GetFromGameIcon(new GameIconLookup(item.Icon)).GetWrapOrDefault();
-
-        if (icon != null)
-            ImGui.Image(icon.Handle, iconSize);
-        else
-            ImGui.Dummy(iconSize);
-
-        ImGui.SameLine();
-        ImGui.AlignTextToFramePadding();
+        UiParts.ItemIcon(item.Icon, 20);
 
         if (owned)
-            ImGui.TextColored(Owned, item.Name.ExtractText());
+            ImGui.TextColored(Palette.Muted, item.Name.ExtractText());
         else
-            ImGui.TextColored(Missing, $"{item.Name.ExtractText()}  ←");
+            ImGui.TextColored(Palette.Missing, $"{item.Name.ExtractText()}  ←");
     }
 
     private static AddonNeedGreed* GetLootAddon() =>

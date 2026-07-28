@@ -4,7 +4,6 @@ using System.Linq;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Game.Text.SeStringHandling;
-using Dalamud.Interface.Textures;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
@@ -14,13 +13,8 @@ using Lumina.Excel.Sheets;
 
 namespace DungeonDrip.Windows;
 
-public class MissingItemsWindow : Window, IDisposable
+public class MissingItemsWindow : Window
 {
-    private static readonly Vector4 Warning = new(1.00f, 0.71f, 0.20f, 1f);
-    private static readonly Vector4 Good = new(0.45f, 0.85f, 0.45f, 1f);
-    private static readonly Vector4 Muted = new(0.60f, 0.60f, 0.60f, 1f);
-    private static readonly Vector4 Focus = new(0.55f, 0.80f, 1.00f, 1f);
-
     private readonly Plugin plugin;
 
     private string dutyFilter = string.Empty;
@@ -37,7 +31,6 @@ public class MissingItemsWindow : Window, IDisposable
         };
     }
 
-    public void Dispose() { }
 
     /// <summary>Opens the window with the picker already filtered, for <c>/dungeondrip &lt;name&gt;</c>.</summary>
     public void OpenPicker(string filter)
@@ -61,7 +54,7 @@ public class MissingItemsWindow : Window, IDisposable
         if (plugin.Duties == null)
         {
             ImGui.Spacing();
-            ImGui.TextColored(Warning, plugin.LootData.StatusMessage);
+            ImGui.TextColored(Palette.Warning, plugin.LootData.StatusMessage);
             ImGui.TextWrapped(
                 "The dungeon loot list is downloaded rather than shipped with the plugin, so it stays " +
                 "current. This only takes a moment the first time.");
@@ -151,20 +144,20 @@ public class MissingItemsWindow : Window, IDisposable
 
         if (!tracker.HasDresserData)
         {
-            ImGui.TextColored(Warning,
+            ImGui.TextColored(Palette.Warning,
                 "No Glamour Dresser data yet - open a Glamour Dresser once so the plugin can read it.");
             return;
         }
 
         var age = Format.Age(tracker.DresserUpdatedUtc!.Value);
         if (tracker.IsDresserStale)
-            ImGui.TextColored(Warning, $"Glamour Dresser snapshot is {age} old - open your dresser to refresh it.");
+            ImGui.TextColored(Palette.Warning, $"Glamour Dresser snapshot is {age} old - open your dresser to refresh it.");
         else
-            ImGui.TextColored(Muted, $"Dresser: {tracker.DresserSlotsUsed} slots, read {age} ago.");
+            ImGui.TextColored(Palette.Muted, $"Dresser: {tracker.DresserSlotsUsed} slots, read {age} ago.");
 
         if (tracker.ArmoireUpdatedUtc == null)
         {
-            ImGui.TextColored(Muted, "Armoire has never been read - open it at an inn to include it.");
+            ImGui.TextColored(Palette.Muted, "Armoire has never been read - open it at an inn to include it.");
         }
     }
 
@@ -198,20 +191,20 @@ public class MissingItemsWindow : Window, IDisposable
         ImGui.Spacing();
         if (report.TotalCount == 0)
         {
-            ImGui.TextColored(Muted, "No glamour-able gear listed for this duty.");
+            ImGui.TextColored(Palette.Muted, "No glamour-able gear listed for this duty.");
             return;
         }
 
         if (report.MissingCount == 0)
-            ImGui.TextColored(Good, $"You have all {report.TotalCount} pieces from this duty.");
+            ImGui.TextColored(Palette.Good, $"You have all {report.TotalCount} pieces from this duty.");
         else
             ImGui.Text($"Missing {report.MissingCount} of {report.TotalCount} pieces.");
 
         if (report.HiddenByJobFilter > 0)
-            ImGui.TextColored(Muted, $"{report.HiddenByJobFilter} hidden by the current-job filter.");
+            ImGui.TextColored(Palette.Muted, $"{report.HiddenByJobFilter} hidden by the current-job filter.");
 
         if (report.HiddenWeapons > 0)
-            ImGui.TextColored(Muted, $"{report.HiddenWeapons} weapons hidden.");
+            ImGui.TextColored(Palette.Muted, $"{report.HiddenWeapons} weapons hidden.");
     }
 
     /// <summary>
@@ -241,7 +234,7 @@ public class MissingItemsWindow : Window, IDisposable
         var leaders = byRole.Where(entry => entry.Count == most).Select(entry => entry.Label).ToList();
 
         ImGui.Spacing();
-        ImGui.TextColored(Focus, leaders.Count == 1
+        ImGui.TextColored(Palette.Focus, leaders.Count == 1
             ? $"Most missing: {leaders[0]} ({most})"
             : $"Most missing: {string.Join(", ", leaders)} ({most} each)");
 
@@ -249,14 +242,14 @@ public class MissingItemsWindow : Window, IDisposable
             return;
 
         using var tooltip = ImRaii.Tooltip();
-        ImGui.TextColored(Muted, "Still missing by role:");
+        ImGui.TextColored(Palette.Muted, "Still missing by role:");
         foreach (var (label, _, count) in byRole)
             ImGui.Text($"   {count,3}   {label}");
 
         if (byRole.Sum(entry => entry.Count) > report.MissingCount)
         {
             ImGui.Spacing();
-            ImGui.TextColored(Muted, "Shared gear is counted under every role that can roll on it.");
+            ImGui.TextColored(Palette.Muted, "Shared gear is counted under every role that can roll on it.");
         }
     }
 
@@ -351,7 +344,7 @@ public class MissingItemsWindow : Window, IDisposable
         if (groups.Count == 0)
         {
             if (report.TotalCount > 0)
-                ImGui.TextColored(Good, "Nothing missing here.");
+                ImGui.TextColored(Palette.Good, "Nothing missing here.");
 
             return;
         }
@@ -389,19 +382,10 @@ public class MissingItemsWindow : Window, IDisposable
 
     private void DrawItemRow(ReportItem item)
     {
-        var iconSize = new Vector2(28, 28) * ImGuiHelpers.GlobalScale;
-        var icon = Plugin.TextureProvider.GetFromGameIcon(new GameIconLookup(item.IconId)).GetWrapOrDefault();
-
-        if (icon != null)
-            ImGui.Image(icon.Handle, iconSize);
-        else
-            ImGui.Dummy(iconSize);
-
-        ImGui.SameLine();
-        ImGui.AlignTextToFramePadding();
+        UiParts.ItemIcon(item.IconId, 28);
 
         if (item.IsOwned)
-            ImGui.TextColored(Muted, item.Name);
+            ImGui.TextColored(Palette.Muted, item.Name);
         else
             ImGui.Text(item.Name);
 
@@ -426,14 +410,14 @@ public class MissingItemsWindow : Window, IDisposable
 
         using var tooltip = ImRaii.Tooltip();
         ImGui.Text(item.Name);
-        ImGui.TextColored(Muted, $"iLvl {item.ItemLevel}");
+        ImGui.TextColored(Palette.Muted, $"iLvl {item.ItemLevel}");
         ImGui.Text(MissingItems.Describe(item.Source));
-        ImGui.TextColored(Muted, ProvenanceDescription(item.Provenance));
+        ImGui.TextColored(Palette.Muted, ProvenanceDescription(item.Provenance));
 
         DrawOutfitMembership(item.ItemId);
 
         ImGui.Spacing();
-        ImGui.TextColored(Muted, "Right-click for options.");
+        ImGui.TextColored(Palette.Muted, "Right-click for options.");
     }
 
     /// <summary>
@@ -463,18 +447,18 @@ public class MissingItemsWindow : Window, IDisposable
 
         ImGui.Spacing();
         ImGui.Separator();
-        ImGui.TextColored(Muted, named.Count == 1
+        ImGui.TextColored(Palette.Muted, named.Count == 1
             ? "Part of 1 outfit set:"
             : $"Part of {named.Count} outfit sets:");
 
         foreach (var (setId, name) in named)
         {
             if (holdingThisPiece?.Contains(setId) == true)
-                ImGui.TextColored(Good, $"   {name} — stored, includes this piece");
+                ImGui.TextColored(Palette.Good, $"   {name} — stored, includes this piece");
             else if (ownership.StoredOutfits.Contains(setId))
-                ImGui.TextColored(Warning, $"   {name} — stored, but this slot is empty");
+                ImGui.TextColored(Palette.Warning, $"   {name} — stored, but this slot is empty");
             else
-                ImGui.TextColored(Muted, $"   {name} — not stored");
+                ImGui.TextColored(Palette.Muted, $"   {name} — not stored");
         }
     }
 

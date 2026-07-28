@@ -4,7 +4,6 @@ using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
 using Dalamud.Interface.Components;
-using Dalamud.Interface.Textures;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
@@ -31,35 +30,32 @@ namespace DungeonDrip.Windows;
 /// It lists whatever the vendor is currently showing, not what is currently on screen. Switching a
 /// category dropdown re-reads and the panel follows; scrolling does not change it.
 /// </remarks>
-public sealed unsafe class VendorPanelWindow : Window, IDisposable
+public sealed unsafe class VendorPanelWindow : Window
 {
-    private static readonly Vector4 NotOwned = new(0.94f, 0.38f, 0.38f, 1f);
-    private static readonly Vector4 Owned = new(0.55f, 0.55f, 0.55f, 1f);
-    private static readonly Vector4 Warning = new(1.00f, 0.71f, 0.20f, 1f);
-    private static readonly Vector4 Complete = new(0.45f, 0.85f, 0.45f, 1f);
-
-    private const float GapPixels = 6f;
     private const string CollapsePrefix = "vendor:";
 
     /// <summary>Used until the stock has been measured, and as a floor afterwards.</summary>
     private const float FallbackWidth = 260f;
+
+    private const float MinWidth = 180f;
+    private const float MinHeight = 120f;
 
     private const string SharedNote = "Also applies to the duty list.";
 
     private readonly Plugin plugin;
 
     /// <summary>Resolved in DrawConditions and reused for the rest of the frame.</summary>
-    private VendorStock? stock;
+    private IReadOnlyList<VendorRow>? rows;
 
     /// <summary>Regrouping only happens when the stock or the view options actually change.</summary>
     private readonly List<SlotGroup> groups = [];
-    private VendorStock? groupedFrom;
+    private IReadOnlyList<VendorRow>? groupedFrom;
     private ViewOptions groupedWith;
     private int hiddenByFilter;
 
     /// <summary>Width the longest name in the current stock needs, measured when it changes.</summary>
     private float contentWidth = FallbackWidth;
-    private VendorStock? measuredFrom;
+    private IReadOnlyList<VendorRow>? measuredFrom;
 
     /// <summary>The size PreDraw wants, so a size we chose is not mistaken for a drag.</summary>
     private Vector2 appliedSize;
@@ -87,29 +83,28 @@ public sealed unsafe class VendorPanelWindow : Window, IDisposable
 
         SizeConstraints = new WindowSizeConstraints
         {
-            MinimumSize = new Vector2(180, 120),
+            MinimumSize = new Vector2(MinWidth, MinHeight),
             MaximumSize = new Vector2(float.MaxValue, float.MaxValue),
         };
     }
 
-    public void Dispose() { }
 
     public override bool DrawConditions()
     {
-        stock = plugin.Shop.Resolve();
+        rows = plugin.Shop.Resolve();
 
         // A vendor selling nothing wearable gets no panel at all. An empty panel at the potion
         // merchant is noise, and "/dungeondrip shop" is there for anyone wondering whether the
         // feature is alive.
-        if (stock is not { Rows.Count: > 0 })
+        if (rows is not { Count: > 0 })
             return false;
 
         // Measured here rather than in Draw because PreDraw is what needs the answer, and it runs
         // first - measuring later would size each shop's panel to the previous shop's longest name.
-        if (!ReferenceEquals(measuredFrom, stock))
+        if (!ReferenceEquals(measuredFrom, rows))
         {
-            measuredFrom = stock;
-            Measure(stock);
+            measuredFrom = rows;
+            Measure(rows);
         }
 
         return true;
@@ -125,8 +120,6 @@ public sealed unsafe class VendorPanelWindow : Window, IDisposable
         if (unit == null)
             return;
 
-        var width = unit->GetScaledWidth(true);
-        var height = unit->GetScaledHeight(true);
         var display = ImGui.GetIO().DisplaySize;
 
         // Matching the shop's height is what stops a long stock list running off the bottom of the
@@ -134,21 +127,18 @@ public sealed unsafe class VendorPanelWindow : Window, IDisposable
         var configuration = plugin.Configuration;
         var desired = configuration is { VendorPanelWidth: > 0, VendorPanelHeight: > 0 }
             ? new Vector2(configuration.VendorPanelWidth, configuration.VendorPanelHeight)
-            : new Vector2(contentWidth, height);
+            : new Vector2(contentWidth, unit->GetScaledHeight(true));
 
-        desired.X = Math.Clamp(desired.X, 180f, display.X);
-        desired.Y = Math.Clamp(desired.Y, 120f, display.Y);
+        desired.X = Math.Clamp(desired.X, MinWidth, display.X);
+        desired.Y = Math.Clamp(desired.Y, MinHeight, display.Y);
 
         // Appearing alone is not enough: it only lands while the window is coming up, so pressing
         // reset - or walking to a taller vendor - did nothing visible until the panel happened to
-        // close and open again. Whenever the size we want actually moves, insist on it for a frame.
+        // close and open again. Whenever what we want differs from what is on screen, insist on it.
         //
-        // Not while the user has hold of the resize grip, though: mid-drag their size is not saved
-        // yet, so the tracked size still differs and insisting would snap the window out from under
-        // them on every frame of the gesture.
-        // Measured against what is actually on screen, not against what was last asked for. A
-        // request made on a frame ImGui ignores is not a size the window has, and recording it as
-        // one is what would let a deferred reset quietly cancel itself.
+        // Not while the user has hold of the resize grip: mid-drag their size is not saved yet, so
+        // the tracked size still differs and insisting would snap the window out from under them on
+        // every frame of the gesture.
         var moved = lastSize != Vector2.Zero && Vector2.Distance(desired, lastSize) > 1f;
         var theirs = resizing || ImGui.IsMouseDown(ImGuiMouseButton.Left);
 
@@ -168,24 +158,7 @@ public sealed unsafe class VendorPanelWindow : Window, IDisposable
             SizeCondition = ImGuiCond.Appearing;
         }
 
-        var side = configuration.VendorPanelSide;
-        var toRight = side switch
-        {
-            LootCompanionSide.Left => false,
-            LootCompanionSide.Right => true,
-            _ => unit->X + width + GapPixels + desired.X <= display.X,
-        };
-
-        var x = toRight
-            ? unit->X + width + GapPixels
-            : unit->X - desired.X - GapPixels;
-
-        // Keep it on screen even if the shop is jammed against an edge. Clamped against our own
-        // height rather than the shop's, since ours is the one that can overrun.
-        x = Math.Clamp(x, 0f, Math.Max(0f, display.X - desired.X));
-        var y = Math.Clamp((float)unit->Y, 0f, Math.Max(0f, display.Y - desired.Y));
-
-        Position = new Vector2(x, y);
+        Position = AddonAnchor.Beside(unit, configuration.VendorPanelSide, desired);
         PositionCondition = ImGuiCond.Always;
     }
 
@@ -193,7 +166,7 @@ public sealed unsafe class VendorPanelWindow : Window, IDisposable
     {
         RememberUserResize();
 
-        if (stock == null)
+        if (rows == null)
             return;
 
         if (DrawToolbar())
@@ -211,15 +184,15 @@ public sealed unsafe class VendorPanelWindow : Window, IDisposable
         // than refusing: it says how much to trust itself and shows the list anyway.
         if (!ownership.HasDresserData)
         {
-            ImGui.TextColored(Warning, "No dresser data yet.");
-            ImGui.TextColored(Warning, "Open your Glamour Dresser.");
+            ImGui.TextColored(Palette.Warning, "No dresser data yet.");
+            ImGui.TextColored(Palette.Warning, "Open your Glamour Dresser.");
             ImGui.Separator();
         }
         else if (stale)
         {
-            var age = DateTime.UtcNow - ownership.DresserUpdatedUtc!.Value;
-            ImGui.TextColored(Warning, $"Dresser last read {Format.Age(age)} ago.");
-            ImGui.TextColored(Warning, "Open one to be sure.");
+            var age = Format.Age(ownership.DresserUpdatedUtc!.Value);
+            ImGui.TextColored(Palette.Warning, $"Dresser last read {age} ago.");
+            ImGui.TextColored(Palette.Warning, "Open one to be sure.");
             ImGui.Separator();
         }
 
@@ -231,11 +204,11 @@ public sealed unsafe class VendorPanelWindow : Window, IDisposable
             plugin.Configuration.HideWeapons,
             plugin.Configuration.VendorGroupBySlot);
 
-        Regroup(stock, options);
+        Regroup(rows, options);
 
         if (groups.Count == 0)
         {
-            ImGui.TextColored(Owned, hiddenByFilter > 0
+            ImGui.TextColored(Palette.Muted, hiddenByFilter > 0
                 ? "Nothing left after your filters."
                 : "Nothing new here.");
 
@@ -430,10 +403,10 @@ public sealed unsafe class VendorPanelWindow : Window, IDisposable
         // reads as "this is the list", and any tint on it competes with the glyph for meaning.
         var glyphColour = row.Marker switch
         {
-            VendorMarker.OutfitComplete => Complete,
-            VendorMarker.NotCollected => uncertain ? Warning : NotOwned,
-            VendorMarker.Unknown => Warning,
-            _ => Owned,
+            VendorMarker.OutfitComplete => Palette.Good,
+            VendorMarker.NotCollected => uncertain ? Palette.Warning : Palette.NotOwned,
+            VendorMarker.Unknown => Palette.Warning,
+            _ => Palette.Muted,
         };
 
         ImGui.AlignTextToFramePadding();
@@ -443,35 +416,25 @@ public sealed unsafe class VendorPanelWindow : Window, IDisposable
             ImGui.TextColored(glyphColour, Glyph(row.Marker).ToIconString());
 
         ImGui.SameLine();
-
-        var iconSize = new Vector2(20, 20) * ImGuiHelpers.GlobalScale;
-        var icon = Plugin.TextureProvider.GetFromGameIcon(new GameIconLookup(row.IconId)).GetWrapOrDefault();
-
-        if (icon != null)
-            ImGui.Image(icon.Handle, iconSize);
-        else
-            ImGui.Dummy(iconSize);
-
-        ImGui.SameLine();
-        ImGui.AlignTextToFramePadding();
+        UiParts.ItemIcon(row.IconId, 20);
 
         if (row.Marker == VendorMarker.NotCollected)
             ImGui.Text(row.Name);
         else if (row.Marker == VendorMarker.Unknown)
-            ImGui.TextColored(Warning, row.Name);
+            ImGui.TextColored(Palette.Warning, row.Name);
         else
-            ImGui.TextColored(Owned, row.Name);
+            ImGui.TextColored(Palette.Muted, row.Name);
 
         if (!ImGui.IsItemHovered())
             return;
 
         using var tooltip = ImRaii.Tooltip();
         ImGui.Text(row.Name);
-        ImGui.TextColored(Owned, $"iLvl {row.ItemLevel}");
+        ImGui.TextColored(Palette.Muted, $"iLvl {row.ItemLevel}");
         ImGui.TextColored(glyphColour, VendorMarkers.Describe(row.Marker));
 
         if (uncertain && row.Marker == VendorMarker.NotCollected)
-            ImGui.TextColored(Warning, "Your dresser snapshot predates this - check before buying.");
+            ImGui.TextColored(Palette.Warning, "Your dresser snapshot predates this - check before buying.");
     }
 
     /// <remarks>
@@ -490,7 +453,7 @@ public sealed unsafe class VendorPanelWindow : Window, IDisposable
         _ => FontAwesomeIcon.Question,
     };
 
-    private void Regroup(VendorStock fresh, ViewOptions options)
+    private void Regroup(IReadOnlyList<VendorRow> fresh, ViewOptions options)
     {
         if (ReferenceEquals(groupedFrom, fresh) && groupedWith == options)
             return;
@@ -502,7 +465,7 @@ public sealed unsafe class VendorPanelWindow : Window, IDisposable
 
         var byLabel = new Dictionary<string, SlotGroup>();
 
-        foreach (var row in fresh.Rows)
+        foreach (var row in fresh)
         {
             // Dropped outright rather than counted against a heading: these say nothing about your
             // collection, only that you asked not to see them.
@@ -555,10 +518,10 @@ public sealed unsafe class VendorPanelWindow : Window, IDisposable
     /// a constant would clip exactly the names that are hardest to recognise from their first half.
     /// Measured here rather than per frame because it only changes when the stock does.
     /// </remarks>
-    private void Measure(VendorStock fresh)
+    private void Measure(IReadOnlyList<VendorRow> fresh)
     {
         var widest = 0f;
-        foreach (var row in fresh.Rows)
+        foreach (var row in fresh)
             widest = Math.Max(widest, ImGui.CalcTextSize(row.Name).X);
 
         var style = ImGui.GetStyle();
