@@ -2,7 +2,7 @@
 
 ### v0.11.0 - 2026-07-28
 - Added roulette advice to the window when you are not in a duty: for Expert, Level Cap Dungeons, Alliance Raids, High-level Dungeons and Leveling, the job to queue as for the best odds of uncollected glamour, with the count and the share of what that job can roll on. Hovering gives the full per-job breakdown and how much of the roulette's pool has loot data. Ranked by share rather than raw count, so a job whose role is handed less gear is not penalised for it. Trials, Main Scenario, Guildhests, Normal Raids, Mentor and Frontline are absent - the plugin carries no loot for them
-- Added a **Roulettes** toolbar button, so the advice can be read from inside a duty without leaving its drop list; **Back to duty** returns, and entering or picking a duty does so on its own
+- Changed the button that stops following a duty you looked up to read **Roulettes** when letting go would land you back on that table, which standing in a city it does. It is the same button doing the same thing, named for where it goes
 - Added job-level gating to that advice: jobs below the roulette's requirement, and duties above your level, are left out, since a roulette will not queue you into them. Duty unlocks are not readable, so the odds still assume an unlocked pool
 - Changed roulette membership to be read from each duty's own roulette flags rather than reconstructed from level bands, and the roulette names from the game's sheet, so renamed and re-pooled roulettes follow the patch
 - Changed the job index to resolve a job's parent class, so gear that old sheet rows mark for the class alone ("GLA PGL MRD LNC ARC ROG MNK WAR DRG BRD NIN" is a real row) now counts for the job that grew out of it. Low-level dungeon gear uses those rows heavily

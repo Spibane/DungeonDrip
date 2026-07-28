@@ -20,12 +20,6 @@ public class MissingItemsWindow : Window
     private string dutyFilter = string.Empty;
     private bool pickerOpen;
 
-    /// <summary>Roulette advice asked for over a duty that has a list of its own.</summary>
-    private bool roulettesOpen;
-
-    /// <summary>What the last frame drew for, so a change of duty can take the panel back.</summary>
-    private uint lastTerritory;
-
     public MissingItemsWindow(Plugin plugin)
         : base("Dungeon Drip###DungeonDripMain")
     {
@@ -49,20 +43,12 @@ public class MissingItemsWindow : Window
     public override void PreDraw()
     {
         var report = plugin.Report;
-        var title = report == null || roulettesOpen ? "Dungeon Drip" : report.Name;
+        var title = report == null ? "Dungeon Drip" : report.Name;
         WindowName = $"{title}###DungeonDripMain";
     }
 
     public override void Draw()
     {
-        // Walking into a duty, or picking one, is a request to see that duty - so it takes the
-        // panel back from the roulette view rather than leaving it stuck on advice.
-        if (plugin.SelectedTerritory != lastTerritory)
-        {
-            lastTerritory = plugin.SelectedTerritory;
-            roulettesOpen = false;
-        }
-
         DrawToolbar();
 
         if (plugin.Duties == null)
@@ -90,13 +76,6 @@ public class MissingItemsWindow : Window
         var report = plugin.Report;
         if (report == null)
         {
-            ImGui.Spacing();
-            ImGui.TextWrapped(
-                "No loot data for your current location. Pick a duty above to look one up, or zone into a dungeon.");
-        }
-
-        if (report == null || roulettesOpen)
-        {
             DrawRouletteAdvice();
             return;
         }
@@ -116,33 +95,26 @@ public class MissingItemsWindow : Window
 
         if (plugin.IsPinned)
         {
-            if (ImGui.Button("Follow current duty"))
+            // One button, named for where it lands rather than for what it does. Unpinning goes
+            // back to tracking wherever you are, and standing anywhere without a drop list of its
+            // own - a city, most of the time - that is the roulette advice.
+            var toRoulettes = plugin.Duties?.TryGet(plugin.CurrentTerritory, out _) != true;
+
+            if (ImGui.Button(toRoulettes ? "Roulettes" : "Follow current duty"))
                 plugin.Unpin();
 
             if (ImGui.IsItemHovered())
-                ImGui.SetTooltip("Stop showing the duty you picked and go back to tracking wherever you are.");
+            {
+                ImGui.SetTooltip(toRoulettes
+                    ? "Stop showing the duty you picked and go back to the roulette advice."
+                    : "Stop showing the duty you picked and go back to tracking wherever you are.");
+            }
         }
         else
         {
             ImGui.BeginDisabled();
             ImGui.Button("Following current duty");
             ImGui.EndDisabled();
-        }
-
-        // Only offered over a duty that has a list of its own. With nothing to go back to, the
-        // advice is already what the window is showing and the button would toggle nothing.
-        if (plugin.Report != null)
-        {
-            ImGui.SameLine();
-            if (ImGui.Button(roulettesOpen ? "Back to duty" : "Roulettes"))
-                roulettesOpen = !roulettesOpen;
-
-            if (ImGui.IsItemHovered())
-            {
-                ImGui.SetTooltip(roulettesOpen
-                    ? "Go back to what drops in the duty you are looking at."
-                    : "Show which job to queue each roulette as, without leaving this duty.");
-            }
         }
 
         ImGui.SameLine();
@@ -222,21 +194,25 @@ public class MissingItemsWindow : Window
     }
 
     /// <summary>
-    /// What to queue as. The window's whole content outside a duty, and reachable from inside one
-    /// through the toolbar.
+    /// What to queue as, shown while you are not standing in a duty we have loot for.
     /// </summary>
     /// <remarks>
-    /// In a city the missing list has nothing to say, so this answers the question you would
-    /// otherwise have to walk into a dungeon to ask. Suppressed without a dresser snapshot, where
-    /// every piece would read as uncollected and the table would confidently recommend nonsense.
+    /// This is the window's whole content in a city, where the missing list has nothing to say -
+    /// so it answers the question you would otherwise have to open the window in a dungeon to ask.
+    /// Suppressed without a dresser snapshot, where every piece would read as uncollected and the
+    /// table would confidently recommend nonsense.
     /// </remarks>
     private void DrawRouletteAdvice()
     {
+        ImGui.Spacing();
+        ImGui.TextWrapped(
+            "No loot data for your current location. Pick a duty above to look one up, or zone into a dungeon.");
+
         if (!plugin.Ownership.HasDresserData || plugin.Roulettes.Count == 0)
             return;
 
         ImGui.Spacing();
-        ImGui.TextColored(Palette.Focus, "Queue a roulette on whichever job stands to gain the most:");
+        ImGui.TextColored(Palette.Focus, "Or queue a roulette on whichever job stands to gain the most:");
         ImGui.Spacing();
 
         using var table = ImRaii.Table(
@@ -253,9 +229,6 @@ public class MissingItemsWindow : Window
 
         foreach (var advice in plugin.Roulettes)
             DrawRouletteRow(advice);
-
-        ImGui.Spacing();
-        ImGui.TextWrapped("Chance is how much of the gear that job can roll on you have yet to collect.");
     }
 
     private static void DrawRouletteRow(RouletteAdvice advice)
