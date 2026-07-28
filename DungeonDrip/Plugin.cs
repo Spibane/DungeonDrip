@@ -151,6 +151,9 @@ public sealed class Plugin : IDalamudPlugin
 
     public uint SelectedTerritory => pinnedTerritory ?? currentTerritory;
 
+    /// <summary>Where the player actually is, as opposed to whichever duty is being looked at.</summary>
+    public uint CurrentTerritory => currentTerritory;
+
     public bool IsPinned => pinnedTerritory.HasValue;
 
     public void PinTerritory(uint territoryId)

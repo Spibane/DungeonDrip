@@ -97,8 +97,7 @@ gets no panel — run `/dungeondrip shop` there and report the addon name it pri
 
 ## Roulettes
 
-Open the window outside a duty — or press **Roulettes** in the toolbar while looking at one — and it
-shows, per roulette, which job to queue as:
+Open the window outside a duty and it shows, per roulette, which job to queue as:
 
 | Roulette | Queue as | New | Chance |
 | --- | --- | --- | --- |
@@ -121,8 +120,9 @@ you have unlocked, only whether your job is high enough, so a returning player's
 optimistically. Jobs below the roulette's level requirement, and duties above your level, are left
 out.
 
-**Back to duty** returns to the drop list. Walking into a duty, or picking one from the list, does
-the same on its own — a duty you just entered is what the window is for.
+Looking a duty up replaces the table with that duty's drops. The toolbar button that unpins it reads
+**Roulettes** when letting go would bring the table back, and **Follow current duty** when you are
+standing somewhere with drops of its own.
 
 ## Commands
 
