@@ -69,6 +69,9 @@ public sealed unsafe class VendorPanelWindow : Window, IDisposable
 
     private bool resizing;
 
+    /// <summary>Frames left for a resize we asked for to land, during which drags are not read.</summary>
+    private int applying;
+
     public VendorPanelWindow(Plugin plugin)
         // Collapsible on purpose: it is pinned where the user cannot move it, so folding it to the
         // title bar is the only way to get it out of the way without turning the feature off.
@@ -150,8 +153,20 @@ public sealed unsafe class VendorPanelWindow : Window, IDisposable
         var theirs = resizing || ImGui.IsMouseDown(ImGuiMouseButton.Left);
 
         Size = desired;
-        SizeCondition = moved && !theirs ? ImGuiCond.Always : ImGuiCond.Appearing;
         appliedSize = desired;
+
+        if (moved && !theirs)
+        {
+            SizeCondition = ImGuiCond.Always;
+
+            // Frames to let our own resize land before user drags are watched for again. Bounded
+            // so a size that can never settle exactly cannot wedge the capture off for good.
+            applying = 5;
+        }
+        else
+        {
+            SizeCondition = ImGuiCond.Appearing;
+        }
 
         var side = configuration.VendorPanelSide;
         var toRight = side switch
@@ -243,11 +258,27 @@ public sealed unsafe class VendorPanelWindow : Window, IDisposable
     /// <remarks>
     /// Saved on mouse release rather than per frame, because a drag changes the size on every one
     /// of them and writing the config file sixty times a second to record an in-progress gesture
-    /// would be absurd. A size matching what PreDraw just asked for is ours, not theirs.
+    /// would be absurd.
+    ///
+    /// Telling our resizes from theirs needs a latch, not just a comparison. This runs before the
+    /// toolbar draws, so mistaking one of ours for a drag does not merely store a stray size - it
+    /// puts a custom size back in the config that the very same frame's toolbar then reads, which
+    /// is how pressing reset used to leave its own button behind: the window really had reverted,
+    /// and the button really was reporting a custom size, because this had just written one.
     /// </remarks>
     private void RememberUserResize()
     {
         var size = ImGui.GetWindowSize();
+        var settled = Vector2.Distance(size, appliedSize) < 1f;
+
+        // A resize PreDraw asked for. Wait for it to arrive without reading anything into it.
+        if (applying > 0)
+        {
+            applying = settled ? 0 : applying - 1;
+            lastSize = size;
+            resizing = false;
+            return;
+        }
 
         if (size != lastSize)
         {
@@ -260,7 +291,7 @@ public sealed unsafe class VendorPanelWindow : Window, IDisposable
 
         resizing = false;
 
-        if (Vector2.Distance(size, appliedSize) < 1f)
+        if (settled)
             return;
 
         plugin.Configuration.VendorPanelWidth = size.X;
