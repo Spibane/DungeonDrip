@@ -5,7 +5,7 @@
 <div align="center">
 
 [![Version](https://img.shields.io/badge/version-0.11.0-black)](./CHANGELOG.md)
-[![Status](https://img.shields.io/badge/status-Alpha-orange)](./CHANGELOG.md)
+[![Status](https://img.shields.io/badge/status-Beta-yellow)](./CHANGELOG.md)
 [![Changelog](https://img.shields.io/badge/changelog-blue)](./CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-AGPL--3.0--or--later-663366)](./LICENSE)
 [![AI](https://img.shields.io/badge/AI--DECLARATION-pair-ffedd5)](./AI-DECLARATION.md)
