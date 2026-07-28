@@ -36,9 +36,6 @@ public enum LootRole
     MagicalRanged,
 }
 
-/// <summary>A job you can queue a duty as, for naming one in advice.</summary>
-public readonly record struct JobOption(uint RowId, string Abbreviation);
-
 /// <summary>
 /// Buckets a piece by who is allowed to roll Need on it.
 /// </summary>
@@ -66,7 +63,6 @@ public sealed class JobRoleIndex
     private const int MeleeOrderBase = 2000;
     private const int PhysicalRangedOrder = 3000;
     private const int MagicalRangedOrder = 4000;
-    private const int MixedOrder = 8000;
     private const int AnyRoleOrder = 9000;
     private const int UnknownOrder = 9900;
 
@@ -90,17 +86,17 @@ public sealed class JobRoleIndex
         LootRole.Melee,
     ];
 
-    private static readonly IReadOnlyList<JobOption> NoJobs = [];
+    private static readonly IReadOnlyList<uint> NoJobs = [];
 
     private readonly Dictionary<uint, IReadOnlyList<RoleGroup>> groupByCategory;
-    private readonly Dictionary<uint, IReadOnlyList<JobOption>> jobsByCategory;
+    private readonly Dictionary<string, IReadOnlyList<uint>> jobsByGroup;
 
     private JobRoleIndex(
         Dictionary<uint, IReadOnlyList<RoleGroup>> groupByCategory,
-        Dictionary<uint, IReadOnlyList<JobOption>> jobsByCategory)
+        Dictionary<string, IReadOnlyList<uint>> jobsByGroup)
     {
         this.groupByCategory = groupByCategory;
-        this.jobsByCategory = jobsByCategory;
+        this.jobsByGroup = jobsByGroup;
     }
 
     /// <summary>
@@ -111,15 +107,11 @@ public sealed class JobRoleIndex
         groupByCategory.TryGetValue(classJobCategoryRow, out var groups) ? groups : UnknownOnly;
 
     /// <summary>
-    /// Named jobs that can wear - and so roll Need on - gear in this category.
+    /// ClassJob rows for the jobs you could queue a heading as, so a caller can ask what level you
+    /// have in it. Classes and the limited jobs are absent: you cannot queue a roulette as one.
     /// </summary>
-    /// <remarks>
-    /// Where <see cref="GroupsFor"/> answers "which heading does this go under", this answers "who
-    /// exactly", which is what advice about queueing needs. Classes and the limited jobs are left
-    /// out because you cannot queue a roulette as one.
-    /// </remarks>
-    public IReadOnlyList<JobOption> JobsFor(uint classJobCategoryRow) =>
-        jobsByCategory.TryGetValue(classJobCategoryRow, out var jobs) ? jobs : NoJobs;
+    public IReadOnlyList<uint> JobsIn(RoleGroup group) =>
+        jobsByGroup.TryGetValue(group.Label, out var jobs) ? jobs : NoJobs;
 
     private readonly record struct JobEntry(
         uint RowId, uint ParentRowId, string Abbreviation, LootRole Role, bool IsFullJob, bool IsLimited);
@@ -192,28 +184,42 @@ public sealed class JobRoleIndex
         var playable = jobs.Where(job => job.IsFullJob && !job.IsLimited).ToList();
 
         var groups = new Dictionary<uint, IReadOnlyList<RoleGroup>>();
-        var jobsByCategory = new Dictionary<uint, IReadOnlyList<JobOption>>();
+        var perGroup = new Dictionary<string, HashSet<uint>>();
+
         foreach (var (categoryRow, present) in members)
         {
-            groups[categoryRow] = Classify(present, meleeOrder);
+            var classified = Classify(present, meleeOrder);
+            groups[categoryRow] = [.. classified.Select(entry => entry.Group)];
 
-            // Old categories list only the classes ("GLA PGL MRD LNC ARC ROG MNK WAR DRG BRD NIN"
-            // is a real row), and low-level dungeon gear still uses them. Reading the parent as
-            // well as the job itself is what keeps Paladin out of a Leveling-roulette blind spot.
-            var rows = present.Select(job => job.RowId).ToHashSet();
-            jobsByCategory[categoryRow] =
-            [
-                .. playable
-                    .Where(job => rows.Contains(job.RowId) || rows.Contains(job.ParentRowId))
-                    .Select(job => new JobOption(job.RowId, job.Abbreviation))
-            ];
+            // One heading is reached from many categories, so the jobs behind it accumulate across
+            // all of them. Old categories list only the classes ("GLA PGL MRD LNC ARC ROG MNK WAR
+            // DRG BRD NIN" is a real row) and low-level dungeon gear still uses them, so the parent
+            // is read as well as the job - otherwise Paladin drops out of the Tank heading there.
+            foreach (var (group, membership) in classified)
+            {
+                var rows = membership.Select(job => job.RowId).ToHashSet();
+                if (!perGroup.TryGetValue(group.Label, out var behind))
+                    perGroup[group.Label] = behind = [];
+
+                foreach (var job in playable)
+                {
+                    if (rows.Contains(job.RowId) || rows.Contains(job.ParentRowId))
+                        behind.Add(job.RowId);
+                }
+            }
         }
+
+        var jobsByGroup = perGroup.ToDictionary(
+            entry => entry.Key,
+            entry => (IReadOnlyList<uint>)[.. playable
+                .Where(job => entry.Value.Contains(job.RowId))
+                .Select(job => job.RowId)]);
 
         Plugin.Log.Information(
             $"Built job role index: {groups.Count} categories, {playable.Count} queueable jobs, " +
             $"{meleeSets.Count} melee gear types ({string.Join("; ", meleeSets)})");
 
-        return new JobRoleIndex(groups, jobsByCategory);
+        return new JobRoleIndex(groups, jobsByGroup);
     }
 
     private static bool IsMeleeOnly(List<JobEntry> jobs) => jobs.All(job => job.Role == LootRole.Melee);
@@ -237,39 +243,44 @@ public sealed class JobRoleIndex
     /// scouting player scanning their own heading never saw them. Each role now gets its own copy of
     /// the entry, and the melee side resolves to the gear-type heading for exactly those melee jobs -
     /// Aiming's melee members are ROG NIN VPR, which is the Scouting heading already on screen.
+    ///
+    /// Each heading is returned with the jobs that produced it, so a caller can ask what the player
+    /// has levelled in it without having to work backwards from the label.
     /// </remarks>
-    private static IReadOnlyList<RoleGroup> Classify(
+    private static List<(RoleGroup Group, List<JobEntry> Membership)> Classify(
         List<JobEntry> present, IReadOnlyDictionary<string, int> meleeOrder)
     {
         var roles = present.Select(job => job.Role).ToHashSet();
 
         if (roles.Count == 0)
-            return UnknownOnly;
+            return [(Unknown, present)];
 
         if (roles.Count == Enum.GetValues<LootRole>().Length)
-            return [new RoleGroup(AnyRoleOrder, "Any role", string.Empty)];
+            return [(new RoleGroup(AnyRoleOrder, "Any role", string.Empty), present)];
 
-        var groups = new List<RoleGroup>();
+        var groups = new List<(RoleGroup, List<JobEntry>)>();
         foreach (var role in roles.OrderBy(r => Array.IndexOf(SharedLabelOrder, r)))
         {
+            var membership = present.Where(job => job.Role == role).ToList();
+
             if (role != LootRole.Melee)
             {
-                groups.Add(role switch
+                groups.Add((role switch
                 {
                     LootRole.Tank => new RoleGroup(TankOrder, "Tank", string.Empty),
                     LootRole.Healer => new RoleGroup(HealerOrder, "Healer", string.Empty),
                     LootRole.PhysicalRanged => new RoleGroup(PhysicalRangedOrder, "Physical Ranged", string.Empty),
                     _ => new RoleGroup(MagicalRangedOrder, "Magical Ranged", string.Empty),
-                });
+                }, membership));
 
                 continue;
             }
 
-            var set = LabelJobs(present.Where(job => job.Role == LootRole.Melee).ToList());
-            groups.Add(new RoleGroup(
+            var set = LabelJobs(membership);
+            groups.Add((new RoleGroup(
                 meleeOrder.TryGetValue(set, out var order) ? order : MeleeOrderBase,
                 $"Melee DPS ({set})",
-                set));
+                set), membership));
         }
 
         return groups;

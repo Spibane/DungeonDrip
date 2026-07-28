@@ -61,23 +61,16 @@ public sealed class LearnedLootStore
 
     private void Load()
     {
-        var raw = JsonStore.Read<Dictionary<string, uint[]>>(path);
-        if (raw == null)
-            return;
+        foreach (var (territoryId, items) in JsonStore.ReadByTerritory<uint[]>(path))
+            byTerritory[territoryId] = [.. items];
 
-        foreach (var (key, items) in raw)
-        {
-            if (uint.TryParse(key, out var territoryId))
-                byTerritory[territoryId] = [.. items];
-        }
-
-        Plugin.Log.Information($"Loaded {ItemCount} learned drops across {TerritoryCount} duties");
+        if (byTerritory.Count > 0)
+            Plugin.Log.Information($"Loaded {ItemCount} learned drops across {TerritoryCount} duties");
     }
 
     private void Save() =>
-        JsonStore.Write(
+        JsonStore.WriteByTerritory(
             path,
             byTerritory.Where(kv => kv.Value.Count > 0)
-                       .ToDictionary(kv => kv.Key.ToString(), kv => kv.Value.Order().ToArray()),
-            indented: true);
+                       .Select(kv => KeyValuePair.Create(kv.Key, kv.Value.Order().ToArray())));
 }

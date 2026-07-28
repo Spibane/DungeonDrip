@@ -68,28 +68,26 @@ public class ConfigWindow : Window
         ImGui.Spacing();
 
         var showOwned = configuration.ShowOwnedItems;
-        if (ImGui.Checkbox("List pieces I already have, greyed out", ref showOwned))
+        if (UiParts.Toggle("List pieces I already have, greyed out", ref showOwned))
         {
             configuration.ShowOwnedItems = showOwned;
             changed = true;
         }
 
         var jobOnly = configuration.OnlyCurrentJobEquippable;
-        if (ImGui.Checkbox("Only show gear my current job can wear", ref jobOnly))
+        if (UiParts.Toggle("Only show gear my current job can wear", ref jobOnly))
         {
             configuration.OnlyCurrentJobEquippable = jobOnly;
             changed = true;
         }
 
         var hideWeapons = configuration.HideWeapons;
-        if (ImGui.Checkbox("Skip weapons", ref hideWeapons))
+        if (UiParts.Toggle("Skip weapons", ref hideWeapons,
+                "Hides main hands and off-hands, which drop together."))
         {
             configuration.HideWeapons = hideWeapons;
             changed = true;
         }
-
-        if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("Hides main hands and off-hands, which drop together.");
 
         ImGui.Spacing();
         ImGui.TextColored(Palette.Muted, "What counts as owned");
@@ -121,17 +119,12 @@ public class ConfigWindow : Window
         }
 
         var countInventory = configuration.CountInventoryAndEquipped;
-        if (ImGui.Checkbox("Also count bags, armoury, equipped gear and saddlebags", ref countInventory))
+        if (UiParts.Toggle("Also count bags, armoury, equipped gear and saddlebags", ref countInventory,
+                "Off by default: a drop sitting in your bag is not in your collection yet.\n" +
+                "Retainer inventories cannot be read unless you are at a retainer, so they are never counted."))
         {
             configuration.CountInventoryAndEquipped = countInventory;
             changed = true;
-        }
-
-        if (ImGui.IsItemHovered())
-        {
-            ImGui.SetTooltip(
-                "Off by default: a drop sitting in your bag is not in your collection yet.\n" +
-                "Retainer inventories cannot be read unless you are at a retainer, so they are never counted.");
         }
 
         ImGui.Spacing();
@@ -176,42 +169,35 @@ public class ConfigWindow : Window
         ImGui.TextColored(Palette.Muted, "Duty window");
 
         var autoOpen = configuration.AutoOpenOnDutyEnter;
-        if (ImGui.Checkbox("Open automatically when I enter a duty", ref autoOpen))
+        if (UiParts.Toggle("Open automatically when I enter a duty", ref autoOpen))
         {
             configuration.AutoOpenOnDutyEnter = autoOpen;
             changed = true;
         }
 
         var hideWhenComplete = configuration.HideWhenNothingMissing;
-        if (ImGui.Checkbox("...but not when I already have everything", ref hideWhenComplete))
+        if (UiParts.Toggle("...but not when I already have everything", ref hideWhenComplete))
         {
             configuration.HideWhenNothingMissing = hideWhenComplete;
             changed = true;
         }
 
         var closeOnLeave = configuration.CloseWhenLeavingDuty;
-        if (ImGui.Checkbox("Close again when I leave the duty", ref closeOnLeave))
+        if (UiParts.Toggle("Close again when I leave the duty", ref closeOnLeave,
+                "A duty you pinned yourself stays open - only the automatic tracking closes."))
         {
             configuration.CloseWhenLeavingDuty = closeOnLeave;
             changed = true;
         }
 
-        if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("A duty you pinned yourself stays open - only the automatic tracking closes.");
-
         var roleSummary = configuration.ShowRoleSummary;
-        if (ImGui.Checkbox("Call out the role with the most missing pieces", ref roleSummary))
+        if (UiParts.Toggle("Call out the role with the most missing pieces", ref roleSummary,
+                "A line above the list naming whichever role still needs the most, so you know what to\n" +
+                "chase. Counts by role even when the list itself is grouped by slot; hover it for the\n" +
+                "full breakdown."))
         {
             configuration.ShowRoleSummary = roleSummary;
             changed = true;
-        }
-
-        if (ImGui.IsItemHovered())
-        {
-            ImGui.SetTooltip(
-                "A line above the list naming whichever role still needs the most, so you know what to\n" +
-                "chase. Counts by role even when the list itself is grouped by slot; hover it for the\n" +
-                "full breakdown.");
         }
 
         var grouping = configuration.Grouping;
@@ -244,18 +230,13 @@ public class ConfigWindow : Window
         ImGui.TextColored(Palette.Muted, "Loot roll window");
 
         var companion = configuration.ShowLootCompanion;
-        if (ImGui.Checkbox("Show a companion list beside the Need/Greed window", ref companion))
+        if (UiParts.Toggle("Show a companion list beside the Need/Greed window", ref companion,
+                "A separate window pinned to the side of the roll window, marking what you do not own.\n" +
+                "It never draws into the game's own loot window, so it cannot fight with plugins that do\n" +
+                "(Allagan Tools, Simple Tweaks, VanillaPlus, Collections)."))
         {
             configuration.ShowLootCompanion = companion;
             changed = true;
-        }
-
-        if (ImGui.IsItemHovered())
-        {
-            ImGui.SetTooltip(
-                "A separate window pinned to the side of the roll window, marking what you do not own.\n" +
-                "It never draws into the game's own loot window, so it cannot fight with plugins that do\n" +
-                "(Allagan Tools, Simple Tweaks, VanillaPlus, Collections).");
         }
 
         if (companion)
@@ -289,18 +270,13 @@ public class ConfigWindow : Window
         ImGui.TextColored(Palette.Muted, "Vendor panel");
 
         var vendorPanel = configuration.ShowVendorPanel;
-        if (ImGui.Checkbox("Show a panel beside vendor windows", ref vendorPanel))
+        if (UiParts.Toggle("Show a panel beside vendor windows", ref vendorPanel,
+                "Lists the glamour gear the vendor is currently showing, marked by where you already\n" +
+                "have each piece. Items that cannot be kept as a glamour are left out entirely.\n" +
+                "Run \"/dungeondrip shop\" at a vendor it does not recognise to identify it."))
         {
             configuration.ShowVendorPanel = vendorPanel;
             changed = true;
-        }
-
-        if (ImGui.IsItemHovered())
-        {
-            ImGui.SetTooltip(
-                "Lists the glamour gear the vendor is currently showing, marked by where you already\n" +
-                "have each piece. Items that cannot be kept as a glamour are left out entirely.\n" +
-                "Run \"/dungeondrip shop\" at a vendor it does not recognise to identify it.");
         }
 
         if (vendorPanel)
@@ -322,7 +298,7 @@ public class ConfigWindow : Window
             }
 
             var vendorGrouped = configuration.VendorGroupBySlot;
-            if (ImGui.Checkbox("Group by equipment slot##vendor", ref vendorGrouped))
+            if (UiParts.Toggle("Group by equipment slot##vendor", ref vendorGrouped))
             {
                 configuration.VendorGroupBySlot = vendorGrouped;
                 changed = true;
@@ -415,18 +391,13 @@ public class ConfigWindow : Window
         ImGui.TextColored(Palette.Muted, "Console Games Wiki");
 
         var useWiki = configuration.UseWikiSource;
-        if (ImGui.Checkbox("Fill gaps from the wiki", ref useWiki))
+        if (UiParts.Toggle("Fill gaps from the wiki", ref useWiki,
+                "Looks the duty you are viewing up on ffxiv.consolegameswiki.com and merges its loot\n" +
+                "table in. One page per duty, cached for two weeks, checked one at a time. The primary\n" +
+                "dataset lags months on new dungeons where the wiki is usually complete."))
         {
             configuration.UseWikiSource = useWiki;
             changed = true;
-        }
-
-        if (ImGui.IsItemHovered())
-        {
-            ImGui.SetTooltip(
-                "Looks the duty you are viewing up on ffxiv.consolegameswiki.com and merges its loot\n" +
-                "table in. One page per duty, cached for two weeks, checked one at a time. The primary\n" +
-                "dataset lags months on new dungeons where the wiki is usually complete.");
         }
 
         if (useWiki)
@@ -464,18 +435,13 @@ public class ConfigWindow : Window
         ImGui.TextColored(Palette.Muted, "Learning from what you see drop");
 
         var learn = configuration.LearnDropsFromLoot;
-        if (ImGui.Checkbox("Record gear that drops in duties", ref learn))
+        if (UiParts.Toggle("Record gear that drops in duties", ref learn,
+                "Watches loot messages and adds anything new to this duty's list, including rolls other\n" +
+                "party members win. Upstream lags months behind on new dungeons; this fills the gap with\n" +
+                "what you actually see. Nothing is uploaded anywhere."))
         {
             configuration.LearnDropsFromLoot = learn;
             changed = true;
-        }
-
-        if (ImGui.IsItemHovered())
-        {
-            ImGui.SetTooltip(
-                "Watches loot messages and adds anything new to this duty's list, including rolls other\n" +
-                "party members win. Upstream lags months behind on new dungeons; this fills the gap with\n" +
-                "what you actually see. Nothing is uploaded anywhere.");
         }
 
         var learned = plugin.LearnedLoot;

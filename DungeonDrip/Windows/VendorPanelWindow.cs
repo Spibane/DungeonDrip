@@ -270,49 +270,43 @@ public sealed unsafe class VendorPanelWindow : Window
         var changed = false;
 
         var showOwned = configuration.ShowOwnedItems;
-        if (ImGuiComponents.IconButton("##vendorOwned", showOwned ? FontAwesomeIcon.Eye : FontAwesomeIcon.EyeSlash))
+        if (UiParts.ToolButton(
+                "##vendorOwned",
+                showOwned ? FontAwesomeIcon.Eye : FontAwesomeIcon.EyeSlash,
+                showOwned
+                    ? "Showing pieces you already have. Click to list only what you are missing.\n" + SharedNote
+                    : "Hiding pieces you already have. Click to list them too.\n" + SharedNote))
         {
             configuration.ShowOwnedItems = !showOwned;
             changed = true;
         }
 
-        if (ImGui.IsItemHovered())
-        {
-            ImGui.SetTooltip(showOwned
-                ? "Showing pieces you already have. Click to list only what you are missing.\n" + SharedNote
-                : "Hiding pieces you already have. Click to list them too.\n" + SharedNote);
-        }
-
         ImGui.SameLine();
 
         var jobOnly = configuration.OnlyCurrentJobEquippable;
-        if (ImGuiComponents.IconButton("##vendorJob", jobOnly ? FontAwesomeIcon.User : FontAwesomeIcon.Users))
+        if (UiParts.ToolButton(
+                "##vendorJob",
+                jobOnly ? FontAwesomeIcon.User : FontAwesomeIcon.Users,
+                jobOnly
+                    ? "Showing only what your current job can wear. Click to show every job.\n" + SharedNote
+                    : "Showing gear for every job. Click to show only your current job.\n" + SharedNote))
         {
             configuration.OnlyCurrentJobEquippable = !jobOnly;
             changed = true;
         }
 
-        if (ImGui.IsItemHovered())
-        {
-            ImGui.SetTooltip(jobOnly
-                ? "Showing only what your current job can wear. Click to show every job.\n" + SharedNote
-                : "Showing gear for every job. Click to show only your current job.\n" + SharedNote);
-        }
-
         ImGui.SameLine();
 
         var hideWeapons = configuration.HideWeapons;
-        if (ImGuiComponents.IconButton("##vendorWeapons", hideWeapons ? FontAwesomeIcon.Ban : FontAwesomeIcon.Khanda))
+        if (UiParts.ToolButton(
+                "##vendorWeapons",
+                hideWeapons ? FontAwesomeIcon.Ban : FontAwesomeIcon.Khanda,
+                hideWeapons
+                    ? "Hiding weapons and off-hands. Click to list them.\n" + SharedNote
+                    : "Listing weapons and off-hands. Click to hide them.\n" + SharedNote))
         {
             configuration.HideWeapons = !hideWeapons;
             changed = true;
-        }
-
-        if (ImGui.IsItemHovered())
-        {
-            ImGui.SetTooltip(hideWeapons
-                ? "Hiding weapons and off-hands. Click to list them.\n" + SharedNote
-                : "Listing weapons and off-hands. Click to hide them.\n" + SharedNote);
         }
 
         // Only once there is something to undo. Without it a drag is a one-way door.
@@ -320,15 +314,15 @@ public sealed unsafe class VendorPanelWindow : Window
         {
             ImGui.SameLine();
 
-            if (ImGuiComponents.IconButton("##vendorSize", FontAwesomeIcon.ArrowsAltV))
+            if (UiParts.ToolButton(
+                    "##vendorSize",
+                    FontAwesomeIcon.ArrowsAltV,
+                    "Using a size you set. Click to match the vendor window again."))
             {
                 configuration.VendorPanelWidth = 0;
                 configuration.VendorPanelHeight = 0;
                 changed = true;
             }
-
-            if (ImGui.IsItemHovered())
-                ImGui.SetTooltip("Using a size you set. Click to match the vendor window again.");
         }
 
         ImGui.Separator();

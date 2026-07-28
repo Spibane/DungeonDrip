@@ -1,11 +1,19 @@
 # Changelog
 
 ### v0.11.0 - 2026-07-28
-- Added roulette advice to the window when you are not in a duty: for Expert, Level Cap Dungeons, Alliance Raids, High-level Dungeons and Leveling, the job to queue as for the best odds of uncollected glamour, with the count and the share of what that job can roll on. Hovering gives the full per-job breakdown and how much of the roulette's pool has loot data. Ranked by share rather than raw count, so a job whose role is handed less gear is not penalised for it. Trials, Main Scenario, Guildhests, Normal Raids, Mentor and Frontline are absent - the plugin carries no loot for them
+- Fixed the collection cache being rewritten to disk once a second. Both stores stay loaded until you zone, so from the moment you opened a Glamour Dresser every poll re-read it, counted as a change, saved the file and invalidated every derived list. Reads still happen and the timestamps still move; only an actual change now saves
+- Fixed the downloaded dataset being handed from the worker thread to the framework thread without the lock that guards its companion field
+- Hardened the raw vendor readers against a registry entry whose indices fall outside the block it describes - a typo there would have thrown inside a draw call rather than declining the shop
+- Changed the three files keyed by territory id onto one pair of read/write helpers, so string-keyed JSON is parsed back in one place instead of three
+- Changed the settings window's thirteen checkboxes onto one shared toggle that takes its own tooltip, removing the repeated hover plumbing
+- Removed a dead ordering constant left over from the combined role headings dropped in 0.9.2
+- Changed the main window's toolbar from five text buttons to icons, matching the vendor panel. The words set the window's minimum useful width at roughly twice what the list under them needs; they now live in the hover tooltips, which also read on a greyed-out button so it can still say why it is greyed out
+- Changed both toolbars onto one shared button, so the two cannot drift apart
+- Added roulette advice to the window when you are not in a duty: for Expert, Level Cap Dungeons, Alliance Raids, High-level Dungeons and Leveling, the role to queue as for the best odds of uncollected glamour, with the count and the share of what that role can roll on. Counted by the same role headings the missing list uses, melee still split by gear type, so "Melee DPS (NIN VPR)" names what to queue rather than lumping pools that share nothing. Hovering gives every role and how much of the roulette's pool has loot data. Ranked by share rather than raw count, so a role handed less gear is not penalised for it. Trials, Main Scenario, Guildhests, Normal Raids, Mentor and Frontline are absent - the plugin carries no loot for them
 - Changed the button that stops following a duty you looked up to read **Roulettes** when letting go would land you back on that table, which standing in a city it does. It is the same button doing the same thing, named for where it goes
-- Added job-level gating to that advice: jobs below the roulette's requirement, and duties above your level, are left out, since a roulette will not queue you into them. Duty unlocks are not readable, so the odds still assume an unlocked pool
+- Added level gating to that advice: roles you have nothing levelled enough for, and duties above your level, are left out, since a roulette will not queue you into them. Duty unlocks are not readable, so the odds still assume an unlocked pool
 - Changed roulette membership to be read from each duty's own roulette flags rather than reconstructed from level bands, and the roulette names from the game's sheet, so renamed and re-pooled roulettes follow the patch
-- Changed the job index to resolve a job's parent class, so gear that old sheet rows mark for the class alone ("GLA PGL MRD LNC ARC ROG MNK WAR DRG BRD NIN" is a real row) now counts for the job that grew out of it. Low-level dungeon gear uses those rows heavily
+- Changed the job index to record the jobs behind each role heading, resolving a job's parent class on the way, so gear that old sheet rows mark for the class alone ("GLA PGL MRD LNC ARC ROG MNK WAR DRG BRD NIN" is a real row) still counts Paladin as a tank. Low-level dungeon gear uses those rows heavily
 
 ### v0.10.0 - 2026-07-28
 - **A new panel now appears beside vendor windows by default.** Turn it off under Settings > Vendors if you would rather it did not

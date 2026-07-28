@@ -93,6 +93,16 @@ public static unsafe class ShopItemReader
         if (values.Length != descriptor.ExpectedValueCount)
             return false;
 
+        // A descriptor whose indices fall outside the block it describes is a typo in the registry,
+        // not a shop worth reading. Checked rather than trusted because the alternative is an
+        // out-of-range throw inside a draw call.
+        if (descriptor.CountIndex >= values.Length ||
+            descriptor.FirstItemIndex >= values.Length ||
+            descriptor.Stride < 1)
+        {
+            return false;
+        }
+
         var count = descriptor.CountIndex >= 0
             ? ToInt(values[descriptor.CountIndex])
             : descriptor.FixedCount;

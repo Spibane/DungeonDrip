@@ -22,10 +22,8 @@ question at each point where you might pick something up.
 On entering a dungeon or alliance raid it lists the gear that drops there and is not yet collected.
 Any duty can also be looked up without entering it. While a Need/Greed roll is open, a companion
 window beside it marks the pieces still missing. And at a vendor, a panel beside the shop lists the
-glamour gear it stocks, marked by where you already have each piece.
-
-Outside a duty the window turns the question round and names the job to queue each roulette as for
-the best odds of something new.
+glamour gear it stocks, marked by where you already have each piece. Outside a duty it names the
+role to queue each roulette as.
 
 ## Architecture
 
@@ -97,32 +95,26 @@ gets no panel — run `/dungeondrip shop` there and report the addon name it pri
 
 ## Roulettes
 
-Open the window outside a duty and it shows, per roulette, which job to queue as:
+Outside a duty the window shows, per roulette, which role to queue as:
 
 | Roulette | Queue as | New | Chance |
 | --- | --- | --- | --- |
-| Expert | NIN +1 | 12 | 35% |
-| Level Cap Dungeons | WHM | 8 | 27% |
+| Expert | Melee DPS (NIN VPR) | 12 | 35% |
+| Level Cap Dungeons | Healer | 8 | 27% |
 
-**New** is how many uncollected pieces that job can roll Need on across the whole roulette.
-**Chance** is those as a share of everything it can roll on there — the odds that the next piece you
-can roll on is one you do not have. Jobs are ranked by chance, so a role the game hands less gear is
-not penalised for it; `+1` means another job ties exactly, which is usual, since a role's armour is
-shared. Hovering gives the full per-job breakdown.
+**New** counts uncollected pieces that role can roll Need on across the roulette; **Chance** is those
+as a share of everything it can roll on there, which is what the ranking uses. Roles are the
+[grouping](#grouping) used everywhere else, melee split by gear type. Hovering gives every role.
 
-Only the roulettes whose gear the plugin tracks are listed: Expert, Level Cap Dungeons, Alliance
-Raids, High-level Dungeons and Leveling. Membership is read from each duty's own roulette flags and
-the names from the game's sheet, so a renamed or re-pooled roulette follows the patch.
+Listed roulettes are Expert, Level Cap Dungeons, Alliance Raids, High-level Dungeons and Leveling —
+the ones whose gear is tracked. Membership and names come from the game's own sheets, so a renamed
+or re-pooled roulette follows the patch.
 
-Two limits worth knowing. It counts per piece you can roll on, not per run — a duty hands out a
-handful of items, so this ranks jobs rather than predicting a drop. And it cannot see which duties
-you have unlocked, only whether your job is high enough, so a returning player's odds read
-optimistically. Jobs below the roulette's level requirement, and duties above your level, are left
-out.
+Odds are per piece you can roll on, not per run, and assume the pool is unlocked; only your level is
+readable. Roles you have nothing levelled enough for, and duties above your level, are left out.
 
-Looking a duty up replaces the table with that duty's drops. The toolbar button that unpins it reads
-**Roulettes** when letting go would bring the table back, and **Follow current duty** when you are
-standing somewhere with drops of its own.
+Looking a duty up replaces the table; the toolbar's pin button lets go of it again, showing a die
+when that lands back here and a thumbtack when it lands on the duty you are standing in.
 
 ## Commands
 

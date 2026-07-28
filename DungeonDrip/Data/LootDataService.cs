@@ -93,18 +93,16 @@ public sealed class LootDataService : IDisposable
     /// </summary>
     public void Update()
     {
-        LootCacheFile? incoming;
-        lock (sync)
-        {
-            incoming = pending;
-            pending = null;
-        }
-
         // A newly observed drop or wiki lookup changes the merged result without changing the
         // download, so rebuild from the cache we already hold.
         var supplementsChanged = learned.Revision != seenLearnedRevision || wiki.Revision != seenWikiRevision;
-        if (incoming == null && supplementsChanged && cache != null)
-            incoming = cache;
+
+        LootCacheFile? incoming;
+        lock (sync)
+        {
+            incoming = pending ?? (supplementsChanged ? cache : null);
+            pending = null;
+        }
 
         if (incoming == null)
             return;
@@ -142,9 +140,8 @@ public sealed class LootDataService : IDisposable
         if (loaded == null || loaded.Instances.Count == 0)
             return;
 
-        cache = loaded;
         lock (sync)
-            pending = loaded;
+            cache = pending = loaded;
 
         StatusMessage = $"Using loot data downloaded {Core.Format.Age(loaded.FetchedUtc)} ago.";
         Plugin.Log.Information($"Loaded cached loot data ({loaded.Instances.Count} duties)");
@@ -186,11 +183,12 @@ public sealed class LootDataService : IDisposable
             if (built.Instances.Count == 0)
                 throw new InvalidOperationException("upstream data produced no duties");
 
-            cache = built;
             JsonStore.Write(CachePath, built);
 
+            // Under the same lock as pending: this runs on a worker and both are read by the
+            // framework thread, so publishing one without the other is a torn hand-off.
             lock (sync)
-                pending = built;
+                cache = pending = built;
 
             StatusMessage = $"Loot data updated ({built.Instances.Count} duties).";
         }
