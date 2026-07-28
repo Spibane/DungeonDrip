@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Dalamud.Game.Command;
 using Dalamud.Interface.Windowing;
@@ -65,6 +66,8 @@ public sealed class Plugin : IDalamudPlugin
     private readonly ConfigWindow configWindow;
 
     private DutyReportBuilder? reportBuilder;
+    private RouletteAdviceBuilder? adviceBuilder;
+    private IReadOnlyList<RouletteAdvice>? advice;
     private uint currentTerritory;
     private uint? pinnedTerritory;
     private DutyReport? report;
@@ -139,6 +142,13 @@ public sealed class Plugin : IDalamudPlugin
 
     public DutyReport? Report => report;
 
+    /// <summary>
+    /// Which job to queue each roulette as. Built on first ask rather than alongside the report,
+    /// because it sweeps every duty in the game and is only wanted while you are not in one.
+    /// </summary>
+    public IReadOnlyList<RouletteAdvice> Roulettes =>
+        advice ??= adviceBuilder?.Build(Ownership.Current, Configuration) ?? [];
+
     public uint SelectedTerritory => pinnedTerritory ?? currentTerritory;
 
     public bool IsPinned => pinnedTerritory.HasValue;
@@ -193,6 +203,7 @@ public sealed class Plugin : IDalamudPlugin
             seenLootRevision = LootData.Revision;
             Duties = DutyCatalog.Build(LootData.Data, contentFinder);
             reportBuilder = new DutyReportBuilder(LootData.Data, Duties, Outfits, jobRoles, Storage, JobFilter);
+            adviceBuilder = new RouletteAdviceBuilder(LootData.Data, contentFinder, Outfits, jobRoles, Storage);
             reportDirty = true;
         }
 
@@ -215,6 +226,11 @@ public sealed class Plugin : IDalamudPlugin
 
         reportDirty = false;
         report = reportBuilder?.Build(SelectedTerritory, Ownership.Current, Configuration);
+
+        // Everything that stales the report stales the advice too - it is the same ownership
+        // snapshot read a different way. Dropped rather than rebuilt, so a duty you pinned does
+        // not pay for a sweep the window will not draw.
+        advice = null;
 
         if (report == null || autoOpenForTerritory != SelectedTerritory)
             return;
