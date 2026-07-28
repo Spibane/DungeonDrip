@@ -11,10 +11,8 @@ namespace DungeonDrip.Game;
 /// Pulls the item ids a vendor is currently offering out of the client.
 /// </summary>
 /// <remarks>
-/// Every path here returns null rather than an empty array when it cannot trust what it read, and
-/// an empty array only when the vendor genuinely has nothing to show. The distinction matters: a
-/// wrong marker beside a piece of gear is worse than no panel at all, so "I could not read this"
-/// has to be able to switch the feature off rather than quietly look like "nothing here".
+/// "Could not read this" and "nothing here" must stay distinguishable: a wrong marker is worse than
+/// no panel, so an unreadable shop has to be able to switch the feature off rather than look empty.
 /// </remarks>
 public static unsafe class ShopItemReader
 {
@@ -32,10 +30,7 @@ public static unsafe class ShopItemReader
         };
     }
 
-    /// <summary>
-    /// The gil shop. The only source with a maintained typed struct behind it, so it fails by
-    /// returning a null pointer rather than by handing back plausible nonsense.
-    /// </summary>
+    /// <summary>The gil shop, via the one source with a maintained typed struct behind it.</summary>
     private static bool ReadShopEventHandler(List<uint> destination)
     {
         var proxy = ShopEventHandler.AgentProxy.Instance();
@@ -44,8 +39,7 @@ public static unsafe class ShopItemReader
 
         var handler = proxy->Handler;
 
-        // Buyback lists what you just sold, not what the vendor stocks. Everything in it is by
-        // definition something you owned moments ago, so marking it says nothing useful.
+        // Buyback lists what you just sold - by definition things you owned moments ago.
         if (handler->BuybackTabActive)
             return true;
 
@@ -54,8 +48,7 @@ public static unsafe class ShopItemReader
         var itemCount = Math.Clamp(handler->ItemsCount, 0, items.Length);
         var visibleCount = Math.Clamp(handler->VisibleItemsCount, 0, visible.Length);
 
-        // VisibleItems holds indices into Items, in the order the game is displaying them - already
-        // filtered by unlock state and quest requirements, which is exactly what should be listed.
+        // Indices into Items, in display order, already filtered by unlock and quest state.
         for (var i = 0; i < visibleCount; i++)
         {
             var index = visible[i];
@@ -79,8 +72,6 @@ public static unsafe class ShopItemReader
         var items = values->Items;
         var count = Math.Clamp(ToInt(values->ItemCount), 0, items.Length);
 
-        // The span covers the category the user has selected, so switching the dropdown re-reads
-        // and the panel follows along with no extra work.
         for (var i = 0; i < count; i++)
             Append(destination, ToItemId(items[i].ItemId));
 
@@ -91,11 +82,10 @@ public static unsafe class ShopItemReader
     /// The addons with no struct at all, read by bare index into their AtkValue block.
     /// </summary>
     /// <remarks>
-    /// The exact-count check is the whole safety story here. These indices are unnamed numbers
-    /// recovered by reverse engineering, and the one thing that reliably changes when the game
-    /// reshapes an addon is how many values it carries - so a block that is still exactly the
-    /// expected size is good evidence the offsets still point where they used to, and a block that
-    /// is not means nothing readable can be salvaged.
+    /// The exact-count check is the whole safety story. The one thing that reliably changes when the
+    /// game reshapes an addon is how many values it carries, so a block of the expected size is good
+    /// evidence the offsets still point where they used to - and a wrong size means nothing is
+    /// salvageable.
     /// </remarks>
     private static bool ReadRawAtkValues(ShopAddonDescriptor descriptor, AtkUnitBase* unit, List<uint> destination)
     {
@@ -117,9 +107,8 @@ public static unsafe class ShopItemReader
     }
 
     /// <summary>
-    /// Normalises a raw client id the way the rest of the plugin does and drops what cannot be a
-    /// glamour. HQ stock collapses onto the base id here, which is correct - the dresser stores the
-    /// base item - and leaves the caller to deal with the duplicate rows that produces.
+    /// Normalises a raw client id. HQ stock collapses onto the base id, which is what the dresser
+    /// stores; the caller deals with the duplicate rows that produces.
     /// </summary>
     private static void Append(List<uint> destination, uint rawId)
     {
@@ -128,8 +117,7 @@ public static unsafe class ShopItemReader
 
         var (itemId, kind) = ItemUtil.GetBaseId(rawId);
 
-        // Event items share the id space behind an offset, so an unfiltered id can collide with a
-        // real one.
+        // Event items share the id space behind an offset and would collide with real gear.
         if (itemId == 0 || kind == ItemKind.EventItem)
             return;
 

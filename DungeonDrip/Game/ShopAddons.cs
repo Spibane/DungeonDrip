@@ -16,9 +16,8 @@ public enum ShopSource
 }
 
 /// <param name="ExpectedValueCount">
-/// The addon's AtkValue count when the layout is the one described here. Checked exactly before any
-/// raw read: if a patch resizes the block, the offsets below are meaningless and the only safe move
-/// is to stop. Unused by the typed sources.
+/// The addon's AtkValue count when the layout is the one described here, checked exactly before any
+/// raw read: a resized block means the offsets are meaningless. Unused by the typed sources.
 /// </param>
 /// <param name="CountIndex">Index of the AtkValue holding the row count, or -1 when it is fixed.</param>
 /// <param name="FixedCount">Row count when the addon always allocates the same number of slots.</param>
@@ -37,31 +36,24 @@ public sealed record ShopAddonDescriptor(
 /// Which addons count as a vendor, and how to get the stock list out of each.
 /// </summary>
 /// <remarks>
-/// This table is the fragile part of the vendor feature, so it is kept as data in one place: adding
-/// a vendor, or repairing one after a patch, is a line here rather than a code change.
+/// The fragile part of the vendor feature, kept as data so repairing one after a patch is a line
+/// here rather than a code change. Two sources are typed and maintained upstream, so they break
+/// loudly; the rest are raw AtkValue indices recovered by reverse engineering and guarded by
+/// <see cref="ShopAddonDescriptor.ExpectedValueCount"/>.
 ///
-/// Two of the sources are typed and maintained upstream in FFXIVClientStructs, so they break loudly
-/// (a null pointer) rather than silently. The rest have no struct at all and are read by raw
-/// AtkValue index - numbers with no names on them, taken from what other plugins have reverse
-/// engineered, and guarded by <see cref="ShopAddonDescriptor.ExpectedValueCount"/> so a drifted
-/// layout disables the addon instead of feeding garbage item ids into the panel.
-///
-/// Deliberately absent: the Gold Saucer prize exchange and MerchantShop (layout unconfirmed - they
-/// render nothing until someone reports the addon name), CollectablesShop and MJIDisposeShop (turn-in
-/// and sell-only), FittingShop (ornaments, not equipment), TripleTriadCoinExchange (cards), and the
-/// market board, where N listings of one item would produce N identical rows.
+/// Absent on purpose: the Gold Saucer exchange and MerchantShop (layout unconfirmed), CollectablesShop
+/// and MJIDisposeShop (turn-in and sell-only), FittingShop (ornaments), TripleTriadCoinExchange
+/// (cards), and the market board, where N listings of one item would give N identical rows.
 /// </remarks>
 public static class ShopAddons
 {
     private static readonly ShopAddonDescriptor[] All =
     [
-        // Gil vendors and the Calamity Salvager. Typed, and its VisibleItems array is already the
-        // game's own filtered and sorted display order.
+        // Gil vendors and the Calamity Salvager. VisibleItems is already the game's own display order.
         new("Shop", ShopSource.ShopEventHandler),
 
-        // Rowena's House of Splendors and the other "item exchange" NPCs. Typed via
-        // AddonInclusionShop.TypedAtkValues, whose Items span covers the selected category only -
-        // which is exactly what the panel wants to list.
+        // Rowena and the other item-exchange counters. TypedAtkValues covers the selected category
+        // only, which is exactly what the panel wants to list.
         new("InclusionShop", ShopSource.InclusionShop),
 
         // Tomestone, scrip, Bicolor Gemstone and Nut vendors. Both addons share a layout.
@@ -77,7 +69,7 @@ public static class ShopAddons
         new("FreeShop", ShopSource.RawAtkValues,
             ExpectedValueCount: 565, CountIndex: 76, FirstItemIndex: 138),
 
-        // The Firmament. Note the trailing 2 - SkyIslandExchange is the agent, not the addon.
+        // The Firmament. The trailing 2 matters - SkyIslandExchange is the agent, not the addon.
         new("SkyIslandExchange2", ShopSource.RawAtkValues,
             ExpectedValueCount: 461, CountIndex: 0, FirstItemIndex: 56),
     ];

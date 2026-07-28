@@ -28,15 +28,13 @@ public sealed record VendorRow(
 /// for each piece of that stock.
 /// </summary>
 /// <remarks>
-/// Discovery is belt and braces on purpose. The addon lifecycle events are the fast path and give an
-/// instant panel, but this is the plugin's first use of them and they have never been exercised
-/// against seven different shop addons - so a slow sweep of the registry runs as well, and the panel
-/// still appears within half a second if an event never fires. The stock itself is compared in full
-/// every frame rather than trusted to a refresh event, because a shop's category dropdown may or may
-/// not raise one and a panel listing the previous category would be quietly wrong.
+/// Discovery is belt and braces. Lifecycle events are the fast path, but a slow sweep of the
+/// registry runs too, so the panel still appears if one never fires. The stock is compared in full
+/// every frame rather than trusted to a refresh event, because a category dropdown may not raise one
+/// and a panel listing the previous category would be quietly wrong.
 ///
-/// Nothing here is driven from the framework tick. The panel is the only consumer, so the work
-/// happens when it draws and costs nothing at all when it is switched off.
+/// Nothing runs on the framework tick: the panel is the only consumer, so this costs nothing when it
+/// is switched off.
 /// </remarks>
 public sealed class ShopWatcher : IDisposable
 {
@@ -98,8 +96,7 @@ public sealed class ShopWatcher : IDisposable
             return Forget();
         }
 
-        // Invisible is not gone - shops flicker through it while opening and closing - so keep the
-        // addon claimed and just draw nothing this frame.
+        // Invisible is not gone - shops flicker through it while opening - so keep it claimed.
         if (!unit->IsVisible)
             return Forget();
 
@@ -196,9 +193,8 @@ public sealed class ShopWatcher : IDisposable
     }
 
     /// <summary>
-    /// A full comparison rather than a hash. At vendor list sizes it costs the same, and it cannot
-    /// collide - which a hash of the count and the end items very much can, since swapping two
-    /// categories of the same length is exactly the case this has to catch.
+    /// A full comparison rather than a hash: at these sizes it costs the same and cannot collide,
+    /// and swapping two categories of equal length is exactly the case this has to catch.
     /// </summary>
     private bool StockUnchanged()
     {
@@ -240,9 +236,8 @@ public sealed class ShopWatcher : IDisposable
             $"Vendor {descriptor.AddonName}: {ids.Length} items, {rows.Count} glamour-eligible, " +
             $"{notCollected} not collected";
 
-        // Once per vendor at Information, because that is the line that makes a bug report useful.
-        // Rebuilds after that - changing category, buying something - drop to Debug, so a value that
-        // jitters cannot turn this into a per-frame flood.
+        // Once per vendor at Information - the line that makes a bug report useful. Rebuilds after
+        // that drop to Debug, so a jittering value cannot flood the log.
         if (loggedFor != descriptor.AddonName)
         {
             loggedFor = descriptor.AddonName;
@@ -274,9 +269,8 @@ public sealed class ShopWatcher : IDisposable
         var storage = plugin.Storage;
         var kind = storage.Of(item);
 
-        // Absence of a row has to mean exactly one thing - "not glamour gear, not my business".
-        // The moment a dye or a fish shows up unmarked next to gear that is also unmarked, the
-        // panel has taught the user that no marker means "you already have it".
+        // Absence of a row must mean exactly one thing: "not glamour gear". If a dye ever appears
+        // here, absence starts reading as "you already have it" instead.
         if (kind == StorageKind.None || !storage.MatchesScope(kind, plugin.Configuration.Scope))
             return null;
 
@@ -288,8 +282,7 @@ public sealed class ShopWatcher : IDisposable
             plugin.Configuration.OutfitOwnership,
             plugin.Configuration.Scope);
 
-        // Only worth asking for a piece that is actually held in a set - the answer is meaningless
-        // otherwise, and walking a set's pieces is not free.
+        // Meaningless for anything not held in a set, and walking a set's pieces is not free.
         var completed = source == OwnershipSource.Outfit && plugin.Outfits.IsInCompletedSet(itemId, view);
 
         var (slotOrder, slotName) = EquipSlots.Describe(item.EquipSlotCategory.Value);
@@ -331,8 +324,7 @@ public sealed class ShopWatcher : IDisposable
 
         active = descriptor;
 
-        // Opportunistic and invisible: standing in a town the dresser is not loaded, so this cannot
-        // conjure data up, but it does pick up an armoire opened at an inn earlier in the session.
+        // Cannot conjure a dresser up from a town, but does pick up an armoire opened at an inn.
         plugin.Ownership.RequestRefresh();
     }
 
@@ -343,7 +335,6 @@ public sealed class ShopWatcher : IDisposable
 
         active = null;
 
-        // So the next visit to this vendor reports itself again rather than staying at Debug.
         loggedFor = null;
     }
 
@@ -352,10 +343,9 @@ public sealed class ShopWatcher : IDisposable
     /// "what invalidates this" to a single line instead of five scattered checks.
     /// </summary>
     /// <remarks>
-    /// Staleness is deliberately absent: it changes how a marker is drawn, not which marker it is,
-    /// so the panel applies it at draw time and an aging snapshot never rebuilds the cache. The
-    /// current job is here rather than at draw time because whether a piece is wearable is baked
-    /// into the row, so switching job has to re-resolve.
+    /// Staleness is absent on purpose: it changes how a marker is drawn, not which marker it is, so
+    /// an aging snapshot never rebuilds the cache. The job is here because wearability is baked into
+    /// the row.
     /// </remarks>
     private readonly record struct MarkerContext(
         int OwnershipRevision,

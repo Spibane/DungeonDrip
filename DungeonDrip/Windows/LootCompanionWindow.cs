@@ -31,9 +31,8 @@ public sealed unsafe class LootCompanionWindow : Window
     /// </summary>
     private float lastWidth = 220f;
 
+    // Collapsible because it cannot be moved: folding it is the only way to get it out of the way.
     public LootCompanionWindow(Plugin plugin)
-        // Collapsible on purpose: it is pinned where the user cannot move it, so folding it to the
-        // title bar is the only way to get it out of the way without turning the feature off.
         : base("Still needed###DungeonDripLootCompanion",
                ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoMove |
                ImGuiWindowFlags.AlwaysAutoResize | ImGuiWindowFlags.NoFocusOnAppearing |
@@ -64,8 +63,7 @@ public sealed unsafe class LootCompanionWindow : Window
 
         var unit = &addon->AtkUnitBase;
 
-        // This one auto-sizes, so its own height is not knowable here; the roll window's height is
-        // the closest stand-in for keeping the bottom edge on screen.
+        // Auto-sized, so its own height is not knowable here; the roll window's is the stand-in.
         var ownSize = new Vector2(lastWidth, unit->GetScaledHeight(true));
 
         Position = AddonAnchor.Beside(unit, plugin.Configuration.LootCompanionSide, ownSize);

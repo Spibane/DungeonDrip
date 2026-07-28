@@ -7,10 +7,7 @@ using FFXIVClientStructs.FFXIV.Component.GUI;
 
 namespace DungeonDrip.Windows;
 
-/// <summary>
-/// The plugin's colours, in one place because four windows were each declaring their own and had
-/// already drifted into two greys a shade apart doing the same job.
-/// </summary>
+/// <summary>The plugin's colours, in one place so they cannot drift apart again.</summary>
 internal static class Palette
 {
     /// <summary>Something the user should act on or distrust: stale data, hidden weapons.</summary>
@@ -35,12 +32,9 @@ internal static class Palette
 internal static class UiParts
 {
     /// <summary>
-    /// Draws an item's icon and leaves the cursor on the same line, ready for its name.
+    /// Draws an item's icon and leaves the cursor on the same line, ready for its name. Falls back
+    /// to blank space of the same size, so a texture still loading does not shunt the row leftwards.
     /// </summary>
-    /// <remarks>
-    /// Falls back to blank space of the same size rather than skipping, so a texture that has not
-    /// loaded yet does not shunt the whole row leftwards for a frame.
-    /// </remarks>
     public static void ItemIcon(ushort iconId, float size)
     {
         var scaled = new Vector2(size, size) * ImGuiHelpers.GlobalScale;
@@ -60,10 +54,9 @@ internal static class UiParts
 /// Places a window alongside a game addon.
 /// </summary>
 /// <remarks>
-/// Shared by the loot roll companion and the vendor panel, which pin themselves to the addon they
-/// describe. Game screen pixels and ImGui pixels are the same thing here, so nothing on this path is
-/// multiplied by <see cref="ImGuiHelpers.GlobalScale"/> - that scales glyphs, not coordinates, and
-/// applying it to a position is the classic way these panels end up drifting away from their addon.
+/// Game screen pixels and ImGui pixels are the same thing here, so nothing on this path is
+/// multiplied by <see cref="ImGuiHelpers.GlobalScale"/>. That scales glyphs, not coordinates;
+/// applying it to a position is how these panels drift away from their addon.
 /// </remarks>
 internal static unsafe class AddonAnchor
 {
@@ -86,8 +79,8 @@ internal static unsafe class AddonAnchor
             ? unit->X + width + Gap
             : unit->X - ownSize.X - Gap;
 
-        // Clamped against the panel's own size, not the addon's: the panel is the one that can
-        // overrun, and an addon jammed against an edge would otherwise push it off screen.
+        // Clamped against the panel's own size: an addon jammed against an edge would otherwise
+        // push it off screen.
         return new Vector2(
             Math.Clamp(x, 0f, Math.Max(0f, display.X - ownSize.X)),
             Math.Clamp(unit->Y, 0f, Math.Max(0f, display.Y - ownSize.Y)));
