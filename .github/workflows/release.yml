@@ -1,0 +1,93 @@
+name: Release
+
+# Publishing is driven entirely by pushing a tag:
+#
+#   git tag v0.11.0 && git push origin v0.11.0
+#
+# which builds, attaches the zip to a GitHub Release, regenerates repo.json and commits it
+# back to main. Users of the third-party repository then see the update on their next
+# plugin-list refresh.
+
+on:
+  push:
+    tags: ['v*']
+
+# Needed to create the release and to push the regenerated manifest.
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      # main, not the tag, because repo.json is committed back here and must land on a
+      # branch. The next step proves the tag actually points into main's history.
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Verify the tag is on main
+        run: |
+          git fetch --tags --force
+          $tagSha = git rev-list -n 1 $env:GITHUB_REF_NAME
+          git merge-base --is-ancestor $tagSha origin/main
+          if ($LASTEXITCODE -ne 0) {
+            throw "Tag $env:GITHUB_REF_NAME is not an ancestor of main; refusing to publish it as the latest release."
+          }
+          Write-Host "Tag $env:GITHUB_REF_NAME -> $tagSha, on main."
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # Same as the build workflow: the SDK compiles against XIVLauncher's assemblies, which
+      # no runner has, and the dev distribution is that same set of files.
+      - name: Fetch Dalamud
+        run: |
+          Invoke-WebRequest -Uri https://goatcorp.github.io/dalamud-distrib/latest.zip -OutFile dalamud.zip
+          Expand-Archive -Path dalamud.zip -DestinationPath dalamud
+          echo "DALAMUD_HOME=$env:GITHUB_WORKSPACE\dalamud" >> $env:GITHUB_ENV
+
+      - name: Build
+        run: dotnet build DungeonDrip.sln -c Release --nologo
+
+      # DalamudPackager always names its output latest.zip, and the platform folder depends
+      # on how MSBuild resolved the solution configuration, so search rather than guess.
+      - name: Collect the plugin zip
+        run: |
+          $zip = Get-ChildItem -Path DungeonDrip\bin -Recurse -Filter latest.zip | Select-Object -First 1
+          if (-not $zip) { throw "DalamudPackager produced no zip - did the build actually run?" }
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Copy-Item $zip.FullName dist\DungeonDrip.zip
+          Write-Host "Packaged $($zip.FullName) -> dist\DungeonDrip.zip"
+
+      # Fails the run if the tag and the built AssemblyVersion disagree, which would produce
+      # a release Dalamud never offers as an update.
+      - name: Regenerate repo.json
+        run: python tools\make-repo-json.py --check-tag $env:GITHUB_REF_NAME
+
+      # Release first: repo.json points at releases/latest/download, so the target has to
+      # exist before the manifest advertising it is published.
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python tools\release-notes.py > notes.md
+          gh release create $env:GITHUB_REF_NAME dist\DungeonDrip.zip `
+            --title "Dungeon Drip $env:GITHUB_REF_NAME" `
+            --notes-file notes.md
+
+      - name: Commit repo.json if it changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add repo.json
+          git diff --cached --quiet
+          if ($LASTEXITCODE -ne 0) {
+            git commit -m "Update repo.json for $env:GITHUB_REF_NAME"
+            git push origin HEAD:main
+            Write-Host "repo.json updated on main."
+          } else {
+            Write-Host "repo.json already current."
+          }
