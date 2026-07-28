@@ -4,6 +4,7 @@ using System.Linq;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Game.Text.SeStringHandling;
+using Dalamud.Interface;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
@@ -86,62 +87,79 @@ public class MissingItemsWindow : Window
         DrawItems(report);
     }
 
+    /// <summary>
+    /// The window's controls, as icons for the same reason the vendor panel's are: five buttons
+    /// worth of sentences set the window's minimum width, and the list underneath does not need it.
+    /// </summary>
     private void DrawToolbar()
     {
-        if (ImGui.Button(pickerOpen ? "Hide duty list" : "Look up a duty"))
+        if (UiParts.ToolButton(
+                "##dutyList",
+                pickerOpen ? FontAwesomeIcon.SearchMinus : FontAwesomeIcon.Search,
+                pickerOpen ? "Duty list open. Click to hide it." : "Look a duty up by name."))
+        {
             pickerOpen = !pickerOpen;
+        }
 
         ImGui.SameLine();
 
         if (plugin.IsPinned)
         {
-            // One button, named for where it lands rather than for what it does. Unpinning goes
-            // back to tracking wherever you are, and standing anywhere without a drop list of its
-            // own - a city, most of the time - that is the roulette advice.
+            // One button, showing where it lands rather than what it does. Unpinning goes back to
+            // tracking wherever you are, and standing anywhere without a drop list of its own - a
+            // city, most of the time - that is the roulette advice.
             var toRoulettes = plugin.Duties?.TryGet(plugin.CurrentTerritory, out _) != true;
 
-            if (ImGui.Button(toRoulettes ? "Roulettes" : "Follow current duty"))
-                plugin.Unpin();
-
-            if (ImGui.IsItemHovered())
+            if (UiParts.ToolButton(
+                    "##unpin",
+                    toRoulettes ? FontAwesomeIcon.Dice : FontAwesomeIcon.Thumbtack,
+                    toRoulettes
+                        ? "Holding the duty you looked up. Click to go back to the roulette advice."
+                        : "Holding the duty you looked up. Click to follow wherever you are instead."))
             {
-                ImGui.SetTooltip(toRoulettes
-                    ? "Stop showing the duty you picked and go back to the roulette advice."
-                    : "Stop showing the duty you picked and go back to tracking wherever you are.");
+                plugin.Unpin();
             }
         }
         else
         {
             ImGui.BeginDisabled();
-            ImGui.Button("Following current duty");
+            UiParts.ToolButton(
+                "##unpin", FontAwesomeIcon.ThumbtackSlash, "Following wherever you are.");
             ImGui.EndDisabled();
         }
 
         ImGui.SameLine();
+
         var byRole = plugin.Configuration.Grouping == MissingGrouping.Role;
-        if (ImGui.Button(byRole ? "Grouped by role" : "Grouped by slot"))
+        if (UiParts.ToolButton(
+                "##grouping",
+                byRole ? FontAwesomeIcon.PeopleGroup : FontAwesomeIcon.Vest,
+                byRole
+                    ? "Grouped by who can roll Need. Click to group by equipment slot."
+                    : "Grouped by equipment slot. Click to group by who can roll Need."))
         {
             plugin.Configuration.Grouping = byRole ? MissingGrouping.Slot : MissingGrouping.Role;
             plugin.Configuration.Save();
             plugin.InvalidateReport();
         }
 
-        if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("Switch between equipment slots and who can roll Need, for claiming during a run.");
-
         ImGui.SameLine();
+
         var showOwned = plugin.Configuration.ShowOwnedItems;
-        if (ImGui.Button(showOwned ? "Owned: shown" : "Owned: hidden"))
+        if (UiParts.ToolButton(
+                "##owned",
+                showOwned ? FontAwesomeIcon.Eye : FontAwesomeIcon.EyeSlash,
+                showOwned
+                    ? "Showing pieces you already have, greyed out. Click to hide them."
+                    : "Hiding pieces you already have. Click to show them greyed out."))
         {
             plugin.Configuration.ShowOwnedItems = !showOwned;
             plugin.Configuration.Save();
         }
 
-        if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("Show or hide the pieces you already have, greyed out among the missing ones.");
-
         ImGui.SameLine();
-        if (ImGui.Button("Settings"))
+
+        if (UiParts.ToolButton("##settings", FontAwesomeIcon.Cog, "Settings."))
             plugin.ToggleConfigUi();
     }
 
@@ -221,9 +239,9 @@ public class MissingItemsWindow : Window
         if (!table.Success)
             return;
 
-        ImGui.TableSetupColumn("Roulette", ImGuiTableColumnFlags.WidthStretch, 0.44f);
-        ImGui.TableSetupColumn("Queue as", ImGuiTableColumnFlags.WidthStretch, 0.22f);
-        ImGui.TableSetupColumn("New", ImGuiTableColumnFlags.WidthStretch, 0.16f);
+        ImGui.TableSetupColumn("Roulette", ImGuiTableColumnFlags.WidthStretch, 0.34f);
+        ImGui.TableSetupColumn("Queue as", ImGuiTableColumnFlags.WidthStretch, 0.36f);
+        ImGui.TableSetupColumn("New", ImGuiTableColumnFlags.WidthStretch, 0.12f);
         ImGui.TableSetupColumn("Chance", ImGuiTableColumnFlags.WidthStretch, 0.18f);
         ImGui.TableHeadersRow();
 
@@ -240,7 +258,7 @@ public class MissingItemsWindow : Window
         ImGui.Selectable($"{advice.Name}##roulette{advice.Name}", false, ImGuiSelectableFlags.SpanAllColumns);
         var hovered = ImGui.IsItemHovered();
 
-        var best = advice.Jobs.Count > 0 ? advice.Jobs[0] : null;
+        var best = advice.Roles.Count > 0 ? advice.Roles[0] : null;
         if (best == null || best.Missing == 0)
         {
             ImGui.TableNextColumn();
@@ -254,12 +272,8 @@ public class MissingItemsWindow : Window
             return;
         }
 
-        // Roles wear the same armour, so the top spot is usually a several-way tie. Naming one job
-        // and counting the rest keeps the row short without pretending the others are worse.
-        var tied = advice.Jobs.Count(odds => odds.Missing == best.Missing && odds.Total == best.Total);
-
         ImGui.TableNextColumn();
-        ImGui.TextColored(Palette.Focus, tied > 1 ? $"{best.Abbreviation}  +{tied - 1}" : best.Abbreviation);
+        ImGui.TextColored(Palette.Focus, best.Label);
 
         ImGui.TableNextColumn();
         ImGui.Text($"{best.Missing}");
@@ -280,7 +294,7 @@ public class MissingItemsWindow : Window
             ? $"All {advice.PoolCount} duties in this roulette, counted."
             : $"{advice.DutyCount} of {advice.PoolCount} duties - no loot list for the rest.");
 
-        var worthwhile = advice.Jobs.Where(odds => odds.Missing > 0).ToList();
+        var worthwhile = advice.Roles.Where(odds => odds.Missing > 0).ToList();
         if (worthwhile.Count == 0)
         {
             ImGui.Spacing();
@@ -288,7 +302,7 @@ public class MissingItemsWindow : Window
             // Three ways to have nothing to say, and they want different answers from the reader.
             if (advice.DutyCount == 0)
                 ImGui.TextColored(Palette.Muted, "Nothing here has a loot list yet.");
-            else if (advice.Jobs.Count == 0)
+            else if (advice.Roles.Count == 0)
                 ImGui.TextColored(Palette.Muted, $"No job of yours is Lv. {advice.RequiredLevel} yet.");
             else
                 ImGui.TextColored(Palette.Muted, "Nothing here you have not already collected.");
@@ -297,9 +311,9 @@ public class MissingItemsWindow : Window
         }
 
         ImGui.Spacing();
-        ImGui.TextColored(Palette.Muted, "Uncollected, by job:");
+        ImGui.TextColored(Palette.Muted, "Uncollected, by role:");
         foreach (var odds in worthwhile)
-            ImGui.Text($"   {odds.Abbreviation,-4}  {odds.Missing,4} of {odds.Total,-4}  {odds.Share * 100,3:0}%");
+            ImGui.Text($"   {odds.Missing,4} of {odds.Total,-4}  {odds.Share * 100,3:0}%   {odds.Label}");
 
         ImGui.Spacing();
         ImGui.TextColored(Palette.Muted, "Odds per piece you can roll on, not per run.");

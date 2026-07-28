@@ -21,6 +21,18 @@ public sealed class DresserSnapshot
     public HashSet<uint> StoredOutfits { get; init; } = [];
 
     public int SlotsUsed { get; init; }
+
+    /// <summary>
+    /// Hash of the raw box this was read from, for telling "read again" from "changed".
+    /// </summary>
+    /// <remarks>
+    /// The box stays loaded until you zone, so it is re-read every second from the moment you open a
+    /// dresser. Without something to compare, each of those reads looked like news and rewrote the
+    /// cache file. Taken over the raw ids rather than the derived sets because it is the input: equal
+    /// input, equal output, and it costs one multiply-add per slot on a read that was happening
+    /// anyway. Zero for a snapshot restored from disk, which is what makes the first live read save.
+    /// </remarks>
+    public ulong Fingerprint { get; init; }
 }
 
 public static unsafe class DresserReader
@@ -44,6 +56,7 @@ public static unsafe class DresserReader
         var viaOutfits = new Dictionary<uint, HashSet<uint>>();
         var storedOutfits = new HashSet<uint>();
         var used = 0;
+        var fingerprint = 1469598103934665603UL;
 
         var boxItems = mirage->PrismBoxItemIds;
         for (var index = 0; index < boxItems.Length; index++)
@@ -53,6 +66,7 @@ public static unsafe class DresserReader
                 continue;
 
             used++;
+            fingerprint = (fingerprint * 1099511628211UL) ^ ((ulong)index << 32 | rawId);
             // Event items share the id space behind an offset; without the kind check their base
             // id collides with real gear.
             var (itemId, kind) = ItemUtil.GetBaseId(rawId);
@@ -74,6 +88,9 @@ public static unsafe class DresserReader
                 if (!mirage->IsSetSlotUnlocked((uint)index, slot))
                     continue;
 
+                // Which slots of a set are filled is content too - topping one up must register.
+                fingerprint = (fingerprint * 1099511628211UL) ^ (uint)slot;
+
                 var piece = OutfitCatalog.GetSlotItemId(set, slot);
                 if (piece == 0)
                     continue;
@@ -91,6 +108,7 @@ public static unsafe class DresserReader
             ItemsInStoredOutfits = viaOutfits,
             StoredOutfits = storedOutfits,
             SlotsUsed = used,
+            Fingerprint = fingerprint,
         };
     }
 }

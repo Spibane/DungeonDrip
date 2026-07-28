@@ -153,16 +153,13 @@ public sealed class DungeonLootData
         Dictionary<uint, Dictionary<uint, LootProvenance>> provenance)
     {
         var path = Path.Combine(configDirectory, OverridesFileName);
-        var raw = JsonStore.Read<Dictionary<string, uint[]>>(path);
-        if (raw == null)
+        var raw = JsonStore.ReadByTerritory<uint[]>(path);
+        if (raw.Count == 0)
             return;
 
         var applied = 0;
-        foreach (var (key, extra) in raw)
+        foreach (var (territoryId, extra) in raw)
         {
-            if (!uint.TryParse(key, out var territoryId))
-                continue;
-
             if (!accumulated.TryGetValue(territoryId, out var set))
                 accumulated[territoryId] = set = [];
 

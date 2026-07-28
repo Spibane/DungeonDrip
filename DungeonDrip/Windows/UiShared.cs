@@ -1,6 +1,8 @@
 using System;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
+using Dalamud.Interface;
+using Dalamud.Interface.Components;
 using Dalamud.Interface.Textures;
 using Dalamud.Interface.Utility;
 using FFXIVClientStructs.FFXIV.Component.GUI;
@@ -31,6 +33,44 @@ internal static class Palette
 
 internal static class UiParts
 {
+    /// <summary>
+    /// A settings checkbox bound straight to its field, reporting whether it moved.
+    /// </summary>
+    /// <remarks>
+    /// ImGui takes a ref, and a property cannot be passed by ref, so every one of these was a local,
+    /// a Checkbox, a write-back and a flag - four lines each and a place to mistype which setting is
+    /// being written. The caller now names the setting once, in the two places that cannot disagree.
+    /// </remarks>
+    public static bool Toggle(string label, ref bool value, string? tooltip = null)
+    {
+        var changed = ImGui.Checkbox(label, ref value);
+
+        if (tooltip != null && ImGui.IsItemHovered())
+            ImGui.SetTooltip(tooltip);
+
+        return changed;
+    }
+
+    /// <summary>
+    /// A square toolbar button, with the words that would have been on it on hover instead.
+    /// </summary>
+    /// <remarks>
+    /// A toolbar of sentences forces a window wider than its list needs to be, so these are icons.
+    /// Each shows the state it is in rather than the state it would move to, which makes it an
+    /// indicator you can also press - and puts the burden of saying so on the tooltip. That tooltip
+    /// is read through <see cref="ImGuiHoveredFlags.AllowWhenDisabled"/> so a greyed-out button can
+    /// still explain why it is greyed out, which an icon cannot do on its own.
+    /// </remarks>
+    public static bool ToolButton(string id, FontAwesomeIcon icon, string tooltip)
+    {
+        var pressed = ImGuiComponents.IconButton(id, icon);
+
+        if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+            ImGui.SetTooltip(tooltip);
+
+        return pressed;
+    }
+
     /// <summary>
     /// Draws an item's icon and leaves the cursor on the same line, ready for its name. Falls back
     /// to blank space of the same size, so a texture still loading does not shunt the row leftwards.

@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
 
 namespace DungeonDrip.Data;
@@ -33,6 +35,32 @@ public static class JsonStore
             return null;
         }
     }
+
+    /// <summary>
+    /// Reads a file keyed by territory id.
+    /// </summary>
+    /// <remarks>
+    /// JSON object keys are strings, so every one of these files - the wiki cache, learned drops and
+    /// the hand-written loot-overrides.json - stores the id as text and has to parse it back. Stated
+    /// once here, including that an unparseable key is skipped rather than fatal, because
+    /// loot-overrides.json is typed by hand.
+    /// </remarks>
+    public static Dictionary<uint, T> ReadByTerritory<T>(string path)
+    {
+        var parsed = new Dictionary<uint, T>();
+
+        foreach (var (key, value) in Read<Dictionary<string, T>>(path) ?? [])
+        {
+            if (uint.TryParse(key, out var territoryId))
+                parsed[territoryId] = value;
+        }
+
+        return parsed;
+    }
+
+    /// <summary>The matching write, so the two halves of the convention sit together.</summary>
+    public static void WriteByTerritory<T>(string path, IEnumerable<KeyValuePair<uint, T>> entries) =>
+        Write(path, entries.ToDictionary(entry => entry.Key.ToString(), entry => entry.Value), indented: true);
 
     /// <summary>Writes via a temporary file, so an interrupted write cannot truncate the original.</summary>
     public static void Write<T>(string path, T value, bool indented = false)

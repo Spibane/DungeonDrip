@@ -89,23 +89,27 @@ public sealed class OwnershipTracker
             LoadFromDisk();
         }
 
+        // Both stores stay loaded until you zone, so from the moment you open one it is re-read on
+        // every poll. Reading is cheap; treating each read as news is not - it rewrote the cache
+        // file and invalidated every derived list once a second. The timestamps move regardless,
+        // because those record when we last looked, but only a change earns a save.
         var dirty = false;
 
         var freshDresser = DresserReader.TryRead();
         if (freshDresser != null)
         {
+            dirty |= freshDresser.Fingerprint != dresser?.Fingerprint;
             dresser = freshDresser;
             DresserSlotsUsed = freshDresser.SlotsUsed;
             DresserUpdatedUtc = DateTime.UtcNow;
-            dirty = true;
         }
 
         var freshArmoire = ArmoireReader.TryRead();
         if (freshArmoire != null)
         {
+            dirty |= armoire == null || !freshArmoire.SetEquals(armoire);
             armoire = freshArmoire;
             ArmoireUpdatedUtc = DateTime.UtcNow;
-            dirty = true;
         }
 
         // Always available for the current character, so never cached.

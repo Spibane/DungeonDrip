@@ -433,19 +433,12 @@ public sealed class WikiLootSource : IDisposable
 
     private void Load()
     {
-        var raw = JsonStore.Read<Dictionary<string, WikiEntry>>(path);
-        if (raw == null)
-            return;
+        foreach (var (territoryId, entry) in JsonStore.ReadByTerritory<WikiEntry>(path))
+            byTerritory[territoryId] = entry;
 
-        foreach (var (key, entry) in raw)
-        {
-            if (uint.TryParse(key, out var territoryId))
-                byTerritory[territoryId] = entry;
-        }
-
-        Plugin.Log.Information($"Loaded wiki loot cache: {DutiesWithData} duties, {TotalItems} items");
+        if (byTerritory.Count > 0)
+            Plugin.Log.Information($"Loaded wiki loot cache: {DutiesWithData} duties, {TotalItems} items");
     }
 
-    private void Save() =>
-        JsonStore.Write(path, byTerritory.ToDictionary(kv => kv.Key.ToString(), kv => kv.Value), indented: true);
+    private void Save() => JsonStore.WriteByTerritory(path, byTerritory);
 }
