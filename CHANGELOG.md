@@ -1,5 +1,9 @@
 # Changelog
 
+### v0.11.1 - 2026-07-28
+- Added the plugin icon, and published through a third-party plugin repository so the plugin can be installed before the official submission lands
+- No changes to the plugin itself; this release exists to carry the packaging and listing work
+
 ### v0.11.0 - 2026-07-28
 - Fixed the collection cache being rewritten to disk once a second. Both stores stay loaded until you zone, so from the moment you opened a Glamour Dresser every poll re-read it, counted as a change, saved the file and invalidated every derived list. Reads still happen and the timestamps still move; only an actual change now saves
 - Fixed the downloaded dataset being handed from the worker thread to the framework thread without the lock that guards its companion field
