@@ -115,6 +115,7 @@ public sealed unsafe class VendorPanelWindow : Window
             return;
 
         var display = ImGui.GetIO().DisplaySize;
+        var scale = ImGuiHelpers.GlobalScale;
 
         // Matching the shop's height keeps a long list on screen, and lines the two windows up.
         // A size the user dragged to wins.
@@ -123,8 +124,10 @@ public sealed unsafe class VendorPanelWindow : Window
             ? new Vector2(configuration.VendorPanelWidth, configuration.VendorPanelHeight)
             : new Vector2(contentWidth, unit->GetScaledHeight(true));
 
-        desired.X = Math.Clamp(desired.X, MinWidth, display.X);
-        desired.Y = Math.Clamp(desired.Y, MinHeight, display.Y);
+        // Against the constraints as ImGui will enforce them, not as they were written: a floor the
+        // window then overrides is a size we asked for and did not get, which reads as a drag below.
+        desired.X = Clamp(desired.X, MinWidth * scale, display.X);
+        desired.Y = Clamp(desired.Y, MinHeight * scale, display.Y);
 
         // Appearing only lands while a window is coming up, so on its own a reset would sit there
         // until the panel next reappeared. Insist whenever the size we want is not the size on
@@ -133,7 +136,11 @@ public sealed unsafe class VendorPanelWindow : Window
         var moved = lastSize != Vector2.Zero && Vector2.Distance(desired, lastSize) > 1f;
         var theirs = resizing || ImGui.IsMouseDown(ImGuiMouseButton.Left);
 
-        Size = desired;
+        // Size is the one value on this path Dalamud scales for us, so it is handed over divided.
+        // Everything else here - the addon's height, the measured width, a size read back off the
+        // window - is already in screen pixels, and appliedSize has to stay in those to be
+        // comparable with what the window actually ends up.
+        Size = desired / scale;
         appliedSize = desired;
 
         if (moved && !theirs)
@@ -212,6 +219,16 @@ public sealed unsafe class VendorPanelWindow : Window
         foreach (var group in groups)
             DrawGroup(group, options.GroupBySlot, stale);
     }
+
+    /// <summary>
+    /// Keeps a value between two bounds, with the floor winning if the ceiling is below it.
+    /// </summary>
+    /// <remarks>
+    /// The screen can be narrower than the minimum width on a small enough window, and
+    /// <see cref="Math.Clamp(float, float, float)"/> throws rather than picking one.
+    /// </remarks>
+    private static float Clamp(float value, float min, float max) =>
+        Math.Max(min, Math.Min(value, max));
 
     /// <summary>
     /// Stores a size the user dragged to, so it is not thrown away the next time a shop opens.
@@ -503,7 +520,9 @@ public sealed unsafe class VendorPanelWindow : Window
                         (style.WindowPadding.X * 2) +
                         style.ScrollbarSize;
 
-        contentWidth = Math.Max(FallbackWidth, widest + furniture);
+        // Scaled, because everything it is being compared against is: CalcTextSize reports the font
+        // at its drawn size, and the floor has to be a floor in the same pixels.
+        contentWidth = Math.Max(FallbackWidth * ImGuiHelpers.GlobalScale, widest + furniture);
     }
 
     /// <summary>Everything that changes the shape of the list, compared by value in one go.</summary>
