@@ -386,7 +386,7 @@ public sealed unsafe class VendorPanelWindow : Window
         ImGui.Spacing();
     }
 
-    private static void DrawRow(VendorRow row, bool stale)
+    private void DrawRow(VendorRow row, bool stale)
     {
         var uncertain = VendorMarkers.IsUncertain(row.Marker, stale);
 
@@ -416,7 +416,13 @@ public sealed unsafe class VendorPanelWindow : Window
         else
             ImGui.TextColored(Palette.Muted, row.Name);
 
-        if (!ImGui.IsItemHovered())
+        // Both bind to the last item drawn, so the hover flag has to be taken against the name before
+        // the popup goes on the row.
+        var hovered = ImGui.IsItemHovered();
+
+        UiParts.ItemContextMenu(plugin, row.ItemId, row.Name);
+
+        if (!hovered)
             return;
 
         using var tooltip = ImRaii.Tooltip();
@@ -426,6 +432,9 @@ public sealed unsafe class VendorPanelWindow : Window
 
         if (uncertain && row.Marker == VendorMarker.NotCollected)
             ImGui.TextColored(Palette.Warning, "Your dresser snapshot predates this - check before buying.");
+
+        ImGui.Spacing();
+        ImGui.TextColored(Palette.Muted, "Right-click for options.");
     }
 
     /// <remarks>

@@ -128,14 +128,18 @@ public sealed unsafe class LootCompanionWindow : Window
             ImGui.TextColored(Palette.Muted, "Nothing new here.");
     }
 
-    private static void DrawRow(Item item, bool owned)
+    private void DrawRow(Item item, bool owned)
     {
+        var name = item.Name.ExtractText();
+
         UiParts.ItemIcon(item.Icon, 20);
 
         if (owned)
-            ImGui.TextColored(Palette.Muted, item.Name.ExtractText());
+            ImGui.TextColored(Palette.Muted, name);
         else
-            ImGui.TextColored(Palette.Missing, $"{item.Name.ExtractText()}  ←");
+            ImGui.TextColored(Palette.Missing, $"{name}  ←");
+
+        UiParts.ItemContextMenu(plugin, item.RowId, name);
     }
 
     private static AddonNeedGreed* GetLootAddon() =>

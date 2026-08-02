@@ -3,14 +3,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
-using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Interface;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
 using DungeonDrip.Core;
 using DungeonDrip.Data;
-using Lumina.Excel.Sheets;
 
 namespace DungeonDrip.Windows;
 
@@ -527,17 +525,7 @@ public class MissingItemsWindow : Window
         // against the name before anything else goes on this row.
         var hovered = ImGui.IsItemHovered();
 
-        using (var context = ImRaii.ContextPopupItem($"##ctx{item.ItemId}"))
-        {
-            if (context.Success)
-            {
-                if (ImGui.Selectable("Link in chat"))
-                    Plugin.ChatGui.Print(new SeStringBuilder().AddItemLink(item.ItemId, false).Build());
-
-                if (ImGui.Selectable("Copy name"))
-                    ImGui.SetClipboardText(item.Name);
-            }
-        }
+        UiParts.ItemContextMenu(plugin, item.ItemId, item.Name);
 
         if (!hovered)
             return;
@@ -564,20 +552,12 @@ public class MissingItemsWindow : Window
     /// </remarks>
     private void DrawOutfitMembership(uint itemId)
     {
-        var sets = plugin.Outfits.SetsContaining(itemId);
-        if (sets.Count == 0)
+        var named = plugin.Outfits.NamedSetsContaining(itemId);
+        if (named.Count == 0)
             return;
 
         var ownership = plugin.Ownership.Current;
         ownership.DresserOutfits.TryGetValue(itemId, out var holdingThisPiece);
-
-        var items = Plugin.DataManager.GetExcelSheet<Item>();
-        var named = sets
-            .Select(setId => (
-                Id: setId,
-                Name: items.TryGetRow(setId, out var row) ? row.Name.ExtractText() : $"Outfit {setId}"))
-            .OrderBy(entry => entry.Name, StringComparer.OrdinalIgnoreCase)
-            .ToList();
 
         ImGui.Spacing();
         ImGui.Separator();

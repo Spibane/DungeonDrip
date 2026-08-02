@@ -1,10 +1,13 @@
 using System;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
+using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Interface;
 using Dalamud.Interface.Components;
 using Dalamud.Interface.Textures;
 using Dalamud.Interface.Utility;
+using Dalamud.Interface.Utility.Raii;
+using DungeonDrip.Game;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 
 namespace DungeonDrip.Windows;
@@ -69,6 +72,46 @@ internal static class UiParts
             ImGui.SetTooltip(tooltip);
 
         return pressed;
+    }
+
+    /// <summary>
+    /// The right-click menu every gear row carries, wherever it is drawn.
+    /// </summary>
+    /// <remarks>
+    /// Must be called against the row's name text, since ImGui binds a context popup to the last item
+    /// drawn - and so must <see cref="ImGui.IsItemHovered()"/>, which is why callers take their hover
+    /// flag before this rather than after.
+    ///
+    /// Trying on is the one thing here that reaches into the game, so it is kept off the rows the
+    /// game will not preview: an entry that silently does nothing is worse than no entry.
+    /// </remarks>
+    public static void ItemContextMenu(Plugin plugin, uint itemId, string name)
+    {
+        using var context = ImRaii.ContextPopupItem($"##ctx{itemId}");
+        if (!context.Success)
+            return;
+
+        if (TryOnService.CanTryOn(itemId))
+        {
+            if (ImGui.Selectable("Try on"))
+                plugin.TryOn.QueuePiece(itemId);
+
+            // Named rather than a bare "Try on outfit", because a piece is often in several sets and
+            // the whole point of the entry is choosing which of them to look at.
+            foreach (var (setId, setName) in plugin.Outfits.NamedSetsContaining(itemId))
+            {
+                if (ImGui.Selectable($"Try on outfit: {setName}"))
+                    plugin.TryOn.QueueOutfit(setId);
+            }
+
+            ImGui.Separator();
+        }
+
+        if (ImGui.Selectable("Link in chat"))
+            Plugin.ChatGui.Print(new SeStringBuilder().AddItemLink(itemId, false).Build());
+
+        if (ImGui.Selectable("Copy name"))
+            ImGui.SetClipboardText(name);
     }
 
     /// <summary>
