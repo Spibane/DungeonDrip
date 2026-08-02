@@ -91,7 +91,7 @@ public sealed class Plugin : IDalamudPlugin
         var configDirectory = PluginInterface.GetPluginConfigDirectory();
 
         Outfits = OutfitCatalog.Build();
-        TryOn = new TryOnService(Outfits);
+        TryOn = new TryOnService(Outfits, Configuration);
         contentFinder = ContentFinderIndex.Build();
         jobRoles = JobRoleIndex.Build();
         Storage = StorageEligibility.Build();

@@ -70,6 +70,12 @@ public class Configuration : IPluginConfiguration
     /// <summary>Leave weapons and off-hands out of every gear list.</summary>
     public bool HideWeapons { get; set; }
 
+    /// <summary>
+    /// Empty the fitting room before trying on a whole outfit, so the set is shown on its own rather
+    /// than over whatever was already in there.
+    /// </summary>
+    public bool ClearFittingRoomForOutfits { get; set; } = true;
+
     /// <summary>Which storage is compared against.</summary>
     public CollectionScope Scope { get; set; } = CollectionScope.Both;
 

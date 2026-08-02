@@ -90,6 +90,22 @@ public class ConfigWindow : Window
         }
 
         ImGui.Spacing();
+        ImGui.TextColored(Palette.Muted, "Trying on");
+        ImGui.TextColored(Palette.Muted, "Right-click any piece in any of the three lists.");
+        ImGui.Spacing();
+
+        var clearFittingRoom = configuration.ClearFittingRoomForOutfits;
+        if (UiParts.Toggle("Empty the fitting room before trying on an outfit", ref clearFittingRoom,
+                "Closes the fitting room first, so the set is shown on its own rather than over\n" +
+                "whatever was already in there. Only the preview is discarded; outfits you have saved\n" +
+                "out of the room are in your Glamour Dresser and are not touched.\n" +
+                "Trying on a single piece never clears anything."))
+        {
+            configuration.ClearFittingRoomForOutfits = clearFittingRoom;
+            changed = true;
+        }
+
+        ImGui.Spacing();
         ImGui.TextColored(Palette.Muted, "What counts as owned");
         ImGui.TextColored(Palette.Muted, "Also applies everywhere.");
         ImGui.Spacing();
