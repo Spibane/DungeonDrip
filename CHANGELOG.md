@@ -1,5 +1,9 @@
 # Changelog
 
+### Unreleased
+- Fixed the vendor panel coming up oversized and overhanging the shop window on anyone whose Dalamud UI scale is not 100%. Dalamud scales a window's `Size` for you; the panel was handing it a height and width already measured in screen pixels, so the scale landed twice
+- Fixed that oversizing then growing. Because the panel believed it had asked for the smaller size, the difference read as a drag on the first frame it appeared, saved itself as a custom size, and was scaled again the next time a shop opened. If your panel is already stuck large, the fourth toolbar button puts it back to matching the shop
+
 ### v0.11.1 - 2026-07-28
 - Added the plugin icon, and published through a third-party plugin repository so the plugin can be installed before the official submission lands
 - No changes to the plugin itself; this release exists to carry the packaging and listing work
