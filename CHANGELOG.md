@@ -1,6 +1,7 @@
 # Changelog
 
 ### Unreleased
+- Added emptying the fitting room before an outfit goes into it, so the set is shown on its own rather than over whatever was left in there. Only the preview is discarded - outfits you have saved out of the room are in your Glamour Dresser and are not touched. Trying on a single piece never clears anything. Turn it off under Settings > General > Trying on
 - Added try-on to the right-click menu on any gear row. **Try on** puts that one piece in the fitting room; below it, one entry per outfit set the piece belongs to, named, which fills the room with the whole set - weapon first, then top down. Pieces in no set get the single entry, and gear the fitting room will not take gets neither rather than an entry that does nothing
 - Trying on a whole outfit turns the fitting room's Save/Delete Outfit option on first. With it off the room holds one piece at a time, so a set fed in piece by piece showed only the last one to arrive. Trying on a single piece leaves the option however you had it, and neither case turns it back off - that is what would throw away the outfit you just put together
 - Added that right-click menu to the vendor panel and the loot-roll companion, which had none. All three surfaces now offer the same options, so **Link in chat** and **Copy name** work at a vendor and mid-roll as well as in the duty list

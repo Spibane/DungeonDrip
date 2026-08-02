@@ -22,12 +22,20 @@ public sealed unsafe class TryOnService
     private const int Capacity = 32;
 
     private readonly OutfitCatalog outfits;
+    private readonly Configuration configuration;
     private readonly Queue<uint> pending = new();
 
     /// <summary>Whether what is queued is meant to be worn all at once.</summary>
     private bool wearTogether;
 
-    public TryOnService(OutfitCatalog outfits) => this.outfits = outfits;
+    /// <summary>Whether the fitting room should be emptied before the queue is fed to it.</summary>
+    private bool clearFirst;
+
+    public TryOnService(OutfitCatalog outfits, Configuration configuration)
+    {
+        this.outfits = outfits;
+        this.configuration = configuration;
+    }
 
     /// <summary>Preview a single piece.</summary>
     /// <remarks>
@@ -44,14 +52,18 @@ public sealed unsafe class TryOnService
         foreach (var piece in outfits.PiecesInSlotOrder(setId))
             Enqueue(piece);
 
-        if (pending.Count > before)
-            wearTogether = true;
+        if (pending.Count == before)
+            return;
+
+        wearTogether = true;
+        clearFirst |= configuration.ClearFittingRoomForOutfits;
     }
 
     public void Clear()
     {
         pending.Clear();
         wearTogether = false;
+        clearFirst = false;
     }
 
     /// <summary>
@@ -74,6 +86,16 @@ public sealed unsafe class TryOnService
         {
             Clear();
             return;
+        }
+
+        // Spends this tick on the close and nothing else. The room takes a frame to go away, and a
+        // piece handed over in the same one lands in the fitting room that is on its way out.
+        if (clearFirst)
+        {
+            clearFirst = false;
+
+            if (Empty())
+                return;
         }
 
         if (wearTogether)
@@ -107,6 +129,51 @@ public sealed unsafe class TryOnService
         var agent = AgentTryon.Instance();
         if (agent != null)
             agent->SaveDeleteOutfit = true;
+    }
+
+    /// <summary>
+    /// Throws away whatever is in the fitting room. Says whether there was anything to throw.
+    /// </summary>
+    /// <remarks>
+    /// The agent's list is emptied in place rather than the room being closed. Closing only puts the
+    /// window away - the agent keeps its items, so the next piece reopens the room with everything
+    /// still in it, which is the whole thing this is meant to prevent.
+    ///
+    /// The list and the figure wearing it are separate: clearing the array empties the list the room
+    /// shows, and the preview character goes on wearing all of it until told otherwise. Only the
+    /// preview is discarded either way - outfits saved out of the room live in the Glamour Dresser
+    /// and are not touched.
+    /// </remarks>
+    private static bool Empty()
+    {
+        var agent = AgentTryon.Instance();
+        if (agent == null)
+            return false;
+
+        var items = agent->TryOnItems;
+        var cleared = false;
+
+        for (var i = 0; i < items.Length; i++)
+        {
+            if (items[i].Id == 0)
+                continue;
+
+            items[i] = default;
+            cleared = true;
+        }
+
+        if (!cleared)
+            return false;
+
+        agent->TryOnItemsChanged = true;
+        Plugin.Log.Debug("Emptied the fitting room before an outfit.");
+
+        // Guarded on the view's own flags, which are what the game passes here: stripping a figure
+        // whose character data has not arrived is asking it to undress nothing.
+        if (agent->CharaView.CharacterLoaded)
+            agent->CharaView.UnequipGear(agent->CharaView.CharacterDataCopied, true);
+
+        return true;
     }
 
     /// <summary>Whether the fitting room can show this at all - it only takes equipment.</summary>
