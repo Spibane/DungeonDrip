@@ -304,6 +304,7 @@ DungeonDrip/
 │   ├── ArmoireReader.cs
 │   ├── InventoryReader.cs
 │   ├── OutfitCatalog.cs         which sets a piece belongs to
+│   ├── TryOnService.cs          feeds the fitting room, one piece per frame
 │   ├── OwnershipTracker.cs      per-character snapshot and staleness
 │   └── LootObserver.cs          records gear seen dropping
 ├── Core/
@@ -325,6 +326,10 @@ DungeonDrip/
 
 The companion window reads the loot addon and never draws into it, so it does not conflict with
 plugins that recolour game UI nodes.
+
+Try-on is the one place the plugin asks the game to do something rather than reading what it has
+already done, and it only ever happens because you picked it out of a right-click menu. Everything
+else - dresser, armoire, inventory, shop and loot addons - is read and nothing more.
 
 ## Releasing
 

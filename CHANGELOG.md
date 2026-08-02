@@ -1,6 +1,10 @@
 # Changelog
 
 ### Unreleased
+- Added try-on to the right-click menu on any gear row. **Try on** puts that one piece in the fitting room; below it, one entry per outfit set the piece belongs to, named, which fills the room with the whole set - weapon first, then top down. Pieces in no set get the single entry, and gear the fitting room will not take gets neither rather than an entry that does nothing
+- Trying on a whole outfit turns the fitting room's Save/Delete Outfit option on first. With it off the room holds one piece at a time, so a set fed in piece by piece showed only the last one to arrive. Trying on a single piece leaves the option however you had it, and neither case turns it back off - that is what would throw away the outfit you just put together
+- Added that right-click menu to the vendor panel and the loot-roll companion, which had none. All three surfaces now offer the same options, so **Link in chat** and **Copy name** work at a vendor and mid-roll as well as in the duty list
+- Trying on is the first thing the plugin asks the game to do rather than reading; it happens only when you pick it out of the menu, and a fitting room the game will not open - in combat, a cutscene, GPose - drops the request rather than springing an outfit on you later
 - Fixed the vendor panel coming up oversized and overhanging the shop window on anyone whose Dalamud UI scale is not 100%. Dalamud scales a window's `Size` for you; the panel was handing it a height and width already measured in screen pixels, so the scale landed twice
 - Fixed that oversizing then growing. Because the panel believed it had asked for the smaller size, the difference read as a drag on the first frame it appeared, saved itself as a custom size, and was scaled again the next time a shop opened. If your panel is already stuck large, the fourth toolbar button puts it back to matching the shop
 

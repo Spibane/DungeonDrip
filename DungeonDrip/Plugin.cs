@@ -44,6 +44,9 @@ public sealed class Plugin : IDalamudPlugin
     /// <summary>Outfit-set membership, needed anywhere ownership is judged.</summary>
     public OutfitCatalog Outfits { get; }
 
+    /// <summary>Feeds pieces and whole outfits to the game's Fitting Room.</summary>
+    public TryOnService TryOn { get; }
+
     /// <summary>Which store can hold a given piece.</summary>
     public StorageEligibility Storage { get; }
 
@@ -88,6 +91,7 @@ public sealed class Plugin : IDalamudPlugin
         var configDirectory = PluginInterface.GetPluginConfigDirectory();
 
         Outfits = OutfitCatalog.Build();
+        TryOn = new TryOnService(Outfits);
         contentFinder = ContentFinderIndex.Build();
         jobRoles = JobRoleIndex.Build();
         Storage = StorageEligibility.Build();
@@ -182,6 +186,9 @@ public sealed class Plugin : IDalamudPlugin
         currentTerritory = territoryId;
         InvalidateReport();
 
+        // A zone change closes the fitting room, so anything still queued for it has nowhere to go.
+        TryOn.Clear();
+
         // A pinned duty means the user is deliberately looking something up, so leave them to it.
         if (leftSupportedDuty && Configuration.CloseWhenLeavingDuty && !pinnedTerritory.HasValue)
             mainWindow.IsOpen = false;
@@ -199,6 +206,7 @@ public sealed class Plugin : IDalamudPlugin
         Wiki.Update();
         LootData.Update();
         Ownership.Update();
+        TryOn.Tick();
         RequestWikiDataIfNeeded();
 
         if (LootData.Revision != seenLootRevision && LootData.Data != null)

@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using Lumina.Excel.Sheets;
 
 namespace DungeonDrip.Game;
@@ -35,6 +37,52 @@ public sealed class OutfitCatalog
     /// <summary>Every piece the given outfit set is made of.</summary>
     private IReadOnlySet<uint> PiecesOf(uint setId) =>
         piecesBySet.TryGetValue(setId, out var pieces) ? pieces : EmptySet;
+
+    /// <summary>
+    /// The pieces of an outfit set, in the sheet's slot order, for anything that has to hand them to
+    /// the game one at a time.
+    /// </summary>
+    /// <remarks>
+    /// Read off the sheet rather than out of <see cref="piecesBySet"/>: that one is a set, and a
+    /// fitting room filled weapon-first then top-down reads as an outfit being put on, whereas hash
+    /// order reads as noise.
+    /// </remarks>
+    public IReadOnlyList<uint> PiecesInSlotOrder(uint setId)
+    {
+        var sheet = Plugin.DataManager.GetExcelSheet<MirageStoreSetItem>();
+        if (!sheet.TryGetRow(setId, out var row))
+            return [];
+
+        var pieces = new List<uint>(SlotCount);
+
+        for (var slot = 0; slot < SlotCount; slot++)
+        {
+            var piece = GetSlotItemId(row, slot);
+            if (piece != 0)
+                pieces.Add(piece);
+        }
+
+        return pieces;
+    }
+
+    /// <summary>
+    /// The outfit sets a piece belongs to, named and sorted, ready to be listed to the user.
+    /// </summary>
+    public IReadOnlyList<(uint Id, string Name)> NamedSetsContaining(uint itemId)
+    {
+        var sets = SetsContaining(itemId);
+        if (sets.Count == 0)
+            return [];
+
+        var items = Plugin.DataManager.GetExcelSheet<Item>();
+
+        return sets
+            .Select(setId => (
+                Id: setId,
+                Name: items.TryGetRow(setId, out var row) ? row.Name.ExtractText() : $"Outfit {setId}"))
+            .OrderBy(entry => entry.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
 
     /// <summary>
     /// Whether any stored outfit set holding this piece has every one of its slots filled.
