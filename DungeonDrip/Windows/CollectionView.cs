@@ -102,10 +102,10 @@ public sealed class CollectionView(Plugin plugin)
     /// Outfit sets you are part way through, closest to done first.
     /// </summary>
     /// <remarks>
-    /// Two counts per row, because they answer different questions with different next actions.
-    /// What you own decides whether the set is worth chasing; what is filled in the stored copy
-    /// decides whether the dresser needs topping up. A set can be nine tenths owned and barely
-    /// stored, and only one of those is a shopping list.
+    /// One count per row. Reporting the dresser copy's filled slots beside it was tried and read as
+    /// an error rather than as extra information - the two are out of different totals and only one
+    /// of them obeys the storage scope, so they disagreed for correct reasons that no row has space
+    /// to explain.
     /// </remarks>
     private void DrawSetsInProgress()
     {
@@ -148,15 +148,7 @@ public sealed class CollectionView(Plugin plugin)
             $"{standing.Name}###set{standing.SetId}", ImGuiTreeNodeFlags.SpanAvailWidth);
 
         ImGui.SameLine();
-        ImGui.TextColored(Palette.Muted, $"{standing.Owned}/{standing.Total} owned");
-
-        if (standing.StoredAsSet)
-        {
-            ImGui.SameLine();
-            ImGui.TextColored(
-                standing.FilledInStoredSet == standing.Total ? Palette.Good : Palette.Warning,
-                $"({standing.FilledInStoredSet} filled in the stored set)");
-        }
+        ImGui.TextColored(Palette.Muted, $"{standing.Owned} of {standing.Total}");
 
         if (!open)
             return;

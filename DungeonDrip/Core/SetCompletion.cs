@@ -19,18 +19,19 @@ public sealed record SetPieceState(
 /// <param name="Owned">
 /// Pieces the collection holds anywhere, by the same rules every other list obeys.
 /// </param>
-/// <param name="FilledInStoredSet">
-/// Slots filled in the copy of this set sitting in the dresser. Only meaningful when
-/// <paramref name="StoredAsSet"/> is true.
-/// </param>
+/// <remarks>
+/// Deliberately one count rather than two. This used to also report how many slots were filled in
+/// the dresser's own copy of the set, and the two disagreed in ways that read as a mistake: they
+/// were out of different totals, and the owned count obeys the storage scope and outfit mode where
+/// the filled one cannot. "7 of 9 owned, 8 filled" is two answers to two questions nobody asked
+/// separately.
+/// </remarks>
 public sealed record SetStanding(
     uint SetId,
     string Name,
     ushort IconId,
     int Owned,
     int Total,
-    int FilledInStoredSet,
-    bool StoredAsSet,
     IReadOnlyList<SetPieceState> Pieces)
 {
     public IEnumerable<SetPieceState> Missing => Pieces.Where(piece => !piece.IsOwned);
@@ -78,6 +79,11 @@ public static class SetCompletion
         [
             .. qualifying
                 .Select(entry => Describe(entry.SetId, outfits, view, configuration))
+
+                // Re-applied against the standing's own totals. The pass above counts every piece
+                // the set lists; this one counts the pieces that resolved to a real item, and a
+                // set can qualify on one and not the other.
+                .Where(standing => standing.Owned > 0 && standing.Owned < standing.Total)
                 .OrderByDescending(standing => standing.Fraction)
                 .ThenBy(standing => standing.Total - standing.Owned)
                 .ThenBy(standing => standing.Name, StringComparer.OrdinalIgnoreCase),
@@ -88,7 +94,6 @@ public static class SetCompletion
         uint setId, OutfitCatalog outfits, OwnershipView view, Configuration configuration)
     {
         var items = Plugin.DataManager.GetExcelSheet<Item>();
-        var progress = outfits.ProgressInDresser(setId, view);
         var states = new List<SetPieceState>();
 
         foreach (var piece in outfits.PiecesOf(setId))
@@ -124,8 +129,6 @@ public static class SetCompletion
             named ? set.Icon : (ushort)0,
             states.Count(state => state.IsOwned),
             states.Count,
-            progress.Filled,
-            progress.StoredAsSet,
             states);
     }
 
