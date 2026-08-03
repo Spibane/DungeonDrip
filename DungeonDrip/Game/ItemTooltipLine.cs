@@ -64,21 +64,30 @@ public sealed unsafe class ItemTooltipLine : IDisposable
     /// The state, as one of the game's own tooltip icons.
     /// </summary>
     /// <remarks>
-    /// Game icons rather than characters, so the line looks like part of the tooltip instead of
-    /// something pasted into it, and so it survives whatever font the player is on. Kept close to
-    /// what the panels already say - a star means a finished outfit and nothing else, and the one
-    /// state worth acting on is the one that stands out.
+    /// Three icons for six states, because the word beside it already says which of the six it is.
+    /// The icon only has to answer whether you have the thing: gold for yes and put away, silver
+    /// for yes but not finished with, and the no-entry sign for no. That is the same division of
+    /// labour the panels use, where the marker carries the state and the name only says whether
+    /// you need the thing.
+    ///
+    /// One family of icons on purpose. The first attempt mixed a green dot and an orange diamond in
+    /// with the stars, and they read as three unrelated badges rather than a scale - the green dot
+    /// in particular is the game's "this is new" marker and looked pasted in.
     ///
     /// This lives here rather than beside the marker vocabulary in Core, which is deliberately free
     /// of anything Dalamud.
     /// </remarks>
     private static BitmapFontIcon Glyph(CollectionMarker marker) => marker switch
     {
-        CollectionMarker.Dresser => BitmapFontIcon.GreenDot,
-        CollectionMarker.Armoire => BitmapFontIcon.GreenDot,
-        CollectionMarker.Outfit => BitmapFontIcon.SilverStar,
+        CollectionMarker.Dresser => BitmapFontIcon.GoldStar,
+        CollectionMarker.Armoire => BitmapFontIcon.GoldStar,
         CollectionMarker.OutfitComplete => BitmapFontIcon.GoldStar,
-        CollectionMarker.Inventory => BitmapFontIcon.OrangeDiamond,
+
+        // Yours, but not stored the way the gold ones are: a set still has gaps in it, and a piece
+        // in your bags is one bank raid away from not being yours at all.
+        CollectionMarker.Outfit => BitmapFontIcon.SilverStar,
+        CollectionMarker.Inventory => BitmapFontIcon.SilverStar,
+
         _ => BitmapFontIcon.NoCircle,
     };
 
@@ -235,14 +244,19 @@ public sealed unsafe class ItemTooltipLine : IDisposable
             return;
         }
 
+        var view = plugin.Ownership.Current;
         var source = MissingItems.Resolve(
             itemId,
-            plugin.Ownership.Current,
+            view,
             plugin.Outfits.SetsContaining(itemId),
             plugin.Configuration.OutfitOwnership,
             plugin.Configuration.Scope);
 
-        var marker0 = CollectionMarkers.For(source, plugin.Ownership.HasDresserData);
+        // Meaningless for anything not held in a set, and walking a set's pieces is not free.
+        // Missing this is what made a finished outfit and a half-finished one look identical.
+        var completed = source == OwnershipSource.Outfit && plugin.Outfits.IsInCompletedSet(itemId, view);
+
+        var marker0 = CollectionMarkers.For(source, plugin.Ownership.HasDresserData, completed);
 
         // A tooltip has no room to explain why it cannot say, so it says nothing.
         if (marker0 == CollectionMarker.Unknown)

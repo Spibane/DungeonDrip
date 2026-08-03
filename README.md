@@ -217,9 +217,17 @@ second of each would sit next to the real one saying the same word.
 
 **Settings → In-game UI** can also mark the game's own item tooltips, adding an icon and a word to
 the category row — the one that says *Body* or *Hands* — saying where the piece is in your
-collection. Shorthand rather than a sentence, because that row is not wide: a green dot for the
-Dresser or Armoire, a silver star for a set with gaps, a gold star for a completed one, an orange
-diamond for carried, and the no-entry sign for something you do not own. It is off by default: it is the only thing in the plugin that changes
+collection. Shorthand rather than a sentence, because that row is not wide.
+
+| | |
+| --- | --- |
+| gold star | Put away — the Dresser, the Armoire, or a finished outfit |
+| silver star | Yours, but in a set with gaps or loose in your bags |
+| no entry | Not collected |
+
+Three icons for six states, because the word beside it already says which one. The icon only
+answers whether you have the thing — the same split the panels use, where the marker carries the
+state and the name only says whether you need it. It is off by default: it is the only thing in the plugin that changes
 what a game window *contains* rather than sitting beside it, and the only thing that hooks a game
 function. It appends and never replaces, and marks its own line so it cannot double up or overwrite
 another plugin's. If a patch moves what it hooks, the line simply does not appear and Settings says
