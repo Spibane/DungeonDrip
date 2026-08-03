@@ -108,14 +108,8 @@ public sealed unsafe class DresserAddWatcher : IDisposable
 
     private List<DresserAddRow> Build()
     {
-        var carried = InventoryReader.ReadDetailed();
         var report = CarriedGear.Build(
-            carried, plugin.Ownership.Current, plugin.Outfits, plugin.Storage);
-
-        // Whether a piece is fully spiritbonded is per stack, and the report has collapsed them.
-        var bonded = carried
-            .GroupBy(stack => stack.ItemId)
-            .ToDictionary(group => group.Key, group => group.Any(stack => stack.FullySpiritbonded));
+            InventoryReader.ReadDetailed(), plugin.Ownership.Current, plugin.Outfits, plugin.Storage);
 
         var built = new List<DresserAddRow>(report.NotStored.Count);
 
@@ -134,12 +128,17 @@ public sealed unsafe class DresserAddWatcher : IDisposable
                 row.ItemLevel,
                 row.SlotOrder,
                 row.SlotName,
-                row.Marker,
+
+                // Not the factory's verdict. It answers "is this collected" using the user's
+                // settings, and with "also count bags" on it calls a carried piece owned - which
+                // hid this entire panel behind the show-owned toggle. Every row here is unstored
+                // by construction; that is what the list is.
+                CollectionMarker.NotCollected,
                 row.JobEquippable,
                 piece.Location,
                 piece.Quantity,
                 piece.ArmoireWouldTake,
-                BlockedReason(piece, bonded)));
+                BlockedReason(piece)));
         }
 
         Plugin.Log.Debug($"Dresser panel: {built.Count} carried pieces are not stored.");
@@ -150,25 +149,19 @@ public sealed unsafe class DresserAddWatcher : IDisposable
     /// Why the box would refuse this piece today, if it would.
     /// </summary>
     /// <remarks>
-    /// Only reasons that are legible from here. The dresser also refuses for reasons that are not
-    /// readable, so a row without a note is "not stored" rather than "you can add this" - the panel
-    /// words itself accordingly, and a few pieces the game turns down will still be listed.
+    /// Only the two reasons that are both legible from here and not already explained by the game.
+    /// Damaged gear is refused too, but the dresser says so itself when you try, and spiritbond is
+    /// not a reason at all - storing a piece resets it rather than requiring it.
+    ///
+    /// A row without a note therefore reads "not stored" rather than "you can add this", and a few
+    /// pieces the game turns down will still be listed.
     /// </remarks>
-    private static string? BlockedReason(CarriedPiece piece, Dictionary<uint, bool> bonded)
+    private static string? BlockedReason(CarriedPiece piece) => piece.Location switch
     {
-        if (piece.Location == CarryLocation.Saddlebag)
-            return "Retrieve it from the saddlebag first.";
-
-        if (piece.Location == CarryLocation.Equipped)
-            return "Take it off first.";
-
-        // Untradeable gear is exempt, and tradeability is not on the stack, so this can only be
-        // raised as a possibility.
-        if (bonded.TryGetValue(piece.ItemId, out var full) && !full)
-            return "If it is tradeable, it has to be fully spiritbonded first.";
-
-        return null;
-    }
+        CarryLocation.Saddlebag => "Retrieve it from the saddlebag first.",
+        CarryLocation.Equipped => "Take it off first.",
+        _ => null,
+    };
 
     private void OnOpened(AddonEvent type, AddonArgs args)
     {

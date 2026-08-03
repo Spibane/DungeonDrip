@@ -78,7 +78,6 @@ public sealed class DresserPanelWindow(Plugin plugin)
 
         using var tooltip = ImRaii.Tooltip();
         ImGui.Text(row.Name);
-        ImGui.TextColored(Palette.Muted, $"iLvl {row.ItemLevel}");
         ImGui.TextColored(Palette.Muted, Describe(add.Location));
 
         if (add.ArmoireWouldTake)

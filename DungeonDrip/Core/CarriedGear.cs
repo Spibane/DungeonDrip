@@ -32,8 +32,7 @@ public sealed record CarriedPiece(
     CarryLocation Location,
     int Quantity,
     OwnershipSource StoredIn,
-    StorageKind Storable,
-    bool FullySpiritbonded)
+    StorageKind Storable)
 {
     /// <summary>The Armoire would take this and it is not in there yet - a dresser slot saved.</summary>
     public bool ArmoireWouldTake =>
@@ -115,8 +114,7 @@ public static class CarriedGear
                 group.Location,
                 group.Quantity,
                 source,
-                storable,
-                group.FullySpiritbonded);
+                storable);
 
             switch (source)
             {
@@ -153,9 +151,7 @@ public static class CarriedGear
             .Select(group => new Collapsed(
                 group.Key.ItemId,
                 group.Key.Location,
-                group.Sum(stack => stack.Quantity),
-                // Any one fully bonded copy is enough - that is the one you would deposit.
-                group.Any(stack => stack.FullySpiritbonded)));
+                group.Sum(stack => stack.Quantity)));
 
     /// <summary>
     /// Records a piece on the add list, keeping the copy that is least trouble to get at.
@@ -205,6 +201,5 @@ public static class CarriedGear
             .ThenBy(piece => piece.Name, StringComparer.OrdinalIgnoreCase),
     ];
 
-    private readonly record struct Collapsed(
-        uint ItemId, CarryLocation Location, int Quantity, bool FullySpiritbonded);
+    private readonly record struct Collapsed(uint ItemId, CarryLocation Location, int Quantity);
 }

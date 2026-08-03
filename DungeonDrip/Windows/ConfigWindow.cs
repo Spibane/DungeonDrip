@@ -327,8 +327,13 @@ public class ConfigWindow : Window
         changed |= DrawPanelSection(
             "Glamour Dresser", "dresser", configuration.DresserPanel,
             "Lists what you are carrying that is not in the dresser or Armoire yet.",
-            "This is the one panel whose list means the opposite of the others: it is what you have\n" +
-            "on you and have not stored, rather than what you are being shown and do not own.");
+            "The one panel whose list means the opposite of the others: what you have on you and\n" +
+            "have not stored, rather than what you are being shown and do not own.\n\n" +
+            "Its markers say where the piece is rather than whether you own it, since by\n" +
+            "construction you do:\n" +
+            "    case: in your bags        box: in the armoury chest\n" +
+            "    figure: worn, take it off first        horse: in the saddlebag, fetch it first\n" +
+            "An amber row needs something doing before it can be stored.");
 
         DrawSharedSettingsNote();
         return changed;
@@ -401,47 +406,29 @@ public class ConfigWindow : Window
         var changed = false;
 
         ImGui.Spacing();
-        ImGui.TextColored(Palette.Muted, "Right-click menus");
-        ImGui.Spacing();
 
         var contextMenu = configuration.ShowGameContextMenu;
         if (UiParts.Toggle("Add gear options to the game's right-click menus", ref contextMenu,
-                "Adds \"Try on outfit\" and \"Where does this drop?\" when you right-click a piece of\n" +
-                "gear in your inventory, the inspect window, a chat link, the Glamour Dresser and so on.\n" +
-                "Only options the game does not already offer are added - it has its own Try On, Link\n" +
-                "and Copy, and a second of each would just sit beside the real one."))
+                "Try on outfit, and where a piece drops.\n" +
+                "Only options the game does not already offer are added."))
         {
             configuration.ShowGameContextMenu = contextMenu;
             changed = true;
         }
 
-        ImGui.Spacing();
-        ImGui.TextColored(Palette.Muted,
-            "Entries are added through the interface Dalamud provides for it and are marked with a D,\n" +
-            "so they sit below the game's own options and alongside any other plugin's rather than\n" +
-            "replacing anything.");
-
-        ImGui.Spacing();
-        ImGui.Separator();
-        ImGui.Spacing();
-        ImGui.TextColored(Palette.Muted, "Item tooltips");
-        ImGui.Spacing();
-
         if (!plugin.TooltipLineAvailable)
         {
-            // Said plainly rather than left as a toggle that quietly does nothing.
-            ImGui.TextColored(Palette.Warning,
-                "Unavailable on this game version - the tooltip line could not attach.");
-            ImGui.TextColored(Palette.Muted,
-                "A patch has moved what it hooks. Everything else is unaffected.");
+            // The one thing here worth the space: a toggle that cannot work should not be offered
+            // as though it can.
+            ImGui.Spacing();
+            ImGui.TextColored(Palette.Warning, "Item tooltip marking is unavailable on this game version.");
             ImGui.Spacing();
             return changed;
         }
 
         var tooltipLine = configuration.ShowTooltipLine;
         if (UiParts.Toggle("Mark the game's item tooltips", ref tooltipLine,
-                "Adds an icon and a word to the tooltip's category line - the row that says Body or\n" +
-                "Hands - saying where the piece is in your collection.\n\n" +
+                "Adds an icon and a word to the tooltip's category row, saying where the piece is.\n\n" +
                 "gold star: put away, in the Dresser, the Armoire or a finished outfit\n" +
                 "silver star: in a stored outfit that still has gaps\n" +
                 "orange diamond: on you, in no box at all\n" +
@@ -450,14 +437,6 @@ public class ConfigWindow : Window
             configuration.ShowTooltipLine = tooltipLine;
             changed = true;
         }
-
-        ImGui.Spacing();
-        ImGui.TextColored(Palette.Muted,
-            "Off by default, and the only thing here that changes what a game window contains rather\n" +
-            "than adding beside it. It only ever adds to what is already there, and marks its own\n" +
-            "line so it cannot double up or overwrite another plugin's.");
-        ImGui.TextColored(Palette.Muted,
-            "Simple Tweaks' Track Outfits does a similar job; with both on you get two lines.");
 
         ImGui.Spacing();
         return changed;

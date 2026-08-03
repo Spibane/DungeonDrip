@@ -312,7 +312,6 @@ public abstract unsafe class AddonPanelWindow : Window
 
         using var tooltip = ImRaii.Tooltip();
         ImGui.Text(row.Name);
-        ImGui.TextColored(Palette.Muted, $"iLvl {row.ItemLevel}");
         ImGui.Text(CollectionMarkers.Describe(row.Marker));
 
         if (uncertain && UncertainNote != null)
