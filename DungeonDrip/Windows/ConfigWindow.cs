@@ -45,6 +45,12 @@ public class ConfigWindow : Window
                 changed |= DrawVendorsTab();
         }
 
+        using (var inGame = ImRaii.TabItem("In-game UI"))
+        {
+            if (inGame.Success)
+                changed |= DrawInGameTab();
+        }
+
         using (var data = ImRaii.TabItem("Data"))
         {
             if (data.Success)
@@ -334,6 +340,43 @@ public class ConfigWindow : Window
         }
 
         DrawSharedSettingsNote();
+        return changed;
+    }
+
+    /// <summary>
+    /// Everything the plugin puts inside the game's own windows, as opposed to beside them.
+    /// </summary>
+    /// <remarks>
+    /// Its own tab because the distinction is worth drawing. Everything on the other tabs is a
+    /// window of the plugin's that happens to sit next to a game one; this is the plugin appearing
+    /// in the game's UI, which is a thing people reasonably want a say over.
+    /// </remarks>
+    private bool DrawInGameTab()
+    {
+        var changed = false;
+
+        ImGui.Spacing();
+        ImGui.TextColored(Palette.Muted, "Right-click menus");
+        ImGui.Spacing();
+
+        var contextMenu = configuration.ShowGameContextMenu;
+        if (UiParts.Toggle("Add gear options to the game's right-click menus", ref contextMenu,
+                "Adds \"Try on outfit\" and \"Where does this drop?\" when you right-click a piece of\n" +
+                "gear in your inventory, the inspect window, a chat link, the Glamour Dresser and so on.\n" +
+                "Only options the game does not already offer are added - it has its own Try On, Link\n" +
+                "and Copy, and a second of each would just sit beside the real one."))
+        {
+            configuration.ShowGameContextMenu = contextMenu;
+            changed = true;
+        }
+
+        ImGui.Spacing();
+        ImGui.TextColored(Palette.Muted,
+            "Entries are added through the interface Dalamud provides for it and are marked with a D,\n" +
+            "so they sit below the game's own options and alongside any other plugin's rather than\n" +
+            "replacing anything.");
+
+        ImGui.Spacing();
         return changed;
     }
 

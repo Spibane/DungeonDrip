@@ -2,7 +2,7 @@
 <Project Sdk="Dalamud.NET.Sdk/15.0.0">
   <PropertyGroup>
     <Version>0.11.1.0</Version>
-    <Description>Shows which drip you are still missing from your Glamour Dresser and Armoire, in duties and at vendors.</Description>
+    <Description>Shows which drip you are still missing from your Glamour Dresser and Armoire, wherever the game shows you gear.</Description>
     <PackageProjectUrl>https://github.com/Spibane/DungeonDrip</PackageProjectUrl>
     <PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>
     <Copyright>Copyright (C) 2026 Spibane</Copyright>
