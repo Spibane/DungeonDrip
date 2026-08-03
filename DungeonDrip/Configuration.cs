@@ -139,5 +139,15 @@ public class Configuration : IPluginConfiguration
     /// <summary>Group the vendor panel by equipment slot rather than listing it flat.</summary>
     public bool VendorGroupBySlot { get; set; } = true;
 
+    /// <summary>
+    /// Offer the plugin's gear actions on the game's own right-click menus.
+    /// </summary>
+    /// <remarks>
+    /// On by default. This adds entries through the API Dalamud provides for exactly that and
+    /// composes with other plugins doing the same, and Dalamud's own prefix makes the source
+    /// obvious - so it is not the kind of thing that needs opting into.
+    /// </remarks>
+    public bool ShowGameContextMenu { get; set; } = true;
+
     public void Save() => Plugin.PluginInterface.SavePluginConfig(this);
 }

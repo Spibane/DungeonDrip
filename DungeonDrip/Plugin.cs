@@ -26,6 +26,7 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] internal static IChatGui ChatGui { get; private set; } = null!;
     [PluginService] internal static IGameGui GameGui { get; private set; } = null!;
     [PluginService] internal static IAddonLifecycle AddonLifecycle { get; private set; } = null!;
+    [PluginService] internal static IContextMenu ContextMenu { get; private set; } = null!;
     [PluginService] internal static IPluginLog Log { get; private set; } = null!;
 
     private const string CommandName = "/dungeondrip";
@@ -70,6 +71,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly ContentFinderIndex contentFinder;
     private readonly JobRoleIndex jobRoles;
     private readonly LootObserver lootObserver;
+    private readonly GameContextMenu gameContextMenu;
     private readonly HttpFetcher http = new();
 
     private readonly MissingItemsWindow mainWindow;
@@ -107,6 +109,7 @@ public sealed class Plugin : IDalamudPlugin
         LearnedLoot = new LearnedLootStore(configDirectory);
         lootObserver = new LootObserver(Configuration, LearnedLoot, contentFinder, Storage);
         Shop = new ShopWatcher(this);
+        gameContextMenu = new GameContextMenu(this);
         Wiki = new WikiLootSource(configDirectory, Configuration, http);
 
         // Reads the on-disk copy immediately and starts an update check in the background, so a
@@ -143,6 +146,7 @@ public sealed class Plugin : IDalamudPlugin
 
         windowSystem.RemoveAllWindows();
         lootObserver.Dispose();
+        gameContextMenu.Dispose();
         Shop.Dispose();
         LootData.Dispose();
         Wiki.Dispose();
