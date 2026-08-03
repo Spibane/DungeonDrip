@@ -65,7 +65,7 @@ public sealed unsafe class MarketBoardWatcher : IDisposable
         if (unit == null || !unit->IsVisible)
             return Forget();
 
-        if (!MarketBoardReader.TryRead(scratch))
+        if (!MarketBoardReader.TryRead(unit, scratch))
         {
             WarnOnce();
             return Forget();
