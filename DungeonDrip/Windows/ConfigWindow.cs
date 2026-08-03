@@ -261,7 +261,7 @@ public class ConfigWindow : Window
             ImGui.SetNextItemWidth(200 * ImGuiHelpers.GlobalScale);
             if (ImGui.BeginCombo("Side", side.ToString()))
             {
-                foreach (var option in Enum.GetValues<LootCompanionSide>())
+                foreach (var option in Enum.GetValues<PanelSide>())
                 {
                     if (ImGui.Selectable(option.ToString(), side == option))
                     {
@@ -301,7 +301,7 @@ public class ConfigWindow : Window
             ImGui.SetNextItemWidth(200 * ImGuiHelpers.GlobalScale);
             if (ImGui.BeginCombo("Side##vendor", vendorSide.ToString()))
             {
-                foreach (var option in Enum.GetValues<LootCompanionSide>())
+                foreach (var option in Enum.GetValues<PanelSide>())
                 {
                     if (ImGui.Selectable($"{option}##vendor", vendorSide == option))
                     {
