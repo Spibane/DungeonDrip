@@ -1,8 +1,6 @@
 using System;
 using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Game.Text.SeStringHandling.Payloads;
-using Dalamud.Game.Addon.Lifecycle;
-using Dalamud.Game.Addon.Lifecycle.AddonArgTypes;
 using Dalamud.Hooking;
 using Dalamud.Plugin.Services;
 using Dalamud.Memory;
@@ -114,7 +112,6 @@ public sealed unsafe class ItemTooltipLine : IDisposable
     {
         this.plugin = plugin;
         marker = Plugin.ChatGui.AddChatLinkHandler(MarkerCommandId, (_, _) => { });
-        Plugin.AddonLifecycle.RegisterListener(AddonEvent.PostRefresh, "ItemDetail", OnRefresh);
 
         try
         {
@@ -132,7 +129,6 @@ public sealed unsafe class ItemTooltipLine : IDisposable
 
     public void Dispose()
     {
-        Plugin.AddonLifecycle.UnregisterListener(AddonEvent.PostRefresh, "ItemDetail", OnRefresh);
         hook?.Disable();
         hook?.Dispose();
         Plugin.ChatGui.RemoveChatLinkHandler(MarkerCommandId);
@@ -155,7 +151,13 @@ public sealed unsafe class ItemTooltipLine : IDisposable
             }
 
             if (plugin.Configuration.ShowTooltipLine)
+            {
+                // Before Original, which is what lays the tooltip out. Setting this afterwards is
+                // what made the wrapped line draw on top of the row below it: the flag let the text
+                // wrap but the height had already been decided without it.
+                AllowWrapping(addon);
                 Append(strings);
+            }
         }
         catch (Exception ex)
         {
@@ -305,34 +307,28 @@ public sealed unsafe class ItemTooltipLine : IDisposable
     }
 
     /// <summary>
-    /// Lets whichever row ended up carrying the line wrap onto a second line.
+    /// Lets the tooltip's rows wrap, so a row that gains a line is measured with it.
     /// </summary>
     /// <remarks>
-    /// These rows were built for one short string each and clip rather than wrap, so the line ran
-    /// off the side of the tooltip. The node is found by looking for our own text rather than by
-    /// id: which row the line lands on depends on the item, the ids are not documented anywhere
-    /// this could read them from, and a hardcoded one would be wrong the day it moved. Searching a
-    /// few dozen nodes once per tooltip refresh costs nothing.
+    /// Applied to every text row rather than to the one the line lands on. Which row that is
+    /// depends on the item, and at this point in the frame the nodes still hold the previous
+    /// item's text, so there is nothing to recognise ours by yet - the array has been written but
+    /// the nodes have not been filled from it. Setting the flag on a row whose text already fits
+    /// and has no break in it changes nothing, so the blanket application is harmless.
+    ///
+    /// Re-applied every time because the game owns these nodes and is free to reset them.
     /// </remarks>
-    private void OnRefresh(AddonEvent type, AddonArgs args)
+    private static void AllowWrapping(AtkUnitBase* addon)
     {
-        if (!plugin.Configuration.ShowTooltipLine)
+        if (addon == null)
             return;
 
-        var unit = (AtkUnitBase*)args.Addon.Address;
-        if (unit == null)
-            return;
-
-        var manager = unit->UldManager;
+        var manager = addon->UldManager;
         for (var i = 0; i < manager.NodeListCount; i++)
         {
             var node = manager.NodeList[i];
-            if (node == null || node->Type != NodeType.Text)
-                continue;
-
-            var text = (AtkTextNode*)node;
-            if (text->NodeText.ToString().Contains(Prefix, StringComparison.Ordinal))
-                text->TextFlags |= TextFlags.MultiLine;
+            if (node != null && node->Type == NodeType.Text)
+                ((AtkTextNode*)node)->TextFlags |= TextFlags.MultiLine;
         }
     }
 }
