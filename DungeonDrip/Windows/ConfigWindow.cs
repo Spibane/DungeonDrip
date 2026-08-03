@@ -443,7 +443,8 @@ public class ConfigWindow : Window
                 "Adds an icon and a word to the tooltip's category line - the row that says Body or\n" +
                 "Hands - saying where the piece is in your collection.\n\n" +
                 "gold star: put away, in the Dresser, the Armoire or a finished outfit\n" +
-                "silver star: yours, but in a set with gaps or loose in your bags\n" +
+                "silver star: in a stored outfit that still has gaps\n" +
+                "orange diamond: on you, in no box at all\n" +
                 "no entry: not collected"))
         {
             configuration.ShowTooltipLine = tooltipLine;
