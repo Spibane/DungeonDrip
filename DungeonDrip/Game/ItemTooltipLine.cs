@@ -24,11 +24,17 @@ namespace DungeonDrip.Game;
 /// the multi-line flag all come from Simple Tweaks (Caraxi, AGPL-3.0), which has been doing this
 /// for years - the useful parts were learned by reading it after guessing wrong twice.</para>
 ///
-/// <para><b>Why the category line rather than the description.</b> The description was the obvious
-/// home and it does not work: the game only writes that field when the item has a description of
-/// its own, and only draws it when it decided there was one. A line written there for a piece of
-/// plain gear is accepted, kept, and never shown. The category line is written for every item and
-/// always drawn.</para>
+/// <para><b>Why the category row.</b> Two other homes were tried and neither works. The description
+/// row is only written when the item has a description of its own and only drawn when the game
+/// decided there was one, so a line put there for plain gear is accepted, kept, and never shown.
+/// The extractable row at the top of the bottom block is drawn, but the tooltip's rows sit at fixed
+/// positions - giving one a second line makes it draw over the row beneath rather than pushing it
+/// down, and that is not something a string write can fix. The plugins that do get their own lines
+/// down there build their own nodes for it.</para>
+///
+/// <para>So: the category row, appended inline. It is written for every item, always drawn, and has
+/// the room because everything this appends is a short fixed phrase - the longest is "Part of a
+/// stored outfit set". No item or outfit name is ever put here.</para>
 ///
 /// <para>The signature will eventually break on a patch. When it does the hook simply fails to
 /// install, the feature is absent, and everything else carries on - which is the right failure for
@@ -55,17 +61,6 @@ public sealed unsafe class ItemTooltipLine : IDisposable
 
     /// <summary>Marks our own text so the node drawing it can be found again afterwards.</summary>
     private const string Prefix = "Drip: ";
-
-    /// <summary>
-    /// The "Extractable / Projectable / Desynthesizable" row, at the top of the tooltip's bottom
-    /// block - where other plugins put their lines.
-    /// </summary>
-    /// <remarks>
-    /// Preferred, but not guaranteed: gear that is none of those three has nothing to say here, and
-    /// a row the game left empty is a row it will not draw. When that happens the line falls back
-    /// to the category, which is always drawn. Better a line in the wrong place than no line.
-    /// </remarks>
-    private const int ExtraInfo = 35;
 
     /// <summary>Ours, so the line can recognise itself and never double up.</summary>
     private const uint MarkerCommandId = 0x44445F31;
@@ -221,15 +216,7 @@ public sealed unsafe class ItemTooltipLine : IDisposable
             return;
         }
 
-        // The bottom block if the game filled it in, the category row if it did not.
-        var field = ExtraInfo;
-        var existing = Rebase(Read(strings, ExtraInfo));
-
-        if (strings->Size <= ExtraInfo || existing.TextValue.Trim().Length == 0)
-        {
-            field = ItemUiCategory;
-            existing = Rebase(Read(strings, ItemUiCategory));
-        }
+        var existing = Rebase(Read(strings, ItemUiCategory));
 
         var stale = plugin.Ownership.IsDresserStale;
         var colour = marker0 switch
@@ -251,19 +238,19 @@ public sealed unsafe class ItemTooltipLine : IDisposable
 
         // Attributed, because an unexplained line in a game tooltip is the kind of thing that gets
         // reported to Square Enix. Short, because this shares a line with the item's category.
-        // On its own line in the bottom block, where there is room and where the eye already goes
-        // looking for this sort of thing. Inline on the category row, where there is not.
+        // Inline, and it has to stay inline: the tooltip's rows sit at fixed positions, so a row
+        // given a second line draws over the row beneath it rather than pushing it down.
         built.Add(marker)
             .Add(RawPayload.LinkTerminator)
-            .AddText(field == ExtraInfo ? "\n" : "   ")
+            .AddText("   ")
             .AddUiForeground(colour)
             .AddText($"{Prefix}{note}")
             .AddUiForegroundOff();
 
         var bytes = built.Build().EncodeWithNullTerminator();
-        strings->SetValue(field, bytes, false);
+        strings->SetValue(ItemUiCategory, bytes, false);
 
-        Trace(itemId, $"WROTE {bytes.Length} bytes to field {field} ({note})");
+        Trace(itemId, $"WROTE {bytes.Length} bytes ({note})");
     }
 
     /// <summary>
