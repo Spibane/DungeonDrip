@@ -132,10 +132,8 @@ window is open you have chosen the piece, so the question was needed one screen 
 row there would be the same piece repeated once per seller.
 
 Results arrive from the server in pages of twenty, so the panel fills in as the category loads.
-Scrolling does not re-read anything.
-
-**Text searches are not handled properly yet.** Searching inside a category leaves both sets of
-results in what the panel reads, so it lists the category's gear alongside the search's.
+Scrolling does not re-read anything, and a text search lists the search's results rather than the
+category's underneath them.
 
 This is where a stale snapshot matters most and where it costs the most, since you reach a board by
 travelling to one and zoning is exactly what wipes the dresser data. The amber x means *probably

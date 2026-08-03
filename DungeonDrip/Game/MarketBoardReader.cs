@@ -1,8 +1,9 @@
 using System;
 using System.Collections.Generic;
 using Dalamud.Utility;
+using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Client.UI.Agent;
-using FFXIVClientStructs.FFXIV.Client.UI.Info;
+using FFXIVClientStructs.FFXIV.Component.GUI;
 
 namespace DungeonDrip.Game;
 
@@ -14,34 +15,38 @@ namespace DungeonDrip.Game;
 /// search agent, and the agent is both easier to read and stable while you scroll - the values
 /// block holds category icons and nothing about what is listed.
 ///
-/// <para>The agent holds the ids and the catalogue proxy holds the count. The agent's array is a
-/// cache the game writes over without shrinking, so it keeps whatever the last category left
-/// behind; the count is what says how much of it is current.</para>
+/// <para>The agent holds the ids and the addon's own results list says how many of them are being
+/// shown. That split matters because the agent's array is a cache the game writes over without
+/// shrinking - it always holds a hundred ids, most of them left behind by whatever was open
+/// before.</para>
 ///
-/// <para><b>Known wrong for text searches.</b> Searching inside a category leaves both sets of
-/// results in the array and the count covers both, so the panel lists the category's gear as well
-/// as the search's. Reading the proxy's own entries instead was tried and is worse - it lags a
-/// category behind and drops results - so this is the better of the two until the search case has
-/// actually been measured rather than guessed at.</para>
+/// <para>The count has to come from the list rather than from the catalogue proxy, which was the
+/// first thing tried and is only right for category browsing. Measured: picking a category walks
+/// the proxy's count up 20 at a time as pages arrive, but typing a search leaves it frozen at
+/// whatever the category left while the search's results are written over the front of the array.
+/// Reading a hundred ids then gave three results followed by ninety-seven stale ones. The proxy's
+/// own entry list is worse still - it stops at the first page and never catches up.</para>
 /// </remarks>
 public static unsafe class MarketBoardReader
 {
     /// <summary>Rows are read into a caller-owned list so the per-frame path allocates nothing.</summary>
     /// <returns>False when the browse list could not be read and the panel must not draw.</returns>
-    public static bool TryRead(List<uint> destination)
+    public static bool TryRead(AtkUnitBase* unit, List<uint> destination)
     {
         destination.Clear();
 
-        var proxy = InfoProxyCatalogSearch.Instance();
-        if (proxy == null)
+        var agent = AgentItemSearch.Instance();
+        if (agent == null || unit == null)
             return false;
 
-        var agent = AgentItemSearch.Instance();
-        if (agent == null)
+        var list = ((AddonItemSearch*)unit)->ResultsList;
+        if (list == null)
             return false;
 
         var ids = agent->ListingPageItemIds;
-        var count = Math.Clamp((int)proxy->EntryCount, 0, ids.Length);
+
+        // Everything past what the list is showing belongs to a previous category or search.
+        var count = Math.Clamp(list->ListLength, 0, ids.Length);
 
         for (var i = 0; i < count; i++)
         {
