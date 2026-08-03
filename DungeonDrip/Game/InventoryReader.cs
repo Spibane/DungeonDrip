@@ -144,6 +144,43 @@ public static unsafe class InventoryReader
     }
 
     /// <summary>
+    /// A hash of what is sitting where, for telling "read again" from "changed".
+    /// </summary>
+    /// <remarks>
+    /// The same trick the dresser snapshot uses, and for the same reason: anything watching the
+    /// bags is doing so every frame, and rebuilding a list of several hundred rows on a frame where
+    /// nothing moved is the cost worth avoiding. One pass, no allocation.
+    /// </remarks>
+    public static ulong Fingerprint()
+    {
+        var hash = 1469598103934665603UL;
+
+        var manager = InventoryManager.Instance();
+        if (manager == null)
+            return hash;
+
+        foreach (var type in Containers)
+        {
+            var container = manager->GetInventoryContainer(type);
+            if (container == null || !container->IsLoaded)
+                continue;
+
+            for (var slot = 0; slot < container->Size; slot++)
+            {
+                var item = container->GetInventorySlot(slot);
+                if (item == null || item->ItemId == 0)
+                    continue;
+
+                hash = (hash * 1099511628211UL) ^ item->ItemId;
+                hash = (hash * 1099511628211UL) ^ (ulong)((int)type << 16 | (ushort)slot);
+                hash = (hash * 1099511628211UL) ^ (uint)item->Quantity;
+            }
+        }
+
+        return hash;
+    }
+
+    /// <summary>
     /// Whether the saddlebag can be read from where you are standing.
     /// </summary>
     /// <remarks>

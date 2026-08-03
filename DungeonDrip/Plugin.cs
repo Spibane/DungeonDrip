@@ -70,6 +70,9 @@ public sealed class Plugin : IDalamudPlugin
     /// <summary>One resolved-row cache, shared by every panel.</summary>
     public GearRowFactory Rows { get; }
 
+    /// <summary>What you are carrying that the Glamour Dresser has not got.</summary>
+    public DresserAddWatcher Dresser { get; }
+
     private readonly WindowSystem windowSystem = new("DungeonDrip");
     private readonly ContentFinderIndex contentFinder;
     private readonly JobRoleIndex jobRoles;
@@ -117,6 +120,7 @@ public sealed class Plugin : IDalamudPlugin
         lootObserver = new LootObserver(Configuration, LearnedLoot, contentFinder, Storage);
         Rows = new GearRowFactory(this);
         Shop = new ShopWatcher(this);
+        Dresser = new DresserAddWatcher(this);
         gameContextMenu = new GameContextMenu(this);
         Wiki = new WikiLootSource(configDirectory, Configuration, http);
 
@@ -132,6 +136,7 @@ public sealed class Plugin : IDalamudPlugin
         // Always open; each decides for itself whether the addon it rides on is up.
         windowSystem.AddWindow(new LootCompanionWindow(this) { IsOpen = true });
         windowSystem.AddWindow(new VendorPanelWindow(this) { IsOpen = true });
+        windowSystem.AddWindow(new DresserPanelWindow(this) { IsOpen = true });
 
         currentTerritory = ClientState.TerritoryType;
 
@@ -156,6 +161,7 @@ public sealed class Plugin : IDalamudPlugin
         lootObserver.Dispose();
         gameContextMenu.Dispose();
         Shop.Dispose();
+        Dresser.Dispose();
         LootData.Dispose();
         Wiki.Dispose();
         http.Dispose();
