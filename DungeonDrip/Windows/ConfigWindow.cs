@@ -293,29 +293,28 @@ public class ConfigWindow : Window
         var changed = false;
 
         ImGui.Spacing();
-        ImGui.TextColored(Palette.Muted, "What the markers mean");
+        ImGui.TextColored(Palette.Muted, "Markers");
         ImGui.BulletText("x - not collected");
-        ImGui.BulletText("tick - in the Glamour Dresser");
-        ImGui.BulletText("layers - in a stored outfit set that still has gaps");
-        ImGui.BulletText("star - in an outfit set you have completed");
-        ImGui.BulletText("box - in the Armoire");
+        ImGui.BulletText("amber x - not collected, dresser data is old");
+        ImGui.BulletText("tick - Glamour Dresser");
+        ImGui.BulletText("layers - stored outfit set with gaps");
+        ImGui.BulletText("star - completed outfit set");
+        ImGui.BulletText("box - Armoire");
         ImGui.BulletText("case - carried or equipped");
-        ImGui.BulletText("? - no dresser data, so nothing can be said either way");
-        ImGui.TextColored(Palette.Muted, "An old dresser snapshot turns the x amber, not the ticks:");
-        ImGui.TextColored(Palette.Muted, "what it says you own stays true far longer than what it says you lack.");
+        ImGui.BulletText("? - no dresser data");
 
         ImGui.Spacing();
 
         changed |= DrawPanelSection(
             "Vendor windows", "vendor", configuration.VendorPanel,
-            "Glamour gear the vendor is currently showing, marked by where it is in your\n" +
+            "Glamour gear the vendor is currently showing, marked by where it is in the\n" +
             "collection. Non-glamour items are left out.\n" +
             "\"/dungeondrip shop\" identifies an unrecognised vendor window.",
             null);
 
         changed |= DrawPanelSection(
             "Market board", "market", configuration.MarketBoardPanel,
-            "Gear in the board's browse list, marked by where it is in your collection.\n" +
+            "Gear in the board's browse list, marked by where it is in the collection.\n" +
             "The listings for a single item get no panel.",
             null);
 
