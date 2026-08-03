@@ -75,7 +75,7 @@ lands.
 ```
 
 Everything on the right branches straight off the collection: those ask only "do I have this?", so
-they need no loot data and work for any shop, any dresser, any tooltip — not just the ones that
+they need no loot data and work at any shop, any board and any dresser — not just the ones that
 involve duty gear.
 
 **The Glamour Dresser needs opening now and then.** The game wipes dresser data on every zone change
@@ -469,6 +469,11 @@ game install is needed, and uploads the packaged plugin.
 
 - Retainer inventories, which the client only loads at a retainer.
 - Per-boss attribution of drops.
+- A line in the game's own item tooltip. Tried and abandoned: the tooltip's description field keeps
+  the *previous* item's text whenever the current one has no description of its own, which is true
+  of most gear. Measured before and after the tooltip's update event and it is stale in both, so a
+  line appended there would hang off an unrelated item's sentence on exactly the gear this plugin
+  is for. The right-click menu covers the same ground safely.
 
 ## Licence
 
