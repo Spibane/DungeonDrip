@@ -371,8 +371,12 @@ public class ConfigWindow : Window
             "when you open it, so Dungeon Drip remembers the last time it saw them.");
 
         var ownership = plugin.Ownership;
+        var slots = ownership.DresserSlotCapacity > 0
+            ? $"{ownership.DresserSlotsUsed} of {ownership.DresserSlotCapacity} slots"
+            : $"{ownership.DresserSlotsUsed} slots";
+
         ImGui.TextColored(Palette.Muted, ownership.HasDresserData
-            ? $"Dresser: {ownership.DresserSlotsUsed} slots, read {ownership.DresserUpdatedUtc:yyyy-MM-dd HH:mm} UTC."
+            ? $"Dresser: {slots}, read {ownership.DresserUpdatedUtc:yyyy-MM-dd HH:mm} UTC."
             : "Dresser: never read.");
 
         ImGui.TextColored(Palette.Muted, ownership.ArmoireUpdatedUtc == null
