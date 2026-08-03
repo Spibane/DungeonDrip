@@ -54,6 +54,59 @@ public static class MissingItems
         return OwnershipSource.None;
     }
 
+    /// <summary>
+    /// How many of the outfit sets listing a piece are stored holding it, out of how many exist.
+    /// </summary>
+    /// <remarks>
+    /// Only interesting once <see cref="Resolve"/> has said <see cref="OwnershipSource.None"/> in
+    /// <see cref="OutfitOwnershipMode.AllOutfits"/>: a non-zero first number there is the difference
+    /// between "go and get one" and "you have one, your own rule wants the rest", which a flat "not
+    /// owned" was hiding on a piece the user could see in their dresser.
+    ///
+    /// Stored is counted by intersection rather than off <c>storedIn.Count</c> alone, so the numbers
+    /// stay a subset and a total: a set that holds the piece but is not in the game's outfit sheet
+    /// cannot push the first number above the second.
+    /// </remarks>
+    public static (int Stored, int Total) OutfitStanding(
+        uint itemId, OwnershipView view, IReadOnlySet<uint> setsContainingItem)
+    {
+        var total = setsContainingItem.Count;
+
+        if (total == 0 || !view.DresserOutfits.TryGetValue(itemId, out var storedIn))
+            return (0, total);
+
+        return (setsContainingItem.Count(storedIn.Contains), total);
+    }
+
+    /// <summary>
+    /// The outfit standing behind a piece <see cref="Resolve"/> rejected, or zeroes when the
+    /// rejection had nothing to do with outfits.
+    /// </summary>
+    /// <remarks>
+    /// One place, called by every surface that shows a marker, so they cannot disagree about when a
+    /// shortfall exists. Zeroes for anything else: a piece nobody stored has no shortfall to report,
+    /// and neither does one rejected in <see cref="OutfitOwnershipMode.AnyOutfit"/> - which never
+    /// rejects a stored piece - or with the dresser out of scope entirely.
+    /// </remarks>
+    public static (int Stored, int Total) Shortfall(
+        uint itemId,
+        OwnershipView view,
+        IReadOnlySet<uint> setsContainingItem,
+        OwnershipSource source,
+        OutfitOwnershipMode mode,
+        CollectionScope scope)
+    {
+        if (source != OwnershipSource.None ||
+            mode != OutfitOwnershipMode.AllOutfits ||
+            scope == CollectionScope.ArmoireOnly)
+        {
+            return (0, 0);
+        }
+
+        var (stored, total) = OutfitStanding(itemId, view, setsContainingItem);
+        return stored > 0 && stored < total ? (stored, total) : (0, 0);
+    }
+
     public static string Describe(OwnershipSource source) => source switch
     {
         OwnershipSource.Dresser => "In your Glamour Dresser",

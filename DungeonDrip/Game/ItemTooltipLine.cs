@@ -89,6 +89,11 @@ public sealed unsafe class ItemTooltipLine : IDisposable
         // Yours, but the set it is in still has gaps.
         CollectionMarker.Outfit => BitmapFontIcon.SilverStar,
 
+        // In a stored outfit, but the strict rule wants the others too. Third grade of star, because
+        // this is the one state where the star scale is doing real work: it is further along than the
+        // no-entry sign and not as far as the silver, and the count beside it says by how much.
+        CollectionMarker.OutfitPartial => BitmapFontIcon.BlueStar,
+
         // On you rather than in anything.
         CollectionMarker.Inventory => BitmapFontIcon.OrangeDiamond,
 
@@ -100,16 +105,26 @@ public sealed unsafe class ItemTooltipLine : IDisposable
     /// </summary>
     /// <remarks>
     /// Short because this shares a row with the item's category and that row is not wide. The full
-    /// sentences the panels use do not fit and do not need to: there are six states and the icon
+    /// sentences the panels use do not fit and do not need to: there are seven states and the icon
     /// carries most of the meaning.
+    ///
+    /// The outfit count is the one thing here that is not a fixed string, and it is the exception
+    /// worth making: without it the strict ownership rule tells you a piece sitting in your dresser
+    /// is not owned, which is indistinguishable from the plugin being broken. Two small numbers are
+    /// still bounded - a piece belongs to a handful of sets at most - so the row cannot outgrow its
+    /// space.
     /// </remarks>
-    private static string Word(CollectionMarker marker, bool stale) => marker switch
+    private static string Word(CollectionMarker marker, bool stale, int stored, int total) => marker switch
     {
         CollectionMarker.Dresser => "Dresser",
         CollectionMarker.Armoire => "Armoire",
         CollectionMarker.Outfit => "Outfit",
         CollectionMarker.OutfitComplete => "Outfit",
         CollectionMarker.Inventory => "Carried",
+
+        // Not a word, on purpose. "Not owned" here would be the bug report; the fraction is the
+        // whole message, and the panels have room to explain it.
+        CollectionMarker.OutfitPartial => $"Outfit {stored}/{total}",
 
         // The one worth acting on, and the one an old snapshot can be wrong about, so it is the
         // only one that spends characters on a caveat.
@@ -201,10 +216,11 @@ public sealed unsafe class ItemTooltipLine : IDisposable
             return;
 
         var view = plugin.Ownership.Current;
+        var sets = plugin.Outfits.SetsContaining(itemId);
         var source = MissingItems.Resolve(
             itemId,
             view,
-            plugin.Outfits.SetsContaining(itemId),
+            sets,
             plugin.Configuration.OutfitOwnership,
             plugin.Configuration.Scope);
 
@@ -212,7 +228,11 @@ public sealed unsafe class ItemTooltipLine : IDisposable
         // Missing this is what made a finished outfit and a half-finished one look identical.
         var completed = source == OwnershipSource.Outfit && plugin.Outfits.IsInCompletedSet(itemId, view);
 
-        var state = CollectionMarkers.For(source, plugin.Ownership.HasDresserData, completed);
+        // Missing this is what made a piece the strict rule holds back look like one you never had.
+        var (stored, total) = MissingItems.Shortfall(
+            itemId, view, sets, source, plugin.Configuration.OutfitOwnership, plugin.Configuration.Scope);
+
+        var state = CollectionMarkers.For(source, plugin.Ownership.HasDresserData, completed, stored > 0);
 
         // A tooltip has no room to explain why it cannot say, so it says nothing.
         if (state == CollectionMarker.Unknown)
@@ -224,6 +244,10 @@ public sealed unsafe class ItemTooltipLine : IDisposable
         var colour = state switch
         {
             CollectionMarker.NotCollected => stale ? (ushort)26 : (ushort)14,
+
+            // Not the red the missing pieces get. You have one of these; what you do not have is
+            // every copy your own setting asks for.
+            CollectionMarker.OutfitPartial => (ushort)26,
             CollectionMarker.Inventory => (ushort)26,
             _ => (ushort)45,
         };
@@ -241,7 +265,7 @@ public sealed unsafe class ItemTooltipLine : IDisposable
             .AddText("   ")
             .Add(new IconPayload(Glyph(state)))
             .AddUiForeground(colour)
-            .AddText(Word(state, stale))
+            .AddText(Word(state, stale, stored, total))
             .AddUiForegroundOff();
 
         strings->SetValue(ItemUiCategory, built.Build().EncodeWithNullTerminator(), false);

@@ -209,7 +209,7 @@ public sealed class ShopWatcher : IDisposable
                 continue;
 
             rows.Add(row);
-            if (row.Marker == CollectionMarker.NotCollected)
+            if (CollectionMarkers.IsMissing(row.Marker))
                 notCollected++;
         }
 

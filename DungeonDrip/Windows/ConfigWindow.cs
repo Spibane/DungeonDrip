@@ -298,6 +298,7 @@ public class ConfigWindow : Window
         ImGui.BulletText("amber x - not collected, dresser data is old");
         ImGui.BulletText("tick - Glamour Dresser");
         ImGui.BulletText("layers - stored outfit set with gaps");
+        ImGui.BulletText("half circle - stored in some of its outfit sets, not all");
         ImGui.BulletText("star - completed outfit set");
         ImGui.BulletText("box - Armoire");
         ImGui.BulletText("case - carried or equipped");
@@ -440,6 +441,7 @@ public class ConfigWindow : Window
                 "Adds an icon and a word to the tooltip's category row.\n\n" +
                 "gold star: put away, in the Dresser, the Armoire or a finished outfit\n" +
                 "silver star: in a stored outfit that still has gaps\n" +
+                "blue star: stored in some of its outfit sets, not all\n" +
                 "orange diamond: on you, in no box at all\n" +
                 "no entry: not collected"))
         {

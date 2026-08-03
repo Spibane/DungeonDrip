@@ -15,6 +15,12 @@ namespace DungeonDrip.Core;
 /// with a different lifetime. Folding them together would drag loot data into the panels to save
 /// six fields.
 /// </remarks>
+/// <param name="OutfitsStored">
+/// Only meaningful beside <see cref="CollectionMarker.OutfitPartial"/>: how many of the outfit sets
+/// using this piece are stored holding it. Zero for every other marker, and defaulted so the
+/// subclasses that pass the base's fields through do not have to know about it.
+/// </param>
+/// <param name="OutfitsTotal">How many sets use it at all, as the denominator for the above.</param>
 public record GearRow(
     uint ItemId,
     string Name,
@@ -22,7 +28,10 @@ public record GearRow(
     int SlotOrder,
     string SlotName,
     CollectionMarker Marker,
-    bool JobEquippable)
+    bool JobEquippable,
+    int OutfitsStored = 0,
+    int OutfitsTotal = 0)
 {
-    public bool IsOwned => Marker is not (CollectionMarker.NotCollected or CollectionMarker.Unknown);
+    public bool IsOwned =>
+        !CollectionMarkers.IsMissing(Marker) && Marker != CollectionMarker.Unknown;
 }
