@@ -64,15 +64,18 @@ public sealed unsafe class ItemTooltipLine : IDisposable
     /// The state, as one of the game's own tooltip icons.
     /// </summary>
     /// <remarks>
-    /// Three icons for six states, because the word beside it already says which of the six it is.
-    /// The icon only has to answer whether you have the thing: gold for yes and put away, silver
-    /// for yes but not finished with, and the no-entry sign for no. That is the same division of
-    /// labour the panels use, where the marker carries the state and the name only says whether
-    /// you need the thing.
+    /// Four icons for six states, because the word beside it already says which of the six it is.
+    /// The stars are a scale of how well collected a piece is - gold for put away, silver for a set
+    /// that still has gaps - and the no-entry sign is the absence of it.
     ///
-    /// One family of icons on purpose. The first attempt mixed a green dot and an orange diamond in
-    /// with the stars, and they read as three unrelated badges rather than a scale - the green dot
-    /// in particular is the game's "this is new" marker and looked pasted in.
+    /// Carried gets a diamond rather than a third grade of star, because it is not a worse kind of
+    /// stored, it is a different thing entirely: the piece is on you and in no box at all, and one
+    /// trip to a vendor from being gone. A different shape says that where a dimmer star would
+    /// imply it is nearly there.
+    ///
+    /// The green dot the first attempt used for the dresser is gone and should stay gone. It is the
+    /// game's "this is new" badge, and beside the stars it read as pasted in rather than as part of
+    /// the same vocabulary.
     ///
     /// This lives here rather than beside the marker vocabulary in Core, which is deliberately free
     /// of anything Dalamud.
@@ -83,10 +86,11 @@ public sealed unsafe class ItemTooltipLine : IDisposable
         CollectionMarker.Armoire => BitmapFontIcon.GoldStar,
         CollectionMarker.OutfitComplete => BitmapFontIcon.GoldStar,
 
-        // Yours, but not stored the way the gold ones are: a set still has gaps in it, and a piece
-        // in your bags is one bank raid away from not being yours at all.
+        // Yours, but the set it is in still has gaps.
         CollectionMarker.Outfit => BitmapFontIcon.SilverStar,
-        CollectionMarker.Inventory => BitmapFontIcon.SilverStar,
+
+        // On you rather than in anything.
+        CollectionMarker.Inventory => BitmapFontIcon.OrangeDiamond,
 
         _ => BitmapFontIcon.NoCircle,
     };

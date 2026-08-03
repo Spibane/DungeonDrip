@@ -222,12 +222,14 @@ collection. Shorthand rather than a sentence, because that row is not wide.
 | | |
 | --- | --- |
 | gold star | Put away — the Dresser, the Armoire, or a finished outfit |
-| silver star | Yours, but in a set with gaps or loose in your bags |
+| silver star | In a stored outfit that still has gaps |
+| orange diamond | On you, in no box at all |
 | no entry | Not collected |
 
-Three icons for six states, because the word beside it already says which one. The icon only
-answers whether you have the thing — the same split the panels use, where the marker carries the
-state and the name only says whether you need it. It is off by default: it is the only thing in the plugin that changes
+Four icons for six states, because the word beside it already says which one. The stars are a scale
+of how well collected a piece is; the diamond is deliberately not a third grade of star, because
+gear on your back is not a worse kind of stored — it is a different thing, and one trip to a vendor
+from being gone. It is off by default: it is the only thing in the plugin that changes
 what a game window *contains* rather than sitting beside it, and the only thing that hooks a game
 function. It appends and never replaces, and marks its own line so it cannot double up or overwrite
 another plugin's. If a patch moves what it hooks, the line simply does not appear and Settings says
