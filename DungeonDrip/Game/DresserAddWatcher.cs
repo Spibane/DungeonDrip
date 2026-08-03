@@ -45,6 +45,7 @@ public sealed unsafe class DresserAddWatcher : IDisposable
     private int seenRowRevision = -1;
     private ulong seenInventory;
     private bool open;
+    private bool seenArmoury = true;
 
     public DresserAddWatcher(Plugin plugin)
     {
@@ -90,9 +91,15 @@ public sealed unsafe class DresserAddWatcher : IDisposable
         plugin.Rows.Revalidate();
 
         var inventory = InventoryReader.Fingerprint();
-        if (rows != null && plugin.Rows.Revision == seenRowRevision && inventory == seenInventory)
-            return rows;
+        var armoury = plugin.Configuration.DresserPanelIncludesArmoury;
 
+        if (rows != null && plugin.Rows.Revision == seenRowRevision &&
+            inventory == seenInventory && armoury == seenArmoury)
+        {
+            return rows;
+        }
+
+        seenArmoury = armoury;
         seenRowRevision = plugin.Rows.Revision;
         seenInventory = inventory;
         rows = Build();
@@ -112,8 +119,13 @@ public sealed unsafe class DresserAddWatcher : IDisposable
 
         var built = new List<DresserAddRow>(report.NotStored.Count);
 
+        var armoury = plugin.Configuration.DresserPanelIncludesArmoury;
+
         foreach (var piece in report.NotStored)
         {
+            if (!armoury && piece.Location == CarryLocation.Armoury)
+                continue;
+
             // Through the shared factory, so job filtering and the marker vocabulary match every
             // other panel. Null here means the factory's scope filter excluded it.
             var row = plugin.Rows.Row(piece.ItemId);

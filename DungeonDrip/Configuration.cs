@@ -130,6 +130,9 @@ public class Configuration : IPluginConfiguration
     /// <summary>The panel beside the market board's browse list.</summary>
     public PanelSettings MarketBoardPanel { get; set; } = new();
 
+    /// <summary>List armoury-chest gear on the Glamour Dresser panel.</summary>
+    public bool DresserPanelIncludesArmoury { get; set; } = true;
+
     // The vendor panel's settings used to be five flat properties. They are nullable so that
     // "absent" stays distinguishable from "the user turned this off", and they are cleared once
     // folded in, so a second run is a no-op even if the version number is wrong.

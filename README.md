@@ -132,8 +132,10 @@ window is open you have chosen the piece, so the question was needed one screen 
 row there would be the same piece repeated once per seller.
 
 Results arrive from the server in pages of twenty, so the panel fills in as the category loads.
-Scrolling does not re-read anything, and searching within a category shows the search's results
-rather than both.
+Scrolling does not re-read anything.
+
+**Text searches are not handled properly yet.** Searching inside a category leaves both sets of
+results in what the panel reads, so it lists the category's gear alongside the search's.
 
 This is where a stale snapshot matters most and where it costs the most, since you reach a board by
 travelling to one and zoning is exactly what wipes the dresser data. The amber x means *probably
@@ -151,6 +153,9 @@ for the saddlebag. A row is amber when something has to happen first — taking 
 from the saddlebag. **Settings → Panels → Glamour Dresser** lists the markers. The header says how
 full the box is, because "which of these do I put in" only becomes a question when they will not all
 fit.
+
+A toolbar button drops armoury-chest gear from the list, since that gear usually belongs to a
+gearset rather than being loose.
 
 Rows read **not stored** rather than "you can add this". Some of the dresser's refusals are not
 readable from outside it, so a few pieces the game turns down will still appear.
