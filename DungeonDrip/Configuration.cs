@@ -179,5 +179,15 @@ public class Configuration : IPluginConfiguration
     /// </remarks>
     public bool ShowGameContextMenu { get; set; } = true;
 
+    /// <summary>
+    /// Append a line to the game's own item tooltip saying where the piece is in your collection.
+    /// </summary>
+    /// <remarks>
+    /// Off by default, unlike the right-click menu. This is the one thing that modifies a game
+    /// window's contents rather than adding beside it, and the one thing that hooks a game
+    /// function, so it is opted into rather than out of.
+    /// </remarks>
+    public bool ShowTooltipLine { get; set; }
+
     public void Save() => Plugin.PluginInterface.SavePluginConfig(this);
 }

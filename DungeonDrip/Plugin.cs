@@ -27,6 +27,8 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] internal static IGameGui GameGui { get; private set; } = null!;
     [PluginService] internal static IAddonLifecycle AddonLifecycle { get; private set; } = null!;
     [PluginService] internal static IContextMenu ContextMenu { get; private set; } = null!;
+    [PluginService] internal static ISigScanner SigScanner { get; private set; } = null!;
+    [PluginService] internal static IGameInteropProvider GameInterop { get; private set; } = null!;
     [PluginService] internal static IPluginLog Log { get; private set; } = null!;
 
     private const string CommandName = "/dungeondrip";
@@ -67,6 +69,9 @@ public sealed class Plugin : IDalamudPlugin
     /// <summary>The vendor currently in front of the player, and what it is selling.</summary>
     public ShopWatcher Shop { get; }
 
+    /// <summary>Whether the tooltip hook found its function, for Settings to be honest about it.</summary>
+    public bool TooltipLineAvailable => tooltipLine.Available;
+
     /// <summary>One resolved-row cache, shared by every panel.</summary>
     public GearRowFactory Rows { get; }
 
@@ -81,6 +86,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly JobRoleIndex jobRoles;
     private readonly LootObserver lootObserver;
     private readonly GameContextMenu gameContextMenu;
+    private readonly ItemTooltipLine tooltipLine;
     private readonly HttpFetcher http = new();
 
     private readonly MissingItemsWindow mainWindow;
@@ -126,6 +132,7 @@ public sealed class Plugin : IDalamudPlugin
         Dresser = new DresserAddWatcher(this);
         Market = new MarketBoardWatcher(this);
         gameContextMenu = new GameContextMenu(this);
+        tooltipLine = new ItemTooltipLine(this, SigScanner, GameInterop);
         Wiki = new WikiLootSource(configDirectory, Configuration, http);
 
         // Reads the on-disk copy immediately and starts an update check in the background, so a
@@ -165,6 +172,7 @@ public sealed class Plugin : IDalamudPlugin
         windowSystem.RemoveAllWindows();
         lootObserver.Dispose();
         gameContextMenu.Dispose();
+        tooltipLine.Dispose();
         Shop.Dispose();
         Dresser.Dispose();
         Market.Dispose();
