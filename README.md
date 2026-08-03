@@ -7,7 +7,7 @@
 [![Version](https://img.shields.io/badge/version-0.13.0-121212)](./CHANGELOG.md)
 [![Status](https://img.shields.io/badge/status-Beta-yellow)](./CHANGELOG.md)
 [![Changelog](https://img.shields.io/badge/changelog-blue)](./CHANGELOG.md)
-[![License](https://img.shields.io/badge/license-AGPL--3.0-663366)](./LICENSE)
+[![License](https://img.shields.io/badge/license-AGPL--3.0--or--later-663366)](./LICENSE)
 [![AI](https://img.shields.io/badge/AI--DECLARATION-pair-ffedd5)](./AI-DECLARATION.md)
 
 [![C#](https://img.shields.io/badge/C%23-14-239120?logo=csharp&logoColor=white)](https://learn.microsoft.com/dotnet/csharp/)
@@ -507,7 +507,7 @@ game install is needed, and uploads the packaged plugin.
 
 ## Licence
 
-[GNU AGPL v3.0](./LICENSE).
+[GNU AGPL v3.0 or later](./LICENSE).
 
 ## AI use
 
