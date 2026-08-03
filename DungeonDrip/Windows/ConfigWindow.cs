@@ -291,19 +291,19 @@ public class ConfigWindow : Window
         ImGui.Spacing();
         ImGui.TextColored(Palette.Muted, "Vendor panel");
 
-        var vendorPanel = configuration.ShowVendorPanel;
+        var vendorPanel = configuration.VendorPanel.Enabled;
         if (UiParts.Toggle("Show a panel beside vendor windows", ref vendorPanel,
                 "Lists the glamour gear the vendor is currently showing, marked by where you already\n" +
                 "have each piece. Items that cannot be kept as a glamour are left out entirely.\n" +
                 "Run \"/dungeondrip shop\" at a vendor it does not recognise to identify it."))
         {
-            configuration.ShowVendorPanel = vendorPanel;
+            configuration.VendorPanel.Enabled = vendorPanel;
             changed = true;
         }
 
         if (vendorPanel)
         {
-            var vendorSide = configuration.VendorPanelSide;
+            var vendorSide = configuration.VendorPanel.Side;
             ImGui.SetNextItemWidth(200 * ImGuiHelpers.GlobalScale);
             if (ImGui.BeginCombo("Side##vendor", vendorSide.ToString()))
             {
@@ -311,7 +311,7 @@ public class ConfigWindow : Window
                 {
                     if (ImGui.Selectable($"{option}##vendor", vendorSide == option))
                     {
-                        configuration.VendorPanelSide = option;
+                        configuration.VendorPanel.Side = option;
                         changed = true;
                     }
                 }
@@ -319,10 +319,10 @@ public class ConfigWindow : Window
                 ImGui.EndCombo();
             }
 
-            var vendorGrouped = configuration.VendorGroupBySlot;
+            var vendorGrouped = configuration.VendorPanel.GroupBySlot;
             if (UiParts.Toggle("Group by equipment slot##vendor", ref vendorGrouped))
             {
-                configuration.VendorGroupBySlot = vendorGrouped;
+                configuration.VendorPanel.GroupBySlot = vendorGrouped;
                 changed = true;
             }
 

@@ -100,6 +100,10 @@ public sealed class Plugin : IDalamudPlugin
 
         Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
 
+        // Before anything reads a panel's settings, so nothing sees the pre-fold defaults.
+        if (Configuration.MigrateIfNeeded())
+            Configuration.Save();
+
         var configDirectory = PluginInterface.GetPluginConfigDirectory();
 
         Outfits = OutfitCatalog.Build();
