@@ -390,6 +390,14 @@ public class ConfigWindow : Window
                 configuration.DresserPanelIncludesArmoury = armoury;
                 changed = true;
             }
+
+            var equipped = configuration.DresserPanelIncludesEquipped;
+            if (UiParts.Toggle("Include gear you are wearing##dresser", ref equipped,
+                    "Has to come off before it can be stored."))
+            {
+                configuration.DresserPanelIncludesEquipped = equipped;
+                changed = true;
+            }
         }
 
         ImGui.Spacing();

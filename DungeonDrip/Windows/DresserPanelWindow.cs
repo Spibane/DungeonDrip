@@ -35,22 +35,38 @@ public sealed class DresserPanelWindow(Plugin plugin)
 
     protected override bool DrawExtraToolbarButtons()
     {
-        var armoury = Plugin.Configuration.DresserPanelIncludesArmoury;
+        var configuration = Plugin.Configuration;
+        var changed = false;
 
         ImGui.SameLine();
 
-        if (!UiParts.ToolButton(
+        var armoury = configuration.DresserPanelIncludesArmoury;
+        if (UiParts.ToolButton(
                 "##dresserArmoury",
                 armoury ? FontAwesomeIcon.Archive : FontAwesomeIcon.BoxOpen,
                 armoury
-                    ? "Listing armoury chest gear. Click to list only bags and saddlebag."
-                    : "Skipping armoury chest gear. Click to list it."))
+                    ? "Listing armoury chest gear. Click to hide it."
+                    : "Hiding armoury chest gear. Click to list it."))
         {
-            return false;
+            configuration.DresserPanelIncludesArmoury = !armoury;
+            changed = true;
         }
 
-        Plugin.Configuration.DresserPanelIncludesArmoury = !armoury;
-        return true;
+        ImGui.SameLine();
+
+        var equipped = configuration.DresserPanelIncludesEquipped;
+        if (UiParts.ToolButton(
+                "##dresserEquipped",
+                equipped ? FontAwesomeIcon.Tshirt : FontAwesomeIcon.UserSlash,
+                equipped
+                    ? "Listing gear you are wearing. Click to hide it."
+                    : "Hiding gear you are wearing. Click to list it."))
+        {
+            configuration.DresserPanelIncludesEquipped = !equipped;
+            changed = true;
+        }
+
+        return changed;
     }
 
     /// <summary>
