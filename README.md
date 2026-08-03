@@ -507,7 +507,7 @@ game install is needed, and uploads the packaged plugin.
 
 ## Licence
 
-[GNU AGPL v3.0 or later](./LICENSE).
+[GNU AGPL v3.0](./LICENSE).
 
 ## AI use
 
