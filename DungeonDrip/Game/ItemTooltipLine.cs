@@ -1,6 +1,8 @@
 using System;
 using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Game.Text.SeStringHandling.Payloads;
+using Dalamud.Game.Addon.Lifecycle;
+using Dalamud.Game.Addon.Lifecycle.AddonArgTypes;
 using Dalamud.Hooking;
 using Dalamud.Plugin.Services;
 using Dalamud.Memory;
@@ -19,11 +21,16 @@ namespace DungeonDrip.Game;
 /// careful.
 ///
 /// <para><b>Why a hook rather than an addon event.</b> Dalamud's RequestedUpdate events fire at a
-/// point where the tooltip's description field still holds the previous item's text whenever the
-/// current item has none of its own - which is true of most gear. Measured before and after that
-/// event and it is stale in both. The game's own tooltip generator is the moment the fields are
-/// correct, so that is where this has to sit. The technique, the signature and the field index are
-/// all taken from Simple Tweaks (Caraxi, AGPL-3.0), which has been doing this for years.</para>
+/// point where the tooltip's fields are not yet what the game will draw. Its own tooltip generator
+/// is that moment, so that is where this sits. The technique, the signature, the field indices and
+/// the multi-line flag all come from Simple Tweaks (Caraxi, AGPL-3.0), which has been doing this
+/// for years - the useful parts were learned by reading it after guessing wrong twice.</para>
+///
+/// <para><b>Why the category line rather than the description.</b> The description was the obvious
+/// home and it does not work: the game only writes that field when the item has a description of
+/// its own, and only draws it when it decided there was one. A line written there for a piece of
+/// plain gear is accepted, kept, and never shown. The category line is written for every item and
+/// always drawn.</para>
 ///
 /// <para>The signature will eventually break on a patch. When it does the hook simply fails to
 /// install, the feature is absent, and everything else carries on - which is the right failure for
@@ -37,8 +44,19 @@ public sealed unsafe class ItemTooltipLine : IDisposable
     private const string Signature =
         "48 89 5C 24 ?? 55 56 57 41 54 41 55 41 56 41 57 48 83 EC ?? 48 8B 42 ?? 4C 8B EA";
 
-    /// <summary>The description field of the tooltip's string array.</summary>
-    private const int ItemDescription = 13;
+    /// <summary>
+    /// The tooltip's category line - "Body", "Hands", "Miscellany".
+    /// </summary>
+    /// <remarks>
+    /// Not the description field, which was the obvious choice and does not work. The game only
+    /// writes that one when the item has a description of its own, and only draws it when it
+    /// decided there was one - so on the majority of gear a line written there is accepted,
+    /// retained, and never shown. The category line is written for every item and always drawn.
+    /// </remarks>
+    private const int ItemUiCategory = 2;
+
+    /// <summary>The category's text node, which has to be told it may wrap.</summary>
+    private const uint CategoryNodeId = 35;
 
     /// <summary>Ours, so the line can recognise itself and never double up.</summary>
     private const uint MarkerCommandId = 0x44445F31;
@@ -85,6 +103,7 @@ public sealed unsafe class ItemTooltipLine : IDisposable
     {
         this.plugin = plugin;
         marker = Plugin.ChatGui.AddChatLinkHandler(MarkerCommandId, (_, _) => { });
+        Plugin.AddonLifecycle.RegisterListener(AddonEvent.PostRefresh, "ItemDetail", OnRefresh);
 
         try
         {
@@ -102,6 +121,7 @@ public sealed unsafe class ItemTooltipLine : IDisposable
 
     public void Dispose()
     {
+        Plugin.AddonLifecycle.UnregisterListener(AddonEvent.PostRefresh, "ItemDetail", OnRefresh);
         hook?.Disable();
         hook?.Dispose();
         Plugin.ChatGui.RemoveChatLinkHandler(MarkerCommandId);
@@ -140,7 +160,7 @@ public sealed unsafe class ItemTooltipLine : IDisposable
 
     private void Append(StringArrayData* strings)
     {
-        if (strings == null || strings->StringArray == null || strings->Size <= ItemDescription)
+        if (strings == null || strings->StringArray == null || strings->Size <= ItemUiCategory)
         {
             Trace(uint.MaxValue, $"array unusable (size {(strings == null ? -1 : strings->Size)})");
             return;
@@ -188,12 +208,12 @@ public sealed unsafe class ItemTooltipLine : IDisposable
             return;
         }
 
-        var raw = strings->StringArray[ItemDescription];
+        var raw = strings->StringArray[ItemUiCategory];
         var present = raw.Value == null
             ? new SeString()
             : MemoryHelper.ReadSeStringNullTerminated((nint)raw.Value);
 
-        var existing = Rebase(present, itemId);
+        var existing = Rebase(present);
 
         var stale = plugin.Ownership.IsDresserStale;
         var colour = marker0 switch
@@ -213,37 +233,32 @@ public sealed unsafe class ItemTooltipLine : IDisposable
         foreach (var payload in existing.Payloads)
             built.Add(payload);
 
+        // Attributed, because an unexplained line in a game tooltip is the kind of thing that gets
+        // reported to Square Enix. Short, because this shares a line with the item's category.
         built.Add(marker)
             .Add(RawPayload.LinkTerminator)
-            .AddText("\n")
+            .AddText("   ")
             .AddUiForeground(colour)
-            .AddText($"Dungeon Drip - {note}")
+            .AddText($"Drip: {note}")
             .AddUiForegroundOff();
 
         var bytes = built.Build().EncodeWithNullTerminator();
-        strings->SetValue(ItemDescription, bytes, false);
+        strings->SetValue(ItemUiCategory, bytes, false);
 
         Trace(itemId, $"WROTE {bytes.Length} bytes ({note}); base was {existing.TextValue.Length} chars");
     }
 
     /// <summary>
-    /// What the description field ought to contain before this adds anything to it.
+    /// The line as the game wrote it, with anything we added last time removed.
     /// </summary>
     /// <remarks>
-    /// The field cannot be trusted on its own. The game only writes it when the item actually has a
-    /// description, and most gear has none, so it keeps whatever was there for the last item that
-    /// did - which after one pass through here includes our own line. Reading it naively meant the
-    /// first piece got a line and every piece after it was skipped for looking already done.
-    ///
-    /// So the sheet decides. Anything from our marker onwards is ours and is dropped, and what is
-    /// left is only kept if it is actually this item's description; otherwise it belongs to some
-    /// earlier item and goes. That also makes repeated calls idempotent by construction, which is
-    /// what the marker was there for in the first place.
-    ///
-    /// A line another plugin added survives this, because it lands after the real description and
-    /// before our marker.
+    /// Truncating at our own marker rather than checking for its presence and giving up. That check
+    /// was the first attempt and it deadlocked the feature: it was reading a field that goes stale,
+    /// so after one write every later item looked already done. Rebuilding from the game's own text
+    /// each time is idempotent whether the field is fresh or not, which is the property actually
+    /// wanted. A line another plugin added survives, since it lands before our marker.
     /// </remarks>
-    private SeString Rebase(SeString present, uint itemId)
+    private SeString Rebase(SeString present)
     {
         var kept = new SeString();
 
@@ -259,14 +274,25 @@ public sealed unsafe class ItemTooltipLine : IDisposable
             kept.Payloads.Add(payload);
         }
 
-        var expected = Plugin.DataManager.GetExcelSheet<Lumina.Excel.Sheets.Item>()
-            .TryGetRow(itemId, out var row) ? row.Description.ExtractText() : string.Empty;
-
-        // Held over from a previous item. The sheet says this piece has nothing of its own, or has
-        // something the field does not contain.
-        if (expected.Length == 0 || !kept.TextValue.Contains(expected, StringComparison.Ordinal))
-            return expected.Length == 0 ? new SeString() : new SeString().Append(expected);
-
         return kept;
+    }
+
+    /// <summary>
+    /// Lets the category line wrap, since it was built for one short word.
+    /// </summary>
+    /// <remarks>
+    /// Without this a status longer than the node is simply clipped. Setting the flag is a change
+    /// to the node rather than to its text, and it is the one thing here that is not just a string
+    /// write - so it is done only while the feature is switched on.
+    /// </remarks>
+    private void OnRefresh(AddonEvent type, AddonArgs args)
+    {
+        if (!plugin.Configuration.ShowTooltipLine)
+            return;
+
+        var unit = (AtkUnitBase*)args.Addon.Address;
+        var node = unit == null ? null : unit->GetTextNodeById(CategoryNodeId);
+        if (node != null)
+            node->TextFlags |= TextFlags.MultiLine;
     }
 }
