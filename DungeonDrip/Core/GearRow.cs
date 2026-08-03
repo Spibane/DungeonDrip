@@ -19,7 +19,6 @@ public record GearRow(
     uint ItemId,
     string Name,
     ushort IconId,
-    ushort ItemLevel,
     int SlotOrder,
     string SlotName,
     CollectionMarker Marker,

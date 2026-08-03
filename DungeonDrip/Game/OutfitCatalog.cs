@@ -5,17 +5,6 @@ using Lumina.Excel.Sheets;
 
 namespace DungeonDrip.Game;
 
-/// <summary>How far along one outfit set is, as stored in the Glamour Dresser.</summary>
-/// <param name="Filled">Slots of the set that are stored with a piece in them.</param>
-/// <param name="Total">Slots the set has at all, per the sheet.</param>
-/// <param name="Missing">The pieces behind the empty slots.</param>
-/// <param name="StoredAsSet">
-/// Whether the set is in the box at all. A set can be held with every slot empty, which is
-/// different news from not having it.
-/// </param>
-public sealed record SetProgress(
-    uint SetId, int Filled, int Total, IReadOnlyList<uint> Missing, bool StoredAsSet);
-
 /// <summary>
 /// Static view of the game's outfit sets: which pieces each set is made of, and which sets a given
 /// piece belongs to.
@@ -123,37 +112,28 @@ public sealed class OutfitCatalog
     }
 
     /// <summary>
-    /// How much of an outfit set is sitting filled in the dresser, and what is missing from it.
+    /// Whether every slot of a stored set is filled.
     /// </summary>
     /// <remarks>
-    /// This is "complete as stored", which is a narrower question than "do you own these pieces" -
-    /// a piece can be in your Armoire, or in a different set, and still leave this slot empty. The
-    /// broader reading belongs with the ownership decision rather than here, because it has to obey
-    /// the user's storage scope and outfit mode and this class knows about neither.
+    /// "Complete as stored" is narrower than "do you own these pieces" - a piece can be in your
+    /// Armoire, or in a different set, and still leave this slot empty. The broader reading obeys
+    /// the storage scope and outfit mode, so it lives with the ownership decision rather than here.
     /// </remarks>
-    public SetProgress ProgressInDresser(uint setId, OwnershipView view)
+    private bool IsComplete(uint setId, OwnershipView view)
     {
         var pieces = PiecesOf(setId);
-        var missing = new List<uint>();
+        if (pieces.Count == 0)
+            return false;
 
         foreach (var piece in pieces)
         {
             // The reader only records a piece against a set when the slot is unlocked, so
             // membership here answers "is this slot filled".
             if (!view.DresserOutfits.TryGetValue(piece, out var owners) || !owners.Contains(setId))
-                missing.Add(piece);
+                return false;
         }
 
-        return new SetProgress(
-            setId, pieces.Count - missing.Count, pieces.Count, missing, view.StoredOutfits.Contains(setId));
-    }
-
-    // One definition of "complete as stored", so the per-piece green star and anything counting
-    // sets cannot disagree about what finished means.
-    private bool IsComplete(uint setId, OwnershipView view)
-    {
-        var progress = ProgressInDresser(setId, view);
-        return progress.Total > 0 && progress.Filled == progress.Total;
+        return true;
     }
 
     private static readonly HashSet<uint> EmptySet = [];

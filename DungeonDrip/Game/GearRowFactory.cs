@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using Dalamud.Utility;
 using DungeonDrip.Core;
 using Lumina.Excel.Sheets;
 
@@ -82,7 +81,6 @@ public sealed class GearRowFactory(Plugin plugin)
             itemId,
             item.Name.ExtractText(),
             (ushort)item.Icon,
-            (ushort)item.LevelItem.RowId,
             slotOrder,
             slotName,
             CollectionMarkers.For(source, plugin.Ownership.HasDresserData, completed),

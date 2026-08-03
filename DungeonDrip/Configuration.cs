@@ -154,8 +154,11 @@ public class Configuration : IPluginConfiguration
         if (ShowVendorPanel == null && VendorPanelSide == null && VendorPanelWidth == null &&
             VendorPanelHeight == null && VendorGroupBySlot == null)
         {
+            // Bumping the version counts as something to save, or the check runs again every
+            // launch for the life of the config.
+            var stamp = Version < 2;
             Version = 2;
-            return false;
+            return stamp;
         }
 
         VendorPanel.Enabled = ShowVendorPanel ?? VendorPanel.Enabled;

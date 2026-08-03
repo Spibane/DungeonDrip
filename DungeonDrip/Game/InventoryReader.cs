@@ -13,17 +13,13 @@ namespace DungeonDrip.Game;
 public readonly record struct CarriedStack(
     uint ItemId,
     InventoryType Container,
-    short Slot,
-    int Quantity,
-    bool HighQuality)
+    int Quantity)
 {
     public bool IsEquipped => InventoryReader.IsEquipped(Container);
 
     public bool IsArmoury => InventoryReader.IsArmoury(Container);
 
     public bool IsSaddlebag => InventoryReader.IsSaddlebag(Container);
-
-    public bool IsBag => InventoryReader.IsBag(Container);
 }
 
 public static unsafe class InventoryReader
@@ -119,8 +115,7 @@ public static unsafe class InventoryReader
                 if (kind == ItemKind.EventItem)
                     continue;
 
-                stacks.Add(new CarriedStack(
-                    itemId, type, (short)slot, item->Quantity, kind == ItemKind.Hq));
+                stacks.Add(new CarriedStack(itemId, type, item->Quantity));
             }
         }
 
@@ -198,8 +193,4 @@ public static unsafe class InventoryReader
         is InventoryType.SaddleBag1 or InventoryType.SaddleBag2
         or InventoryType.PremiumSaddleBag1 or InventoryType.PremiumSaddleBag2;
 
-    /// <summary>Loose in your bags, which is the only place anything can be acted on directly.</summary>
-    public static bool IsBag(InventoryType type) => type
-        is InventoryType.Inventory1 or InventoryType.Inventory2
-        or InventoryType.Inventory3 or InventoryType.Inventory4;
 }
