@@ -143,6 +143,24 @@ public static unsafe class InventoryReader
         return stacks;
     }
 
+    /// <summary>
+    /// Whether the saddlebag can be read from where you are standing.
+    /// </summary>
+    /// <remarks>
+    /// The client only loads it near a summoning bell, so away from one it reads as empty. Anything
+    /// listing what you are carrying has to be able to say "not readable here" rather than letting
+    /// an unloaded container pass for an empty one.
+    /// </remarks>
+    public static bool SaddlebagLoaded()
+    {
+        var manager = InventoryManager.Instance();
+        if (manager == null)
+            return false;
+
+        var container = manager->GetInventoryContainer(InventoryType.SaddleBag1);
+        return container != null && container->IsLoaded;
+    }
+
     /// <summary>Worn right now. Never a candidate for advice about getting rid of something.</summary>
     public static bool IsEquipped(InventoryType type) => type == InventoryType.EquippedItems;
 
