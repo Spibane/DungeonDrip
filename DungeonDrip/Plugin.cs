@@ -175,6 +175,16 @@ public sealed class Plugin : IDalamudPlugin
         InvalidateReport();
     }
 
+    /// <summary>Pins a duty and brings the window up on it, for anything acted on from elsewhere.</summary>
+    public void ShowDuty(uint territoryId)
+    {
+        PinTerritory(territoryId);
+        mainWindow.IsOpen = true;
+    }
+
+    /// <summary>Opens the duty picker with a search already typed into it.</summary>
+    public void ShowDutyPicker(string filter) => mainWindow.OpenPicker(filter);
+
     public void InvalidateReport() => reportDirty = true;
 
     public void ToggleConfigUi() => configWindow.Toggle();
