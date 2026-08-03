@@ -318,6 +318,13 @@ public class ConfigWindow : Window
             null);
 
         changed |= DrawPanelSection(
+            "Market board", "market", configuration.MarketBoardPanel,
+            "Lists the gear the board's browse list is currently showing, marked by where you\n" +
+            "already have each piece. The listings for one item get no panel - by then you have\n" +
+            "chosen it, and every row would be the same piece.",
+            null);
+
+        changed |= DrawPanelSection(
             "Glamour Dresser", "dresser", configuration.DresserPanel,
             "Lists what you are carrying that is not in the dresser or Armoire yet.",
             "This is the one panel whose list means the opposite of the others: it is what you have\n" +

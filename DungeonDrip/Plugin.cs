@@ -73,6 +73,9 @@ public sealed class Plugin : IDalamudPlugin
     /// <summary>What you are carrying that the Glamour Dresser has not got.</summary>
     public DresserAddWatcher Dresser { get; }
 
+    /// <summary>The gear the market board is currently browsing.</summary>
+    public MarketBoardWatcher Market { get; }
+
     private readonly WindowSystem windowSystem = new("DungeonDrip");
     private readonly ContentFinderIndex contentFinder;
     private readonly JobRoleIndex jobRoles;
@@ -121,6 +124,7 @@ public sealed class Plugin : IDalamudPlugin
         Rows = new GearRowFactory(this);
         Shop = new ShopWatcher(this);
         Dresser = new DresserAddWatcher(this);
+        Market = new MarketBoardWatcher(this);
         gameContextMenu = new GameContextMenu(this);
         Wiki = new WikiLootSource(configDirectory, Configuration, http);
 
@@ -137,6 +141,7 @@ public sealed class Plugin : IDalamudPlugin
         windowSystem.AddWindow(new LootCompanionWindow(this) { IsOpen = true });
         windowSystem.AddWindow(new VendorPanelWindow(this) { IsOpen = true });
         windowSystem.AddWindow(new DresserPanelWindow(this) { IsOpen = true });
+        windowSystem.AddWindow(new MarketBoardPanelWindow(this) { IsOpen = true });
 
         currentTerritory = ClientState.TerritoryType;
 
@@ -162,6 +167,7 @@ public sealed class Plugin : IDalamudPlugin
         gameContextMenu.Dispose();
         Shop.Dispose();
         Dresser.Dispose();
+        Market.Dispose();
         LootData.Dispose();
         Wiki.Dispose();
         http.Dispose();

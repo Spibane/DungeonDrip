@@ -1,6 +1,8 @@
 # Changelog
 
 ### Unreleased
+- **Added a panel beside the market board**, marking which of the gear in the browse list you already have. Only the browse list gets one: by the time the listings for a single item are open you have chosen the piece, and every row there would be the same piece once per seller. Results arrive in pages of twenty so the panel fills in as a category loads, and scrolling re-reads nothing
+- The board is where a stale dresser snapshot matters most, since you get there by travelling and zoning is what wipes the data. The amber x carries its usual meaning and the tooltip says to check before spending
 - **Added a panel beside the Glamour Dresser** listing what you are carrying that is not stored yet - the mirror of the vendor panel, and the one surface where the answer is something you can act on where you stand. The marker column shows where the piece is rather than whether you own it, since by construction you do not, and a row goes amber when something has to happen first: taking it off, fetching it from the saddlebag, or spiritbonding a tradeable piece. The header says how full the box is, because which of these to put in is only a question when they will not all fit
 - Rows there read "not stored" rather than "you can add this", because some of the dresser's refusals cannot be read from outside it. The panel also waits for the box's contents rather than its window, since a list built against an unloaded dresser would claim everything you own is unstored
 - Settings' Vendors tab becomes Panels, with a section per panel drawn by one shared routine and the marker legend shown once
