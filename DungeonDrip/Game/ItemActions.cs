@@ -69,9 +69,16 @@ public static class ItemActions
                 actions.Add(new ItemAction($"Try on outfit: {setName}", () => plugin.TryOn.QueueOutfit(setId)));
         }
 
-        var drops = DropSubmenu(plugin, itemId);
-        if (drops != null)
-            actions.Add(drops with { StartsGroup = actions.Count > 0 });
+        // Only on the game's menus. Inside the plugin's own windows the answer is already on
+        // screen: the duty list is a duty, the loot companion is the roll you are in, the vendor
+        // panel is stock rather than drops, and the collection view prints the source under each
+        // missing piece.
+        if (surface == ItemActionSurface.GameMenu)
+        {
+            var drops = DropSubmenu(plugin, itemId);
+            if (drops != null)
+                actions.Add(drops with { StartsGroup = actions.Count > 0 });
+        }
 
         // Both of these the game offers already on its own menus. Divided off from the entries
         // above, which are the only ones that act on the game rather than on a window.
@@ -140,16 +147,6 @@ public static class ItemActions
             }
         }
 
-        // Shown on every answer, including the ones that look complete, so a short list is never
-        // mistaken for the whole story.
-        entries.Add(new ItemAction(Coverage(plugin), StartsGroup: true));
-
         return new ItemAction("Where does this drop?", Submenu: entries);
-    }
-
-    private static string Coverage(Plugin plugin)
-    {
-        var total = plugin.Duties?.Entries.Count ?? 0;
-        return $"Dungeons and alliance raids. Wiki read for {plugin.Wiki.DutiesWithData} of {total}.";
     }
 }

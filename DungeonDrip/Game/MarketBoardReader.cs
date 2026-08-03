@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using Dalamud.Utility;
-using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 using FFXIVClientStructs.FFXIV.Client.UI.Info;
 
 namespace DungeonDrip.Game;
@@ -14,10 +13,11 @@ namespace DungeonDrip.Game;
 /// search agent, and the agent is both easier to read and stable while you scroll - the values
 /// block holds category icons and nothing about what is listed.
 ///
-/// <para><b>The id array does not shrink.</b> Switching from a category with a hundred results to
-/// one with twenty leaves the previous eighty ids sitting past the end, and reading the whole array
-/// would put body armour on the panel at a dye vendor. The live count comes from the catalogue
-/// proxy instead, and everything past it is stale by definition.</para>
+/// <para>Read from the catalogue proxy's own entries rather than the agent's page of ids. The
+/// agent's array is a cache the game writes over and does not shrink, so it keeps whatever the last
+/// category left behind - and searching within a category leaves both sets of results in it at
+/// once, which put the category's gear on the panel beside the search's. The proxy holds the result
+/// set the board is actually showing.</para>
 /// </remarks>
 public static unsafe class MarketBoardReader
 {
@@ -27,22 +27,16 @@ public static unsafe class MarketBoardReader
     {
         destination.Clear();
 
-        var agent = AgentItemSearch.Instance();
-        if (agent == null)
-            return false;
-
         var proxy = InfoProxyCatalogSearch.Instance();
         if (proxy == null)
             return false;
 
-        var ids = agent->ListingPageItemIds;
-
-        // Everything past the live count belongs to whatever category was open before.
-        var count = Math.Clamp((int)proxy->EntryCount, 0, ids.Length);
+        var entries = proxy->Entries;
+        var count = Math.Clamp((int)proxy->EntryCount, 0, entries.Length);
 
         for (var i = 0; i < count; i++)
         {
-            var rawId = ids[i];
+            var rawId = entries[i].ItemId;
             if (rawId == 0)
                 continue;
 

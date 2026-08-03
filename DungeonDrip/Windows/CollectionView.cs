@@ -279,22 +279,51 @@ public sealed class CollectionView(Plugin plugin)
             return;
         }
 
-        if (report.DuplicateInArmoire.Count > 0)
-        {
-            ImGui.Spacing();
-            ImGui.TextColored(Palette.Focus,
-                $"{report.DuplicateInArmoire.Count} pieces are in your Armoire as well as the dresser.");
-            ImGui.TextColored(Palette.Muted,
-                "   The dresser copy is doing nothing the Armoire is not already doing.");
-        }
+        DrawResidents(
+            report.DuplicateInArmoire,
+            "In your Armoire as well as the dresser",
+            "The dresser copy is doing nothing the Armoire is not already doing.",
+            Palette.Focus);
 
-        if (report.ArmoireWouldTake.Count == 0)
+        DrawResidents(
+            report.ArmoireWouldTake,
+            "The Armoire would take these, at no dresser slot",
+            "Each has to be taken out of the dresser and deposited, so this one is work.",
+            Palette.Muted);
+    }
+
+    /// <summary>
+    /// Names the pieces rather than only counting them.
+    /// </summary>
+    /// <remarks>
+    /// "3 pieces are duplicated" is not something anybody can act on without being told which
+    /// three. Collapsed by default because these lists get long on a full dresser, and the count
+    /// on the heading is the part worth seeing at a glance.
+    /// </remarks>
+    private void DrawResidents(
+        IReadOnlyList<DresserResident> residents, string heading, string note, Vector4 colour)
+    {
+        if (residents.Count == 0)
             return;
 
         ImGui.Spacing();
-        ImGui.TextColored(Palette.Muted,
-            $"{report.ArmoireWouldTake.Count} more would be accepted by the Armoire, which costs no " +
-            "dresser slot - though each has to be taken out and deposited.");
+
+        if (!ImGui.TreeNodeEx($"{heading} ({residents.Count})###{heading}"))
+        {
+            ImGui.TextColored(Palette.Muted, $"   {note}");
+            return;
+        }
+
+        ImGui.TextColored(Palette.Muted, note);
+
+        foreach (var resident in residents)
+        {
+            UiParts.ItemIcon(resident.IconId, 18);
+            ImGui.TextColored(colour, resident.Name);
+            UiParts.ItemContextMenu(plugin, resident.ItemId, resident.Name);
+        }
+
+        ImGui.TreePop();
     }
 
     /// <summary>
@@ -320,9 +349,12 @@ public sealed class CollectionView(Plugin plugin)
 
         var stale = plugin.Ownership.IsDresserStale;
 
+        ImGui.TextColored(Palette.Muted,
+            "Read from your bags, armoury chest and saddlebag.");
+
         if (carried.AlreadyStored.Count == 0 && carried.OnlyInsideAnOutfit.Count == 0)
         {
-            ImGui.TextColored(Palette.Good, "Nothing you are carrying is already stored.");
+            ImGui.TextColored(Palette.Good, "Nothing there is already stored.");
             DrawCaveats(stale);
             return;
         }
@@ -400,8 +432,7 @@ public sealed class CollectionView(Plugin plugin)
                 $"Read from a dresser snapshot {Format.Age(plugin.Ownership.DresserUpdatedUtc!.Value)} old.");
         }
 
-        ImGui.TextColored(Palette.Muted,
-            "Dungeon Drip never deletes anything, and cannot see your retainers.");
+        ImGui.TextColored(Palette.Muted, "Retainers cannot be read, so they are not counted.");
 
         if (!carried!.SaddlebagReadable)
         {

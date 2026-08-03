@@ -15,20 +15,8 @@ public readonly record struct CarriedStack(
     InventoryType Container,
     short Slot,
     int Quantity,
-    bool HighQuality,
-    ushort Spiritbond)
+    bool HighQuality)
 {
-    /// <summary>
-    /// Whether the Glamour Dresser would take this at all, as far as can be told from here.
-    /// </summary>
-    /// <remarks>
-    /// The box refuses a tradeable piece until it is fully spiritbonded, which is the one refusal
-    /// reason that is legible from the stack itself. Untradeable gear is exempt, and whether a piece
-    /// is tradeable lives on the sheet rather than here - so this is a necessary condition, not a
-    /// sufficient one, and callers must word themselves accordingly.
-    /// </remarks>
-    public bool FullySpiritbonded => Spiritbond >= 10000;
-
     public bool IsEquipped => InventoryReader.IsEquipped(Container);
 
     public bool IsArmoury => InventoryReader.IsArmoury(Container);
@@ -131,12 +119,8 @@ public static unsafe class InventoryReader
                 if (kind == ItemKind.EventItem)
                     continue;
 
-                // The client packs spiritbond and collectability into one field. Collectables are
-                // not glamour gear and get filtered long before anything reads this, so on the
-                // stacks that survive it is always the spiritbond.
                 stacks.Add(new CarriedStack(
-                    itemId, type, (short)slot, item->Quantity, kind == ItemKind.Hq,
-                    item->SpiritbondOrCollectability));
+                    itemId, type, (short)slot, item->Quantity, kind == ItemKind.Hq));
             }
         }
 

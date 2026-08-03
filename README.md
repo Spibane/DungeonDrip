@@ -132,7 +132,8 @@ window is open you have chosen the piece, so the question was needed one screen 
 row there would be the same piece repeated once per seller.
 
 Results arrive from the server in pages of twenty, so the panel fills in as the category loads.
-Scrolling does not re-read anything.
+Scrolling does not re-read anything, and searching within a category shows the search's results
+rather than both.
 
 This is where a stale snapshot matters most and where it costs the most, since you reach a board by
 travelling to one and zoning is exactly what wipes the dresser data. The amber x means *probably
@@ -145,10 +146,11 @@ yet — the mirror of every other panel, which ask whether you need what the gam
 This is the one surface where the answer is something you can act on without going anywhere.
 
 The marker column shows where the piece is rather than whether you own it, since by construction you
-do not: bags, armoury chest, worn, or saddlebag. A row is amber when something has to happen first —
-taking it off, fetching it from the saddlebag, or spiritbonding a tradeable piece the box would
-refuse. The header says how full the box is, because "which of these do I put in" only becomes a
-question when they will not all fit.
+do not: a case for your bags, a box for the armoury chest, a figure for something worn and a horse
+for the saddlebag. A row is amber when something has to happen first — taking it off, or fetching it
+from the saddlebag. **Settings → Panels → Glamour Dresser** lists the markers. The header says how
+full the box is, because "which of these do I put in" only becomes a question when they will not all
+fit.
 
 Rows read **not stored** rather than "you can add this". Some of the dresser's refusals are not
 readable from outside it, so a few pieces the game turns down will still appear.
@@ -205,7 +207,9 @@ listed. The plugin deletes nothing and cannot see retainers, and the section say
 ## In the game's menus
 
 Right-click gear anywhere the game offers a menu — inventory, armoury, inspect, a chat link, the
-dresser, a vendor, the market board — and the plugin's options are there:
+dresser, a vendor, the market board — and the plugin's options are there. This is the only place
+**Where does this drop?** appears: inside the plugin's own windows you can already see where you
+are, so it would only be restating the obvious.
 
 | Option | |
 | --- | --- |
