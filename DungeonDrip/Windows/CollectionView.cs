@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Utility;
@@ -32,6 +34,7 @@ public sealed class CollectionView(Plugin plugin)
     private Inputs seenInputs;
 
     private DresserPressureReport? pressure;
+    private CarriedGearReport? carried;
 
     public void Draw()
     {
@@ -65,6 +68,9 @@ public sealed class CollectionView(Plugin plugin)
         var ownership = plugin.Ownership.Current;
         pressure = DresserPressure.Build(
             ownership, plugin.Outfits, plugin.Storage, plugin.Ownership.ArmoireUpdatedUtc != null);
+
+        carried = CarriedGear.Build(
+            Game.InventoryReader.ReadDetailed(), ownership, plugin.Outfits, plugin.Storage);
     }
 
     private Inputs Capture()
@@ -193,8 +199,127 @@ public sealed class CollectionView(Plugin plugin)
             "dresser slot - though each has to be taken out and deposited.");
     }
 
-    private void DrawAlreadyStored() =>
-        ImGui.TextColored(Palette.Muted, "Nothing yet.");
+    /// <summary>
+    /// Gear you are carrying that the collection already holds.
+    /// </summary>
+    /// <remarks>
+    /// The heading is "already in your collection" rather than "safe to discard", and that is the
+    /// whole design of the section. It reports a fact the plugin can stand behind - this piece is
+    /// also in a box - and leaves the conclusion to the reader, because the conclusion is
+    /// irreversible and is being drawn from a snapshot that may be days old.
+    /// </remarks>
+    private void DrawAlreadyStored()
+    {
+        if (!plugin.Ownership.HasDresserData)
+        {
+            ImGui.TextColored(Palette.Muted,
+                "No Glamour Dresser data yet - open a dresser once so this can be answered.");
+            return;
+        }
+
+        if (carried == null)
+            return;
+
+        var stale = plugin.Ownership.IsDresserStale;
+
+        if (carried.AlreadyStored.Count == 0 && carried.OnlyInsideAnOutfit.Count == 0)
+        {
+            ImGui.TextColored(Palette.Good, "Nothing you are carrying is already stored.");
+            DrawCaveats(stale);
+            return;
+        }
+
+        DrawCarriedGroup(
+            "In your bags", carried.AlreadyStored.Where(piece => piece.Location == CarryLocation.Bags),
+            null, stale);
+
+        DrawCarriedGroup(
+            "In your armoury chest",
+            carried.AlreadyStored.Where(piece => piece.Location == CarryLocation.Armoury),
+            "A gearset may be using these.", stale);
+
+        DrawCarriedGroup(
+            "In your saddlebag",
+            carried.AlreadyStored.Where(piece => piece.Location == CarryLocation.Saddlebag),
+            "Retrieve these before you can do anything with them.", stale);
+
+        DrawCarriedGroup(
+            "Held only inside a stored outfit", carried.OnlyInsideAnOutfit,
+            "Taking the set apart would empty the slot again, so these are listed and not suggested.",
+            stale);
+
+        DrawCaveats(stale);
+    }
+
+    private void DrawCarriedGroup(
+        string label, IEnumerable<CarriedPiece> pieces, string? note, bool stale)
+    {
+        var listed = pieces.ToList();
+        if (listed.Count == 0)
+            return;
+
+        ImGui.Spacing();
+        ImGui.TextColored(stale ? Palette.Warning : Palette.Focus, $"{label} ({listed.Count})");
+
+        if (note != null)
+            ImGui.TextColored(Palette.Muted, $"   {note}");
+
+        foreach (var piece in listed)
+        {
+            UiParts.ItemIcon(piece.IconId, 20);
+
+            var quantity = piece.Quantity > 1 ? $"  x{piece.Quantity}" : string.Empty;
+            ImGui.Text($"{piece.Name}{quantity}");
+
+            var hovered = ImGui.IsItemHovered();
+            UiParts.ItemContextMenu(plugin, piece.ItemId, piece.Name);
+
+            ImGui.SameLine();
+            ImGui.TextColored(Palette.Muted, $"- {MissingItems.Describe(piece.StoredIn).ToLowerInvariant()}");
+
+            if (!hovered)
+                continue;
+
+            using var tooltip = ImRaii.Tooltip();
+            ImGui.Text(piece.Name);
+            ImGui.TextColored(Palette.Muted, MissingItems.Describe(piece.StoredIn));
+
+            if (piece.ArmoireWouldTake)
+                ImGui.TextColored(Palette.Muted, "The Armoire would also take this, at no dresser slot.");
+        }
+    }
+
+    /// <summary>
+    /// Always drawn, never collapsible. What is not said here is what makes the section safe.
+    /// </summary>
+    private void DrawCaveats(bool stale)
+    {
+        ImGui.Spacing();
+
+        if (stale)
+        {
+            ImGui.TextColored(Palette.Warning,
+                $"Read from a dresser snapshot {Format.Age(plugin.Ownership.DresserUpdatedUtc!.Value)} old.");
+        }
+
+        ImGui.TextColored(Palette.Muted,
+            "Dungeon Drip never deletes anything, and cannot see your retainers.");
+
+        if (!carried!.SaddlebagReadable)
+        {
+            ImGui.TextColored(Palette.Muted,
+                "Your saddlebag is not readable away from a summoning bell, so it is not counted.");
+        }
+
+        if (!plugin.Configuration.CountInventoryAndEquipped)
+        {
+            // Otherwise this section looks like it is ignoring a setting. It is asking the opposite
+            // question from the one that setting governs.
+            ImGui.TextColored(Palette.Muted,
+                "Your bags are read here whatever \"also count bags\" is set to - that setting decides " +
+                "what counts as collected, and this asks the other way round.");
+        }
+    }
 
     /// <summary>A collapsible heading whose state survives a restart, as the duty list's do.</summary>
     private void Section(string label, System.Action body)
