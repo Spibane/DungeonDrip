@@ -215,6 +215,13 @@ dresser, a vendor, the market board — and the plugin's options are there:
 Only what the game does not already offer is added. It has its own Try On, Link and Copy, and a
 second of each would sit next to the real one saying the same word.
 
+**Settings → In-game UI** can also add a line to the game's own item tooltips, saying where the
+piece is in your collection. It is off by default: it is the only thing in the plugin that changes
+what a game window *contains* rather than sitting beside it, and the only thing that hooks a game
+function. It appends and never replaces, and marks its own line so it cannot double up or overwrite
+another plugin's. If a patch moves what it hooks, the line simply does not appear and Settings says
+so — nothing else is affected.
+
 ## Commands
 
 | Command | What it does |
@@ -254,6 +261,7 @@ what is specific to that surface.
 | Panel beside the Glamour Dresser | Panels | on |
 | Group each panel by slot | Panels | on |
 | Gear options on the game's right-click menus | In-game UI | on |
+| Line on the game's item tooltips | In-game UI | off |
 | Warn when dresser data is older than | Data | 7 days |
 | Record gear that drops in duties | Data | on |
 | Fill gaps from the wiki | Data | on |
@@ -469,11 +477,7 @@ game install is needed, and uploads the packaged plugin.
 
 - Retainer inventories, which the client only loads at a retainer.
 - Per-boss attribution of drops.
-- A line in the game's own item tooltip. Tried and abandoned: the tooltip's description field keeps
-  the *previous* item's text whenever the current one has no description of its own, which is true
-  of most gear. Measured before and after the tooltip's update event and it is stale in both, so a
-  line appended there would hang off an unrelated item's sentence on exactly the gear this plugin
-  is for. The right-click menu covers the same ground safely.
+- Nothing else currently planned.
 
 ## Licence
 

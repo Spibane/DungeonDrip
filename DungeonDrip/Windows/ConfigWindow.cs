@@ -422,6 +422,39 @@ public class ConfigWindow : Window
             "replacing anything.");
 
         ImGui.Spacing();
+        ImGui.Separator();
+        ImGui.Spacing();
+        ImGui.TextColored(Palette.Muted, "Item tooltips");
+        ImGui.Spacing();
+
+        if (!plugin.TooltipLineAvailable)
+        {
+            // Said plainly rather than left as a toggle that quietly does nothing.
+            ImGui.TextColored(Palette.Warning,
+                "Unavailable on this game version - the tooltip line could not attach.");
+            ImGui.TextColored(Palette.Muted,
+                "A patch has moved what it hooks. Everything else is unaffected.");
+            ImGui.Spacing();
+            return changed;
+        }
+
+        var tooltipLine = configuration.ShowTooltipLine;
+        if (UiParts.Toggle("Add a line to the game's item tooltips", ref tooltipLine,
+                "Says where the piece is in your collection, on the tooltip itself."))
+        {
+            configuration.ShowTooltipLine = tooltipLine;
+            changed = true;
+        }
+
+        ImGui.Spacing();
+        ImGui.TextColored(Palette.Muted,
+            "Off by default, and the only thing here that changes what a game window contains rather\n" +
+            "than adding beside it. It only ever adds to what is already there, and marks its own\n" +
+            "line so it cannot double up or overwrite another plugin's.");
+        ImGui.TextColored(Palette.Muted,
+            "Simple Tweaks' Track Outfits does a similar job; with both on you get two lines.");
+
+        ImGui.Spacing();
         return changed;
     }
 
