@@ -32,6 +32,7 @@ public sealed class CollectionView(Plugin plugin)
 
     private int seenOwnershipRevision = -1;
     private Inputs seenInputs;
+    private ulong seenInventory;
 
     /// <summary>Sets listed before the "show all" toggle earns its place.</summary>
     private const int InitialSetsShown = 25;
@@ -63,24 +64,45 @@ public sealed class CollectionView(Plugin plugin)
     /// Rebuilds the sections when, and only when, something they are derived from has changed.
     /// </summary>
     /// <remarks>
-    /// Staleness of the snapshot is deliberately not an input, matching the ownership tracker's own
-    /// rule: an ageing snapshot changes how the answer should be worded, not what it is.
+    /// Two keys, because the sections do not read the same things.
+    ///
+    /// The carried list needs its own. The ownership tracker only bumps its revision for inventory
+    /// changes while "also count bags" is on, since that setting is the only reason it reads the
+    /// bags at all - but this section reads them regardless, on purpose, because it asks the
+    /// opposite question. With the setting off, which is the default, throwing a piece away left it
+    /// on the list with nothing that could ever clear it.
+    ///
+    /// Staleness of the snapshot is deliberately in neither key, matching the tracker's own rule:
+    /// an ageing snapshot changes how the answer should be worded, not what it is.
     /// </remarks>
     private void Recompute()
     {
         var inputs = Capture();
-        if (plugin.Ownership.Revision == seenOwnershipRevision && inputs == seenInputs)
+        var ownershipMoved = plugin.Ownership.Revision != seenOwnershipRevision || inputs != seenInputs;
+
+        // One pass over the containers, no allocation, and the only thing that notices a piece
+        // leaving your bags when the tracker has no reason to look.
+        var inventory = Game.InventoryReader.Fingerprint();
+        var inventoryMoved = inventory != seenInventory;
+
+        if (!ownershipMoved && !inventoryMoved)
             return;
 
         seenOwnershipRevision = plugin.Ownership.Revision;
         seenInputs = inputs;
+        seenInventory = inventory;
 
         var ownership = plugin.Ownership.Current;
-        pressure = DresserPressure.Build(
-            ownership, plugin.Outfits, plugin.Storage, plugin.Ownership.ArmoireUpdatedUtc != null);
 
+        // Carried gear is the collection compared against the bags, so either side moving rebuilds it.
         carried = CarriedGear.Build(
             Game.InventoryReader.ReadDetailed(), ownership, plugin.Outfits, plugin.Storage);
+
+        if (!ownershipMoved)
+            return;
+
+        pressure = DresserPressure.Build(
+            ownership, plugin.Outfits, plugin.Storage, plugin.Ownership.ArmoireUpdatedUtc != null);
 
         sets = plugin.Ownership.HasDresserData
             ? SetCompletion.InProgress(plugin.Outfits, ownership, plugin.Configuration)
@@ -341,12 +363,9 @@ public sealed class CollectionView(Plugin plugin)
 
         var stale = plugin.Ownership.IsDresserStale;
 
-        ImGui.TextColored(Palette.Muted,
-            "Read from your bags, armoury chest and saddlebag.");
-
         if (carried.AlreadyStored.Count == 0 && carried.OnlyInsideAnOutfit.Count == 0)
         {
-            ImGui.TextColored(Palette.Good, "Nothing there is already stored.");
+            ImGui.TextColored(Palette.Good, "Nothing carried is already stored.");
             DrawCaveats(stale);
             return;
         }
@@ -363,12 +382,11 @@ public sealed class CollectionView(Plugin plugin)
         DrawCarriedGroup(
             "In your saddlebag",
             carried.AlreadyStored.Where(piece => piece.Location == CarryLocation.Saddlebag),
-            "Retrieve these before you can do anything with them.", stale);
+            null, stale);
 
         DrawCarriedGroup(
-            "Held only inside a stored outfit", carried.OnlyInsideAnOutfit,
-            "Taking the set apart would empty the slot again, so these are listed and not suggested.",
-            stale);
+            "Only inside a stored outfit", carried.OnlyInsideAnOutfit,
+            "Removing the set empties the slot.", stale);
 
         DrawCaveats(stale);
     }
@@ -407,13 +425,19 @@ public sealed class CollectionView(Plugin plugin)
             ImGui.TextColored(Palette.Muted, MissingItems.Describe(piece.StoredIn));
 
             if (piece.ArmoireWouldTake)
-                ImGui.TextColored(Palette.Muted, "The Armoire would also take this, at no dresser slot.");
+                ImGui.TextColored(Palette.Muted, "The Armoire would take this too.");
         }
     }
 
     /// <summary>
-    /// Always drawn, never collapsible. What is not said here is what makes the section safe.
+    /// What the list cannot see, in as few words as it can be put.
     /// </summary>
+    /// <remarks>
+    /// Each of these changes what the list means, which is why they are on screen at all - but
+    /// none of them needs a sentence. The note about reading the bags regardless of the
+    /// count-inventory setting is gone: it explained the plugin's reasoning to someone who only
+    /// wanted to know what was on the list.
+    /// </remarks>
     private void DrawCaveats(bool stale)
     {
         ImGui.Spacing();
@@ -421,25 +445,12 @@ public sealed class CollectionView(Plugin plugin)
         if (stale)
         {
             ImGui.TextColored(Palette.Warning,
-                $"Read from a dresser snapshot {Format.Age(plugin.Ownership.DresserUpdatedUtc!.Value)} old.");
+                $"Dresser snapshot {Format.Age(plugin.Ownership.DresserUpdatedUtc!.Value)} old.");
         }
 
-        ImGui.TextColored(Palette.Muted, "Retainers cannot be read, so they are not counted.");
-
-        if (!carried!.SaddlebagReadable)
-        {
-            ImGui.TextColored(Palette.Muted,
-                "Your saddlebag is not readable away from a summoning bell, so it is not counted.");
-        }
-
-        if (!plugin.Configuration.CountInventoryAndEquipped)
-        {
-            // Otherwise this section looks like it is ignoring a setting. It is asking the opposite
-            // question from the one that setting governs.
-            ImGui.TextColored(Palette.Muted,
-                "Your bags are read here whatever \"also count bags\" is set to - that setting decides " +
-                "what counts as collected, and this asks the other way round.");
-        }
+        ImGui.TextColored(Palette.Muted, carried!.SaddlebagReadable
+            ? "Retainers not counted."
+            : "Retainers not counted. Saddlebag unreadable away from a bell.");
     }
 
     /// <summary>A collapsible heading whose state survives a restart, as the duty list's do.</summary>

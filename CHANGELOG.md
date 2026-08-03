@@ -1,5 +1,9 @@
 # Changelog
 
+### v0.12.1 - 2026-08-03
+- Fixed a piece thrown away from your bags staying on the Collection view's "Already in your collection" list, with nothing that would ever clear it. That list reads your bags directly, on purpose, but it was being rebuilt only when the collection changed - and the collection only notices your bags when "also count bags" is on, which it is not by default
+- Trimmed what that section says. It was explaining the plugin's reasoning to somebody who only wanted to know what was on the list
+
 ### v0.12.0 - 2026-08-03
 - **Added a panel beside the market board**, marking which of the gear in the browse list you already have. Only the browse list gets one: by the time the listings for a single item are open you have chosen the piece, and every row would be the same piece once per seller. Results arrive in pages of twenty so the panel fills in as a category loads; scrolling and text searches both re-read correctly. This is where a stale dresser snapshot matters most, since you reach a board by travelling and zoning is what wipes the data
 - **Added a panel beside the Glamour Dresser** listing what you are carrying that is not stored yet - the mirror of the other panels, and the one surface where the answer is something you can act on where you stand. Its markers give the location rather than ownership, since by construction you do not own these yet, and a row goes amber when something has to happen first: taking it off, or fetching it from the saddlebag. The header says how full the box is, because which of these to put in is only a question when they will not all fit. Toolbar buttons drop armoury chest gear and gear you are wearing, both of which are usually spoken for
