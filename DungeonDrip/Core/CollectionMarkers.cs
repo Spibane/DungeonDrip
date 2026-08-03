@@ -1,12 +1,12 @@
 namespace DungeonDrip.Core;
 
-/// <summary>What the vendor panel says about one piece of the stock in front of you.</summary>
+/// <summary>What a panel says about one piece of gear the game is showing you.</summary>
 /// <remarks>
 /// Not <see cref="OwnershipSource"/>, which folds "not collected" and "never read the dresser" into
 /// one value. The duty report can afford that because it refuses to draw without a snapshot; a
-/// vendor shows the list anyway, so it has to keep the two apart.
+/// panel riding beside a game window shows the list anyway, so it has to keep the two apart.
 /// </remarks>
-public enum VendorMarker
+public enum CollectionMarker
 {
     /// <summary>Nowhere in the collection, and the collection was actually read.</summary>
     NotCollected,
@@ -27,30 +27,30 @@ public enum VendorMarker
 }
 
 /// <summary>
-/// Turns an ownership answer into what the vendor panel shows. Free of Dalamud and Lumina, like
+/// Turns an ownership answer into what a panel shows. Free of Dalamud and Lumina, like
 /// <see cref="MissingItems"/>, so it can be reasoned about on its own.
 /// </summary>
-public static class VendorMarkers
+public static class CollectionMarkers
 {
     /// <param name="outfitCompleted">
     /// Only consulted for a piece held in an outfit set: whether any set holding it is finished.
     /// </param>
-    public static VendorMarker For(OwnershipSource source, bool hasDresserData, bool outfitCompleted = false)
+    public static CollectionMarker For(OwnershipSource source, bool hasDresserData, bool outfitCompleted = false)
     {
         // Positive evidence needs no dresser snapshot behind it: inventory is re-read every tick,
         // and an armoire result is only recorded when the game had the cabinet loaded.
         var marker = source switch
         {
-            OwnershipSource.Dresser => VendorMarker.Dresser,
-            OwnershipSource.Outfit => outfitCompleted ? VendorMarker.OutfitComplete : VendorMarker.Outfit,
-            OwnershipSource.Armoire => VendorMarker.Armoire,
-            OwnershipSource.Inventory => VendorMarker.Inventory,
-            _ => VendorMarker.NotCollected,
+            OwnershipSource.Dresser => CollectionMarker.Dresser,
+            OwnershipSource.Outfit => outfitCompleted ? CollectionMarker.OutfitComplete : CollectionMarker.Outfit,
+            OwnershipSource.Armoire => CollectionMarker.Armoire,
+            OwnershipSource.Inventory => CollectionMarker.Inventory,
+            _ => CollectionMarker.NotCollected,
         };
 
         // Absence of evidence is only evidence of absence once something was actually looked at.
-        if (marker == VendorMarker.NotCollected && !hasDresserData)
-            return VendorMarker.Unknown;
+        if (marker == CollectionMarker.NotCollected && !hasDresserData)
+            return CollectionMarker.Unknown;
 
         return marker;
     }
@@ -63,18 +63,18 @@ public static class VendorMarkers
     /// dresser contents are near-monotonic, so an old snapshot's positives still hold while its
     /// negatives are exactly what rots. Do not invert this.
     /// </remarks>
-    public static bool IsUncertain(VendorMarker marker, bool dresserIsStale) =>
-        marker == VendorMarker.Unknown ||
-        (marker == VendorMarker.NotCollected && dresserIsStale);
+    public static bool IsUncertain(CollectionMarker marker, bool dresserIsStale) =>
+        marker == CollectionMarker.Unknown ||
+        (marker == CollectionMarker.NotCollected && dresserIsStale);
 
-    public static string Describe(VendorMarker marker) => marker switch
+    public static string Describe(CollectionMarker marker) => marker switch
     {
-        VendorMarker.Dresser => "In your Glamour Dresser",
-        VendorMarker.Outfit => "Part of a stored outfit set",
-        VendorMarker.OutfitComplete => "Outfit completed",
-        VendorMarker.Armoire => "In your Armoire",
-        VendorMarker.Inventory => "Carried or equipped",
-        VendorMarker.NotCollected => "Not collected",
+        CollectionMarker.Dresser => "In your Glamour Dresser",
+        CollectionMarker.Outfit => "Part of a stored outfit set",
+        CollectionMarker.OutfitComplete => "Outfit completed",
+        CollectionMarker.Armoire => "In your Armoire",
+        CollectionMarker.Inventory => "Carried or equipped",
+        CollectionMarker.NotCollected => "Not collected",
         _ => "No dresser data - open your Glamour Dresser",
     };
 }
