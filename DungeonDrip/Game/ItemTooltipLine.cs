@@ -128,35 +128,6 @@ public sealed unsafe class ItemTooltipLine : IDisposable
 
     private bool warned;
 
-    // TEMPORARY: reports which guard the line is stopping at, toggled by "/dungeondrip tooltipdebug".
-    private bool debug;
-    private uint debugLast;
-    private bool firedOnce;
-
-    public string ToggleDebug()
-    {
-        debug = !debug;
-        debugLast = 0;
-        firedOnce = false;
-        if (debug && hook == null)
-            return "Dungeon Drip: the tooltip hook never installed - the signature did not match.";
-
-        return debug
-            ? "Dungeon Drip: tooltip diagnostics ON. Hover a few pieces, then check /xllog."
-            : "Dungeon Drip: tooltip diagnostics OFF.";
-    }
-
-    private bool Trace(uint itemId, string outcome)
-    {
-        if (debug && itemId != debugLast)
-        {
-            debugLast = itemId;
-            Plugin.Log.Information($"[tooltip] {itemId}: {outcome}");
-        }
-
-        return false;
-    }
-
     public ItemTooltipLine(Plugin plugin, ISigScanner scanner, IGameInteropProvider interop)
     {
         this.plugin = plugin;
@@ -192,13 +163,6 @@ public sealed unsafe class ItemTooltipLine : IDisposable
         // an exception must never cost the user their tooltip.
         try
         {
-            if (debug && !firedOnce)
-            {
-                firedOnce = true;
-                Plugin.Log.Information(
-                    $"[tooltip] detour is firing. setting={plugin.Configuration.ShowTooltipLine}");
-            }
-
             if (plugin.Configuration.ShowTooltipLine)
                 Append(strings);
         }
@@ -217,17 +181,11 @@ public sealed unsafe class ItemTooltipLine : IDisposable
     private void Append(StringArrayData* strings)
     {
         if (strings == null || strings->StringArray == null || strings->Size <= ItemUiCategory)
-        {
-            Trace(uint.MaxValue, $"array unusable (size {(strings == null ? -1 : strings->Size)})");
             return;
-        }
 
         var hovered = Plugin.GameGui.HoveredItem;
         if (hovered is <= 0 or > uint.MaxValue)
-        {
-            Trace(uint.MaxValue, $"HoveredItem is {hovered} at generate time");
             return;
-        }
 
         var (itemId, kind) = ItemUtil.GetBaseId((uint)hovered);
 
@@ -235,18 +193,12 @@ public sealed unsafe class ItemTooltipLine : IDisposable
         // a turn-in rather than a glamour decision. HQ is not excluded - HQ gear is real gear, and
         // the base id is what the dresser stores.
         if (itemId == 0 || kind is ItemKind.EventItem or ItemKind.Collectible)
-        {
-            Trace(itemId, $"kind {kind}");
             return;
-        }
 
         // The same content rule as every other surface, so the absence of a line keeps meaning
         // "not glamour gear" rather than "you have it".
         if (!plugin.Storage.CanBeStored(itemId))
-        {
-            Trace(itemId, "not storable");
             return;
-        }
 
         var view = plugin.Ownership.Current;
         var source = MissingItems.Resolve(
@@ -260,19 +212,16 @@ public sealed unsafe class ItemTooltipLine : IDisposable
         // Missing this is what made a finished outfit and a half-finished one look identical.
         var completed = source == OwnershipSource.Outfit && plugin.Outfits.IsInCompletedSet(itemId, view);
 
-        var marker0 = CollectionMarkers.For(source, plugin.Ownership.HasDresserData, completed);
+        var state = CollectionMarkers.For(source, plugin.Ownership.HasDresserData, completed);
 
         // A tooltip has no room to explain why it cannot say, so it says nothing.
-        if (marker0 == CollectionMarker.Unknown)
-        {
-            Trace(itemId, "no dresser data");
+        if (state == CollectionMarker.Unknown)
             return;
-        }
 
         var existing = Rebase(Read(strings, ItemUiCategory));
 
         var stale = plugin.Ownership.IsDresserStale;
-        var colour = marker0 switch
+        var colour = state switch
         {
             CollectionMarker.NotCollected => stale ? (ushort)26 : (ushort)14,
             CollectionMarker.Inventory => (ushort)26,
@@ -285,22 +234,17 @@ public sealed unsafe class ItemTooltipLine : IDisposable
         foreach (var payload in existing.Payloads)
             built.Add(payload);
 
-        // Attributed, because an unexplained line in a game tooltip is the kind of thing that gets
-        // reported to Square Enix. Short, because this shares a line with the item's category.
         // Inline, and it has to stay inline: the tooltip's rows sit at fixed positions, so a row
         // given a second line draws over the row beneath it rather than pushing it down.
         built.Add(marker)
             .Add(RawPayload.LinkTerminator)
             .AddText("   ")
-            .Add(new IconPayload(Glyph(marker0)))
+            .Add(new IconPayload(Glyph(state)))
             .AddUiForeground(colour)
-            .AddText(Word(marker0, stale))
+            .AddText(Word(state, stale))
             .AddUiForegroundOff();
 
-        var bytes = built.Build().EncodeWithNullTerminator();
-        strings->SetValue(ItemUiCategory, bytes, false);
-
-        Trace(itemId, $"WROTE {bytes.Length} bytes ({Word(marker0, stale)})");
+        strings->SetValue(ItemUiCategory, built.Build().EncodeWithNullTerminator(), false);
     }
 
     /// <summary>
