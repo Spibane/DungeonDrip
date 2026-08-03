@@ -5,6 +5,17 @@ using Lumina.Excel.Sheets;
 
 namespace DungeonDrip.Game;
 
+/// <summary>How far along one outfit set is, as stored in the Glamour Dresser.</summary>
+/// <param name="Filled">Slots of the set that are stored with a piece in them.</param>
+/// <param name="Total">Slots the set has at all, per the sheet.</param>
+/// <param name="Missing">The pieces behind the empty slots.</param>
+/// <param name="StoredAsSet">
+/// Whether the set is in the box at all. A set can be held with every slot empty, which is
+/// different news from not having it.
+/// </param>
+public sealed record SetProgress(
+    uint SetId, int Filled, int Total, IReadOnlyList<uint> Missing, bool StoredAsSet);
+
 /// <summary>
 /// Static view of the game's outfit sets: which pieces each set is made of, and which sets a given
 /// piece belongs to.
@@ -34,8 +45,11 @@ public sealed class OutfitCatalog
     public IReadOnlySet<uint> SetsContaining(uint itemId) =>
         setsByPiece.TryGetValue(itemId, out var sets) ? sets : EmptySet;
 
+    /// <summary>Every outfit set in the game, for anything that has to sweep them.</summary>
+    public IReadOnlyCollection<uint> SetIds => piecesBySet.Keys;
+
     /// <summary>Every piece the given outfit set is made of.</summary>
-    private IReadOnlySet<uint> PiecesOf(uint setId) =>
+    public IReadOnlySet<uint> PiecesOf(uint setId) =>
         piecesBySet.TryGetValue(setId, out var pieces) ? pieces : EmptySet;
 
     /// <summary>
@@ -46,6 +60,9 @@ public sealed class OutfitCatalog
     /// Read off the sheet rather than out of <see cref="piecesBySet"/>: that one is a set, and a
     /// fitting room filled weapon-first then top-down reads as an outfit being put on, whereas hash
     /// order reads as noise.
+    ///
+    /// That sheet read is per call, so this is for the handful of sets someone picked out of a
+    /// menu. Anything sweeping every set wants <see cref="PiecesOf"/> and its own ordering.
     /// </remarks>
     public IReadOnlyList<uint> PiecesInSlotOrder(uint setId)
     {
@@ -105,21 +122,38 @@ public sealed class OutfitCatalog
         return false;
     }
 
-    private bool IsComplete(uint setId, OwnershipView view)
+    /// <summary>
+    /// How much of an outfit set is sitting filled in the dresser, and what is missing from it.
+    /// </summary>
+    /// <remarks>
+    /// This is "complete as stored", which is a narrower question than "do you own these pieces" -
+    /// a piece can be in your Armoire, or in a different set, and still leave this slot empty. The
+    /// broader reading belongs with the ownership decision rather than here, because it has to obey
+    /// the user's storage scope and outfit mode and this class knows about neither.
+    /// </remarks>
+    public SetProgress ProgressInDresser(uint setId, OwnershipView view)
     {
         var pieces = PiecesOf(setId);
-        if (pieces.Count == 0)
-            return false;
+        var missing = new List<uint>();
 
         foreach (var piece in pieces)
         {
             // The reader only records a piece against a set when the slot is unlocked, so
             // membership here answers "is this slot filled".
             if (!view.DresserOutfits.TryGetValue(piece, out var owners) || !owners.Contains(setId))
-                return false;
+                missing.Add(piece);
         }
 
-        return true;
+        return new SetProgress(
+            setId, pieces.Count - missing.Count, pieces.Count, missing, view.StoredOutfits.Contains(setId));
+    }
+
+    // One definition of "complete as stored", so the per-piece green star and anything counting
+    // sets cannot disagree about what finished means.
+    private bool IsComplete(uint setId, OwnershipView view)
+    {
+        var progress = ProgressInDresser(setId, view);
+        return progress.Total > 0 && progress.Filled == progress.Total;
     }
 
     private static readonly HashSet<uint> EmptySet = [];
