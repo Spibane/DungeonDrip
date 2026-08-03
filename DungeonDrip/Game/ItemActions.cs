@@ -46,6 +46,9 @@ public sealed record ItemAction(
 /// </remarks>
 public static class ItemActions
 {
+    /// <summary>How many duties to name before the rest collapse into a count.</summary>
+    private const int MaxNamedSources = 8;
+
     public static IReadOnlyList<ItemAction> For(
         Plugin plugin, uint itemId, string name, ItemActionSurface surface)
     {
@@ -66,8 +69,12 @@ public static class ItemActions
                 actions.Add(new ItemAction($"Try on outfit: {setName}", () => plugin.TryOn.QueueOutfit(setId)));
         }
 
-        // Both of these the game offers already on its own menus. Divided off from the try-on
-        // entries above, which are the only ones that act on the game rather than on a window.
+        var drops = DropSubmenu(plugin, itemId);
+        if (drops != null)
+            actions.Add(drops with { StartsGroup = actions.Count > 0 });
+
+        // Both of these the game offers already on its own menus. Divided off from the entries
+        // above, which are the only ones that act on the game rather than on a window.
         if (surface == ItemActionSurface.PluginWindow)
         {
             actions.Add(new ItemAction(
@@ -79,5 +86,70 @@ public static class ItemActions
         }
 
         return actions;
+    }
+
+    /// <summary>
+    /// The duties a piece drops in, as a submenu that navigates to whichever one is chosen.
+    /// </summary>
+    /// <remarks>
+    /// An empty answer still gets the entry, carrying the reason. Loot coverage is thin for new
+    /// content by design - the wiki is only read for duties you have opened - so "nothing lists
+    /// this" and "this does not drop" are different statements and only the first can honestly be
+    /// made here. Dropping the entry when there is no answer would read as the menu being broken,
+    /// which is why it is a disabled line rather than an absence.
+    /// </remarks>
+    private static ItemAction? DropSubmenu(Plugin plugin, uint itemId)
+    {
+        var drops = plugin.Drops;
+
+        // No loot data at all yet - a different situation from having looked and found nothing,
+        // and not one this menu should editorialise about.
+        if (drops == null)
+            return null;
+
+        // Only worth answering for something that could have been a drop in the first place.
+        if (!plugin.Storage.CanBeStored(itemId))
+            return null;
+
+        var sources = drops.For(itemId);
+        var entries = new List<ItemAction>(Math.Min(sources.Count, MaxNamedSources) + 2);
+
+        if (sources.Count == 0)
+        {
+            entries.Add(new ItemAction("Nothing in the loot data lists this piece"));
+        }
+        else
+        {
+            for (var i = 0; i < sources.Count; i++)
+            {
+                if (i == MaxNamedSources)
+                {
+                    // Hands the rest to the picker rather than growing the menu without limit.
+                    var name = plugin.Duties?.NameOf(sources[i].TerritoryId) ?? string.Empty;
+                    entries.Add(new ItemAction(
+                        $"...and {sources.Count - i} more", () => plugin.ShowDutyPicker(name)));
+                    break;
+                }
+
+                var source = sources[i];
+                var label = source.Level > 0
+                    ? $"{source.DutyName}  (Lv. {source.Level})"
+                    : source.DutyName;
+
+                entries.Add(new ItemAction(label, () => plugin.ShowDuty(source.TerritoryId)));
+            }
+        }
+
+        // Shown on every answer, including the ones that look complete, so a short list is never
+        // mistaken for the whole story.
+        entries.Add(new ItemAction(Coverage(plugin), StartsGroup: true));
+
+        return new ItemAction("Where does this drop?", Submenu: entries);
+    }
+
+    private static string Coverage(Plugin plugin)
+    {
+        var total = plugin.Duties?.Entries.Count ?? 0;
+        return $"Dungeons and alliance raids. Wiki read for {plugin.Wiki.DutiesWithData} of {total}.";
     }
 }
