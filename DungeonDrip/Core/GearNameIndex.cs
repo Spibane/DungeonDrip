@@ -28,8 +28,6 @@ public sealed class GearNameIndex
         this.all = all;
     }
 
-    public int Count => all.Count;
-
     /// <summary>An exact name, which wins outright over any number of partial ones.</summary>
     public bool TryGetExact(string name, out uint itemId) =>
         byName.TryGetValue(name.Trim(), out itemId);

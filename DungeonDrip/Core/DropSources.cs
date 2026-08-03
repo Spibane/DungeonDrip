@@ -36,8 +36,6 @@ public sealed class DropSources
     public IReadOnlyList<DropSource> For(uint itemId) =>
         byItem.TryGetValue(itemId, out var sources) ? sources : None;
 
-    public bool Any(uint itemId) => byItem.ContainsKey(itemId);
-
     /// <summary>Every piece that drops somewhere we know about. Feeds the by-name lookup.</summary>
     public IReadOnlyCollection<uint> Items => byItem.Keys;
 

@@ -13,7 +13,6 @@ public sealed record DresserAddRow(
     uint ItemId,
     string Name,
     ushort IconId,
-    ushort ItemLevel,
     int SlotOrder,
     string SlotName,
     CollectionMarker Marker,
@@ -22,7 +21,7 @@ public sealed record DresserAddRow(
     int Quantity,
     bool ArmoireWouldTake,
     string? Blocked)
-    : GearRow(ItemId, Name, IconId, ItemLevel, SlotOrder, SlotName, Marker, JobEquippable);
+    : GearRow(ItemId, Name, IconId, SlotOrder, SlotName, Marker, JobEquippable);
 
 /// <summary>
 /// Watches the Glamour Dresser and works out what you are carrying that is not in it.
@@ -62,8 +61,13 @@ public sealed unsafe class DresserAddWatcher : IDisposable
     }
 
     /// <summary>Slots in use and slots the box has, for the header. Zero when unread.</summary>
+    /// <remarks>
+    /// Off the tracker rather than through the ownership view. The view is built fresh on every
+    /// read and the header wants this once a frame, which is a record's worth of garbage per frame
+    /// to fetch two integers that are sitting right there.
+    /// </remarks>
     public (int Used, int Capacity) Space =>
-        plugin.Ownership.Current.Space is { } space ? (space.Used, space.Capacity) : (0, 0);
+        (plugin.Ownership.DresserSlotsUsed, plugin.Ownership.DresserSlotCapacity);
 
     /// <summary>
     /// What you are carrying that is not stored, or null when there is nothing to draw against.
@@ -153,7 +157,6 @@ public sealed unsafe class DresserAddWatcher : IDisposable
                 row.ItemId,
                 row.Name,
                 row.IconId,
-                row.ItemLevel,
                 row.SlotOrder,
                 row.SlotName,
 
