@@ -55,8 +55,8 @@ public sealed unsafe class ItemTooltipLine : IDisposable
     /// </remarks>
     private const int ItemUiCategory = 2;
 
-    /// <summary>The category's text node, which has to be told it may wrap.</summary>
-    private const uint CategoryNodeId = 35;
+    /// <summary>Marks our own text so the node drawing it can be found again afterwards.</summary>
+    private const string Prefix = "Drip: ";
 
     /// <summary>
     /// The "Extractable / Projectable / Desynthesizable" row, at the top of the tooltip's bottom
@@ -255,7 +255,7 @@ public sealed unsafe class ItemTooltipLine : IDisposable
             .Add(RawPayload.LinkTerminator)
             .AddText(field == ExtraInfo ? "\n" : "   ")
             .AddUiForeground(colour)
-            .AddText($"Drip: {note}")
+            .AddText($"{Prefix}{note}")
             .AddUiForegroundOff();
 
         var bytes = built.Build().EncodeWithNullTerminator();
@@ -305,12 +305,14 @@ public sealed unsafe class ItemTooltipLine : IDisposable
     }
 
     /// <summary>
-    /// Lets the category line wrap, since it was built for one short word.
+    /// Lets whichever row ended up carrying the line wrap onto a second line.
     /// </summary>
     /// <remarks>
-    /// Without this a status longer than the node is simply clipped. Setting the flag is a change
-    /// to the node rather than to its text, and it is the one thing here that is not just a string
-    /// write - so it is done only while the feature is switched on.
+    /// These rows were built for one short string each and clip rather than wrap, so the line ran
+    /// off the side of the tooltip. The node is found by looking for our own text rather than by
+    /// id: which row the line lands on depends on the item, the ids are not documented anywhere
+    /// this could read them from, and a hardcoded one would be wrong the day it moved. Searching a
+    /// few dozen nodes once per tooltip refresh costs nothing.
     /// </remarks>
     private void OnRefresh(AddonEvent type, AddonArgs args)
     {
@@ -318,8 +320,19 @@ public sealed unsafe class ItemTooltipLine : IDisposable
             return;
 
         var unit = (AtkUnitBase*)args.Addon.Address;
-        var node = unit == null ? null : unit->GetTextNodeById(CategoryNodeId);
-        if (node != null)
-            node->TextFlags |= TextFlags.MultiLine;
+        if (unit == null)
+            return;
+
+        var manager = unit->UldManager;
+        for (var i = 0; i < manager.NodeListCount; i++)
+        {
+            var node = manager.NodeList[i];
+            if (node == null || node->Type != NodeType.Text)
+                continue;
+
+            var text = (AtkTextNode*)node;
+            if (text->NodeText.ToString().Contains(Prefix, StringComparison.Ordinal))
+                text->TextFlags |= TextFlags.MultiLine;
+        }
     }
 }
