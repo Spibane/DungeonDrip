@@ -215,8 +215,11 @@ dresser, a vendor, the market board — and the plugin's options are there:
 Only what the game does not already offer is added. It has its own Try On, Link and Copy, and a
 second of each would sit next to the real one saying the same word.
 
-**Settings → In-game UI** can also add a line to the game's own item tooltips, saying where the
-piece is in your collection. It is off by default: it is the only thing in the plugin that changes
+**Settings → In-game UI** can also mark the game's own item tooltips, adding an icon and a word to
+the category row — the one that says *Body* or *Hands* — saying where the piece is in your
+collection. Shorthand rather than a sentence, because that row is not wide: a green dot for the
+Dresser or Armoire, a silver star for a set with gaps, a gold star for a completed one, an orange
+diamond for carried, and the no-entry sign for something you do not own. It is off by default: it is the only thing in the plugin that changes
 what a game window *contains* rather than sitting beside it, and the only thing that hooks a game
 function. It appends and never replaces, and marks its own line so it cannot double up or overwrite
 another plugin's. If a patch moves what it hooks, the line simply does not appear and Settings says
@@ -261,7 +264,7 @@ what is specific to that surface.
 | Panel beside the Glamour Dresser | Panels | on |
 | Group each panel by slot | Panels | on |
 | Gear options on the game's right-click menus | In-game UI | on |
-| Line on the game's item tooltips | In-game UI | off |
+| Marker on the game's item tooltips | In-game UI | off |
 | Warn when dresser data is older than | Data | 7 days |
 | Record gear that drops in duties | Data | on |
 | Fill gaps from the wiki | Data | on |

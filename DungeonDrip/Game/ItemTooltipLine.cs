@@ -2,8 +2,8 @@ using System;
 using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Game.Text.SeStringHandling.Payloads;
 using Dalamud.Hooking;
-using Dalamud.Plugin.Services;
 using Dalamud.Memory;
+using Dalamud.Plugin.Services;
 using Dalamud.Utility;
 using DungeonDrip.Core;
 using FFXIVClientStructs.FFXIV.Component.GUI;
@@ -32,9 +32,10 @@ namespace DungeonDrip.Game;
 /// down, and that is not something a string write can fix. The plugins that do get their own lines
 /// down there build their own nodes for it.</para>
 ///
-/// <para>So: the category row, appended inline. It is written for every item, always drawn, and has
-/// the room because everything this appends is a short fixed phrase - the longest is "Part of a
-/// stored outfit set". No item or outfit name is ever put here.</para>
+/// <para>So: the category row, appended inline, and kept to one of the game's own icons plus a
+/// single word. That row is written for every item and always drawn, but it is not wide - which is
+/// the reason for the shorthand rather than the sentences the panels use. Nothing is ever put here
+/// that varies in length, so it cannot outgrow the space.</para>
 ///
 /// <para>The signature will eventually break on a patch. When it does the hook simply fails to
 /// install, the feature is absent, and everything else carries on - which is the right failure for
@@ -59,8 +60,48 @@ public sealed unsafe class ItemTooltipLine : IDisposable
     /// </remarks>
     private const int ItemUiCategory = 2;
 
-    /// <summary>Marks our own text so the node drawing it can be found again afterwards.</summary>
-    private const string Prefix = "Drip: ";
+    /// <summary>
+    /// The state, as one of the game's own tooltip icons.
+    /// </summary>
+    /// <remarks>
+    /// Game icons rather than characters, so the line looks like part of the tooltip instead of
+    /// something pasted into it, and so it survives whatever font the player is on. Kept close to
+    /// what the panels already say - a star means a finished outfit and nothing else, and the one
+    /// state worth acting on is the one that stands out.
+    ///
+    /// This lives here rather than beside the marker vocabulary in Core, which is deliberately free
+    /// of anything Dalamud.
+    /// </remarks>
+    private static BitmapFontIcon Glyph(CollectionMarker marker) => marker switch
+    {
+        CollectionMarker.Dresser => BitmapFontIcon.GreenDot,
+        CollectionMarker.Armoire => BitmapFontIcon.GreenDot,
+        CollectionMarker.Outfit => BitmapFontIcon.SilverStar,
+        CollectionMarker.OutfitComplete => BitmapFontIcon.GoldStar,
+        CollectionMarker.Inventory => BitmapFontIcon.OrangeDiamond,
+        _ => BitmapFontIcon.NoCircle,
+    };
+
+    /// <summary>
+    /// Where it is, in one word. The icon has already said whether you have it.
+    /// </summary>
+    /// <remarks>
+    /// Short because this shares a row with the item's category and that row is not wide. The full
+    /// sentences the panels use do not fit and do not need to: there are six states and the icon
+    /// carries most of the meaning.
+    /// </remarks>
+    private static string Word(CollectionMarker marker, bool stale) => marker switch
+    {
+        CollectionMarker.Dresser => "Dresser",
+        CollectionMarker.Armoire => "Armoire",
+        CollectionMarker.Outfit => "Outfit",
+        CollectionMarker.OutfitComplete => "Outfit",
+        CollectionMarker.Inventory => "Carried",
+
+        // The one worth acting on, and the one an old snapshot can be wrong about, so it is the
+        // only one that spends characters on a caveat.
+        _ => stale ? "Not owned?" : "Not owned",
+    };
 
     /// <summary>Ours, so the line can recognise itself and never double up.</summary>
     private const uint MarkerCommandId = 0x44445F31;
@@ -146,13 +187,7 @@ public sealed unsafe class ItemTooltipLine : IDisposable
             }
 
             if (plugin.Configuration.ShowTooltipLine)
-            {
-                // Before Original, which is what lays the tooltip out. Setting this afterwards is
-                // what made the wrapped line draw on top of the row below it: the flag let the text
-                // wrap but the height had already been decided without it.
-                AllowWrapping(addon);
                 Append(strings);
-            }
         }
         catch (Exception ex)
         {
@@ -226,10 +261,6 @@ public sealed unsafe class ItemTooltipLine : IDisposable
             _ => (ushort)45,
         };
 
-        var note = CollectionMarkers.Describe(marker0);
-        if (marker0 == CollectionMarker.NotCollected && stale)
-            note += " (dresser snapshot is old)";
-
         // Appended, never replaced: whatever is already there - including a line another plugin
         // added in an earlier hook - is re-emitted first and ours lands after it.
         var built = new SeStringBuilder();
@@ -243,14 +274,15 @@ public sealed unsafe class ItemTooltipLine : IDisposable
         built.Add(marker)
             .Add(RawPayload.LinkTerminator)
             .AddText("   ")
+            .Add(new IconPayload(Glyph(marker0)))
             .AddUiForeground(colour)
-            .AddText($"{Prefix}{note}")
+            .AddText(Word(marker0, stale))
             .AddUiForegroundOff();
 
         var bytes = built.Build().EncodeWithNullTerminator();
         strings->SetValue(ItemUiCategory, bytes, false);
 
-        Trace(itemId, $"WROTE {bytes.Length} bytes ({note})");
+        Trace(itemId, $"WROTE {bytes.Length} bytes ({Word(marker0, stale)})");
     }
 
     /// <summary>
@@ -293,29 +325,4 @@ public sealed unsafe class ItemTooltipLine : IDisposable
         return kept;
     }
 
-    /// <summary>
-    /// Lets the tooltip's rows wrap, so a row that gains a line is measured with it.
-    /// </summary>
-    /// <remarks>
-    /// Applied to every text row rather than to the one the line lands on. Which row that is
-    /// depends on the item, and at this point in the frame the nodes still hold the previous
-    /// item's text, so there is nothing to recognise ours by yet - the array has been written but
-    /// the nodes have not been filled from it. Setting the flag on a row whose text already fits
-    /// and has no break in it changes nothing, so the blanket application is harmless.
-    ///
-    /// Re-applied every time because the game owns these nodes and is free to reset them.
-    /// </remarks>
-    private static void AllowWrapping(AtkUnitBase* addon)
-    {
-        if (addon == null)
-            return;
-
-        var manager = addon->UldManager;
-        for (var i = 0; i < manager.NodeListCount; i++)
-        {
-            var node = manager.NodeList[i];
-            if (node != null && node->Type == NodeType.Text)
-                ((AtkTextNode*)node)->TextFlags |= TextFlags.MultiLine;
-        }
-    }
 }
