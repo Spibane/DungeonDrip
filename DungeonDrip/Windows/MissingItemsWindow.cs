@@ -376,6 +376,12 @@ public class MissingItemsWindow : Window
         if (report.HiddenByJobFilter > 0)
             ImGui.TextColored(Palette.Muted, $"{report.HiddenByJobFilter} hidden by the current-job filter.");
 
+        if (report.HiddenUnwearable > 0)
+        {
+            ImGui.TextColored(Palette.Muted,
+                $"{report.HiddenUnwearable} hidden as this character cannot wear them.");
+        }
+
         if (report.HiddenWeapons > 0)
             ImGui.TextColored(Palette.Muted, $"{report.HiddenWeapons} weapons hidden.");
     }

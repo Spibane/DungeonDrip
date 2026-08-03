@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Dalamud.Game.Player;
 using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Interface.Windowing;
 using Dalamud.IoC;
@@ -62,6 +63,9 @@ public sealed class Plugin : IDalamudPlugin
     /// <summary>Shared so every gear list agrees on what the current job can wear.</summary>
     public JobFilter JobFilter { get; } = new();
 
+    /// <summary>Shared for the same reason, for what this character can wear at all.</summary>
+    public EquipLockFilter EquipLocks { get; } = new();
+
     /// <summary>Chat commands that were actually claimed at load.</summary>
     public CommandRegistration Commands { get; }
 
@@ -101,6 +105,8 @@ public sealed class Plugin : IDalamudPlugin
     private int seenLootRevision = -1;
     private int seenOwnershipRevision = -1;
     private uint seenClassJob;
+    private Sex? seenSex;
+    private uint seenRace;
     private uint? autoOpenForTerritory;
     private uint wikiRequestedFor;
 
@@ -282,8 +288,10 @@ public sealed class Plugin : IDalamudPlugin
             Duties = DutyCatalog.Build(LootData.Data, contentFinder);
             Drops = DropSources.Build(LootData.Data, Duties);
             GearNames = GearNameIndex.Build(Drops.Items);
-            reportBuilder = new DutyReportBuilder(LootData.Data, Duties, Outfits, jobRoles, Storage, JobFilter);
-            adviceBuilder = new RouletteAdviceBuilder(LootData.Data, contentFinder, Outfits, jobRoles, Storage);
+            reportBuilder = new DutyReportBuilder(
+                LootData.Data, Duties, Outfits, jobRoles, Storage, JobFilter, EquipLocks);
+            adviceBuilder = new RouletteAdviceBuilder(
+                LootData.Data, contentFinder, Outfits, jobRoles, Storage, EquipLocks);
             reportDirty = true;
         }
 
@@ -298,6 +306,18 @@ public sealed class Plugin : IDalamudPlugin
             PlayerState.ClassJob.RowId != seenClassJob)
         {
             seenClassJob = PlayerState.ClassJob.RowId;
+            reportDirty = true;
+        }
+
+        // The same for the gender and race filters. These move once in a blue moon - a Fantasia, or
+        // a log in as somebody else - but the list is wrong until it is noticed, and noticing costs
+        // two compares.
+        if ((Configuration.OnlyCurrentGenderEquippable || Configuration.OnlyCurrentRaceEquippable) &&
+            PlayerState.IsLoaded &&
+            (PlayerState.Sex != seenSex || PlayerState.Race.RowId != seenRace))
+        {
+            seenSex = PlayerState.Sex;
+            seenRace = PlayerState.Race.RowId;
             reportDirty = true;
         }
 

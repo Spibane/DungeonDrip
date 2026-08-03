@@ -52,7 +52,7 @@ public sealed record SetStanding(
 public static class SetCompletion
 {
     public static IReadOnlyList<SetStanding> InProgress(
-        OutfitCatalog outfits, OwnershipView view, Configuration configuration)
+        OutfitCatalog outfits, OwnershipView view, Configuration configuration, EquipLockFilter equipLocks)
     {
         var qualifying = new List<(uint SetId, int Owned, int Total)>();
 
@@ -61,7 +61,14 @@ public static class SetCompletion
         // a place on the list.
         foreach (var setId in outfits.SetIds)
         {
-            var pieces = outfits.PiecesOf(setId);
+            // Projected only when the filter is on, so the common path keeps handing the catalogue's
+            // own set around rather than allocating a copy of it a thousand times over.
+            IReadOnlyCollection<uint> pieces = Filtering(configuration)
+                ? [.. outfits.PiecesOf(setId).Where(piece => Wearable(piece, configuration, equipLocks))]
+                : outfits.PiecesOf(setId);
+
+            // Empty here now means one of two things, and both belong off the list: a set the sheet
+            // gives no pieces for, and a set that is nothing but pieces this character cannot wear.
             if (pieces.Count == 0)
                 continue;
 
@@ -78,7 +85,7 @@ public static class SetCompletion
         return
         [
             .. qualifying
-                .Select(entry => Describe(entry.SetId, outfits, view, configuration))
+                .Select(entry => Describe(entry.SetId, outfits, view, configuration, equipLocks))
 
                 // Re-applied against the standing's own totals. The pass above counts every piece
                 // the set lists; this one counts the pieces that resolved to a real item, and a
@@ -91,7 +98,11 @@ public static class SetCompletion
     }
 
     public static SetStanding Describe(
-        uint setId, OutfitCatalog outfits, OwnershipView view, Configuration configuration)
+        uint setId,
+        OutfitCatalog outfits,
+        OwnershipView view,
+        Configuration configuration,
+        EquipLockFilter equipLocks)
     {
         var items = Plugin.DataManager.GetExcelSheet<Item>();
         var states = new List<SetPieceState>();
@@ -99,6 +110,12 @@ public static class SetCompletion
         foreach (var piece in outfits.PiecesOf(setId))
         {
             if (!items.TryGetRow(piece, out var item))
+                continue;
+
+            // Left out of the pieces and out of the totals both, so a set that is half unwearable
+            // reads as done when you have the half you can wear rather than stalling at 4 of 8
+            // against pieces you will never get.
+            if (equipLocks.Hides(item, configuration))
                 continue;
 
             // Slot order comes off the row already being read for the name. The catalogue's own
@@ -131,6 +148,27 @@ public static class SetCompletion
             states.Count,
             states);
     }
+
+    /// <summary>
+    /// Whether a piece belongs in a set's reckoning at all.
+    /// </summary>
+    /// <remarks>
+    /// A sheet read per piece of every set in the game, which the counting pass is otherwise careful
+    /// to avoid - but only while the filter is on, and only when the ownership view has moved. The
+    /// alternative is a second index over the same data to save a lookup that Lumina already caches.
+    /// </remarks>
+    private static bool Wearable(uint itemId, Configuration configuration, EquipLockFilter equipLocks)
+    {
+        if (!Filtering(configuration))
+            return true;
+
+        return !Plugin.DataManager.GetExcelSheet<Item>().TryGetRow(itemId, out var item) ||
+               !equipLocks.Hides(item, configuration);
+    }
+
+    /// <summary>Whether either lock filter is on, and so whether a set's pieces need sifting.</summary>
+    private static bool Filtering(Configuration configuration) =>
+        configuration.OnlyCurrentGenderEquippable || configuration.OnlyCurrentRaceEquippable;
 
     private static OwnershipSource Resolve(
         uint itemId, OutfitCatalog outfits, OwnershipView view, Configuration configuration) =>

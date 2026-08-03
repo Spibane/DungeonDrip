@@ -249,6 +249,8 @@ public abstract unsafe class AddonPanelWindow : Window
         var options = new ViewOptions(
             Plugin.Configuration.ShowOwnedItems,
             Plugin.Configuration.OnlyCurrentJobEquippable,
+            Plugin.Configuration.OnlyCurrentGenderEquippable,
+            Plugin.Configuration.OnlyCurrentRaceEquippable,
             Plugin.Configuration.HideWeapons,
             Settings.GroupBySlot);
 

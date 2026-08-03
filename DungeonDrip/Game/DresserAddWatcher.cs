@@ -17,11 +17,12 @@ public sealed record DresserAddRow(
     string SlotName,
     CollectionMarker Marker,
     bool JobEquippable,
+    EquipLock Locks,
     CarryLocation Location,
     int Quantity,
     bool ArmoireWouldTake,
     string? Blocked)
-    : GearRow(ItemId, Name, IconId, SlotOrder, SlotName, Marker, JobEquippable);
+    : GearRow(ItemId, Name, IconId, SlotOrder, SlotName, Marker, JobEquippable, Locks);
 
 /// <summary>
 /// Watches the Glamour Dresser and works out what you are carrying that is not in it.
@@ -166,6 +167,7 @@ public sealed unsafe class DresserAddWatcher : IDisposable
                 // by construction; that is what the list is.
                 CollectionMarker.NotCollected,
                 row.JobEquippable,
+                row.Locks,
                 piece.Location,
                 piece.Quantity,
                 piece.ArmoireWouldTake,

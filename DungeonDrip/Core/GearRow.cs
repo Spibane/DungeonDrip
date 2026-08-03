@@ -15,6 +15,11 @@ namespace DungeonDrip.Core;
 /// with a different lifetime. Folding them together would drag loot data into the panels to save
 /// six fields.
 /// </remarks>
+/// <param name="Locks">
+/// Which of the piece's own locks this character falls foul of. Baked in beside the job answer rather
+/// than asked at draw time, for the same reason: the row is cached and the sheet read is not free.
+/// The user's filters are applied to it where it is drawn, so flipping one costs no rebuild.
+/// </param>
 /// <param name="OutfitsStored">
 /// Only meaningful beside <see cref="CollectionMarker.OutfitPartial"/>: how many of the outfit sets
 /// using this piece are stored holding it. Zero for every other marker, and defaulted so the
@@ -29,6 +34,7 @@ public record GearRow(
     string SlotName,
     CollectionMarker Marker,
     bool JobEquippable,
+    EquipLock Locks,
     int OutfitsStored = 0,
     int OutfitsTotal = 0)
 {

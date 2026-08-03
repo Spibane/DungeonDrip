@@ -270,6 +270,8 @@ what is specific to that surface.
 | --- | --- | --- |
 | List owned pieces, greyed out | General | off |
 | Only show gear the current job can wear | General | off |
+| Leave out gear locked to the other gender | General | off |
+| Leave out gear locked to another race | General | off |
 | Skip weapons, main hands and off-hands | General | off |
 | Compare against Dresser, Armoire or both | General | both |
 | Also count bags, armoury, equipped, saddlebags | General | off |

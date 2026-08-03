@@ -105,7 +105,7 @@ public sealed class CollectionView(Plugin plugin)
             ownership, plugin.Outfits, plugin.Storage, plugin.Ownership.ArmoireUpdatedUtc != null);
 
         sets = plugin.Ownership.HasDresserData
-            ? SetCompletion.InProgress(plugin.Outfits, ownership, plugin.Configuration)
+            ? SetCompletion.InProgress(plugin.Outfits, ownership, plugin.Configuration, plugin.EquipLocks)
             : [];
     }
 
@@ -117,7 +117,9 @@ public sealed class CollectionView(Plugin plugin)
             configuration.OutfitOwnership,
             configuration.CountInventoryAndEquipped,
             configuration.HideWeapons,
-            configuration.OnlyCurrentJobEquippable);
+            configuration.OnlyCurrentJobEquippable,
+            configuration.OnlyCurrentGenderEquippable,
+            configuration.OnlyCurrentRaceEquippable);
     }
 
     /// <summary>
@@ -491,5 +493,7 @@ public sealed class CollectionView(Plugin plugin)
         OutfitOwnershipMode Outfits,
         bool CountInventory,
         bool HideWeapons,
-        bool JobOnly);
+        bool JobOnly,
+        bool GenderOnly,
+        bool RaceOnly);
 }
