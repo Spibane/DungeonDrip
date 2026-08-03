@@ -52,6 +52,35 @@ public sealed unsafe class ItemTooltipLine : IDisposable
 
     private bool warned;
 
+    // TEMPORARY: reports which guard the line is stopping at, toggled by "/dungeondrip tooltipdebug".
+    private bool debug;
+    private uint debugLast;
+    private bool firedOnce;
+
+    public string ToggleDebug()
+    {
+        debug = !debug;
+        debugLast = 0;
+        firedOnce = false;
+        if (debug && hook == null)
+            return "Dungeon Drip: the tooltip hook never installed - the signature did not match.";
+
+        return debug
+            ? "Dungeon Drip: tooltip diagnostics ON. Hover a few pieces, then check /xllog."
+            : "Dungeon Drip: tooltip diagnostics OFF.";
+    }
+
+    private bool Trace(uint itemId, string outcome)
+    {
+        if (debug && itemId != debugLast)
+        {
+            debugLast = itemId;
+            Plugin.Log.Information($"[tooltip] {itemId}: {outcome}");
+        }
+
+        return false;
+    }
+
     public ItemTooltipLine(Plugin plugin, ISigScanner scanner, IGameInteropProvider interop)
     {
         this.plugin = plugin;
@@ -87,6 +116,13 @@ public sealed unsafe class ItemTooltipLine : IDisposable
         // an exception must never cost the user their tooltip.
         try
         {
+            if (debug && !firedOnce)
+            {
+                firedOnce = true;
+                Plugin.Log.Information(
+                    $"[tooltip] detour is firing. setting={plugin.Configuration.ShowTooltipLine}");
+            }
+
             if (plugin.Configuration.ShowTooltipLine)
                 Append(strings);
         }
@@ -105,11 +141,17 @@ public sealed unsafe class ItemTooltipLine : IDisposable
     private void Append(StringArrayData* strings)
     {
         if (strings == null || strings->StringArray == null || strings->Size <= ItemDescription)
+        {
+            Trace(uint.MaxValue, $"array unusable (size {(strings == null ? -1 : strings->Size)})");
             return;
+        }
 
         var hovered = Plugin.GameGui.HoveredItem;
         if (hovered is <= 0 or > uint.MaxValue)
+        {
+            Trace(uint.MaxValue, $"HoveredItem is {hovered} at generate time");
             return;
+        }
 
         var (itemId, kind) = ItemUtil.GetBaseId((uint)hovered);
 
@@ -117,12 +159,18 @@ public sealed unsafe class ItemTooltipLine : IDisposable
         // a turn-in rather than a glamour decision. HQ is not excluded - HQ gear is real gear, and
         // the base id is what the dresser stores.
         if (itemId == 0 || kind is ItemKind.EventItem or ItemKind.Collectible)
+        {
+            Trace(itemId, $"kind {kind}");
             return;
+        }
 
         // The same content rule as every other surface, so the absence of a line keeps meaning
         // "not glamour gear" rather than "you have it".
         if (!plugin.Storage.CanBeStored(itemId))
+        {
+            Trace(itemId, "not storable");
             return;
+        }
 
         var source = MissingItems.Resolve(
             itemId,
@@ -135,7 +183,10 @@ public sealed unsafe class ItemTooltipLine : IDisposable
 
         // A tooltip has no room to explain why it cannot say, so it says nothing.
         if (marker0 == CollectionMarker.Unknown)
+        {
+            Trace(itemId, "no dresser data");
             return;
+        }
 
         var raw = strings->StringArray[ItemDescription];
         var existing = raw.Value == null
@@ -145,7 +196,10 @@ public sealed unsafe class ItemTooltipLine : IDisposable
         // The generator runs more than once per hover, so without this the line would stack up.
         // The payload is namespaced by plugin, so ours and another plugin's cannot be confused.
         if (AlreadyMarked(existing))
+        {
+            Trace(itemId, "already marked");
             return;
+        }
 
         var stale = plugin.Ownership.IsDresserStale;
         var colour = marker0 switch
@@ -172,7 +226,11 @@ public sealed unsafe class ItemTooltipLine : IDisposable
             .AddText($"Dungeon Drip - {note}")
             .AddUiForegroundOff();
 
-        strings->SetValue(ItemDescription, built.Build().EncodeWithNullTerminator(), false);
+        var bytes = built.Build().EncodeWithNullTerminator();
+        strings->SetValue(ItemDescription, bytes, false);
+
+        Trace(itemId, $"WROTE {bytes.Length} bytes to field {ItemDescription} ({note}); " +
+                      $"existing was {existing.TextValue.Length} chars");
     }
 
     private bool AlreadyMarked(SeString text)

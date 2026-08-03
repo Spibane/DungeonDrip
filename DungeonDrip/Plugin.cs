@@ -377,6 +377,11 @@ public sealed class Plugin : IDalamudPlugin
                 ChatGui.Print(Shop.Describe());
                 return;
 
+            // TEMPORARY - remove with the tooltip diagnostics.
+            case "tooltipdebug":
+                ChatGui.Print(tooltipLine.ToggleDebug());
+                return;
+
             case "update":
                 LootData.CheckForUpdates(force: true);
                 RefetchWikiForSelection();
