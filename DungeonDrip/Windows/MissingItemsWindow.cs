@@ -215,7 +215,9 @@ public class MissingItemsWindow : Window
         if (tracker.IsDresserStale)
             ImGui.TextColored(Palette.Warning, $"Glamour Dresser snapshot is {age} old - open your dresser to refresh it.");
         else
-            ImGui.TextColored(Palette.Muted, $"Dresser: {tracker.DresserSlotsUsed} slots, read {age} ago.");
+            ImGui.TextColored(Palette.Muted, tracker.DresserSlotCapacity > 0
+                ? $"Dresser: {tracker.DresserSlotsUsed} of {tracker.DresserSlotCapacity} slots, read {age} ago."
+                : $"Dresser: {tracker.DresserSlotsUsed} slots, read {age} ago.");
 
         if (tracker.ArmoireUpdatedUtc == null)
         {
