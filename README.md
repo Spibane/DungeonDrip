@@ -122,6 +122,22 @@ plugins that do. Covered: gil vendors and Calamity Salvagers, item-exchange coun
 scrip exchanges, Grand Company quartermasters, free-item counters and the Firmament. Anything else
 gets no panel — run `/dungeondrip shop` there and report the addon name it prints.
 
+## At the market board
+
+Open a board, pick a category, and a panel appears beside the browse list marking which of that
+gear you already have — the same markers as at a vendor, and the same amber-x rule.
+
+Only the **browse list** gets a panel. The listings for a single item do not: by the time that
+window is open you have chosen the piece, so the question was needed one screen earlier, and every
+row there would be the same piece repeated once per seller.
+
+Results arrive from the server in pages of twenty, so the panel fills in as the category loads.
+Scrolling does not re-read anything.
+
+This is where a stale snapshot matters most and where it costs the most, since you reach a board by
+travelling to one and zoning is exactly what wipes the dresser data. The amber x means *probably
+new, but worth checking before you spend the gil*.
+
 ## At the Glamour Dresser
 
 Open a dresser and a panel appears beside it listing what you are carrying that is **not** stored
@@ -234,6 +250,7 @@ what is specific to that surface.
 | Group the list by slot or by role | Duties | slot |
 | Companion list beside the loot window | Duties | on |
 | Panel beside vendor windows | Panels | on |
+| Panel beside the market board | Panels | on |
 | Panel beside the Glamour Dresser | Panels | on |
 | Group each panel by slot | Panels | on |
 | Gear options on the game's right-click menus | In-game UI | on |
@@ -377,6 +394,7 @@ DungeonDrip/
 │   ├── GameContextMenu.cs       that list, rendered into the game's own menus
 │   ├── GearRowFactory.cs        item id -> drawable row, cached, shared by the panels
 │   ├── ShopWatcher.cs           which vendor is open and what it is selling
+│   ├── MarketBoardWatcher.cs    what the board's browse list is showing
 │   ├── DresserAddWatcher.cs     what you carry that the dresser has not got
 │   ├── OwnershipTracker.cs      per-character snapshot and staleness
 │   └── LootObserver.cs          records gear seen dropping
@@ -404,6 +422,7 @@ DungeonDrip/
     ├── AddonPanelWindow.cs      anchoring, sizing and the drag latch every panel shares
     ├── VendorPanelWindow.cs     what is vendor-specific about the vendor panel
     ├── DresserPanelWindow.cs    the add list beside the Glamour Dresser
+    ├── MarketBoardPanelWindow.cs what is board-specific about the board panel
     ├── PanelGrouping.cs         slot headings and the filter counts
     ├── LootCompanionWindow.cs   read-only list beside the Need/Greed window
     └── ConfigWindow.cs
