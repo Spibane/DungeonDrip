@@ -573,6 +573,7 @@ public class MissingItemsWindow : Window
 
         using var tooltip = ImRaii.Tooltip();
         ImGui.Text(item.Name);
+        ImGui.TextColored(Palette.Muted, $"iLvl {item.ItemLevel}");
         ImGui.Text(MissingItems.Describe(item.Source));
         ImGui.TextColored(Palette.Muted, ProvenanceDescription(item.Provenance));
 

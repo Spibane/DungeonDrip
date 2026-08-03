@@ -89,7 +89,7 @@ public class ConfigWindow : Window
 
         var hideWeapons = configuration.HideWeapons;
         if (UiParts.Toggle("Skip weapons", ref hideWeapons,
-                "Hides main hands and off-hands, which drop together."))
+                "Main hands and off-hands."))
         {
             configuration.HideWeapons = hideWeapons;
             changed = true;
@@ -102,10 +102,9 @@ public class ConfigWindow : Window
 
         var clearFittingRoom = configuration.ClearFittingRoomForOutfits;
         if (UiParts.Toggle("Empty the fitting room before trying on an outfit", ref clearFittingRoom,
-                "Closes the fitting room first, so the set is shown on its own rather than over\n" +
-                "whatever was already in there. Only the preview is discarded; outfits you have saved\n" +
-                "out of the room are in your Glamour Dresser and are not touched.\n" +
-                "Trying on a single piece never clears anything."))
+                "Shows the set on its own rather than over what was already in the room.\n" +
+                "Discards the preview only; saved outfits are untouched.\n" +
+                "Single pieces never clear anything."))
         {
             configuration.ClearFittingRoomForOutfits = clearFittingRoom;
             changed = true;
@@ -135,15 +134,13 @@ public class ConfigWindow : Window
         if (ImGui.IsItemHovered())
         {
             ImGui.SetTooltip(
-                "The list only ever shows pieces the chosen store can actually hold. Most Armoire\n" +
-                "items can live in either place, so Armoire-only is a narrower view of the same gear -\n" +
-                "recent dungeon sets qualify, older ones are Dresser-only.");
+                "Lists only pieces the chosen store can hold. The two overlap: most Armoire items\n" +
+                "can also go in the Dresser, so Armoire-only is a narrower view of the same gear.");
         }
 
         var countInventory = configuration.CountInventoryAndEquipped;
         if (UiParts.Toggle("Also count bags, armoury, equipped gear and saddlebags", ref countInventory,
-                "Off by default: a drop sitting in your bag is not in your collection yet.\n" +
-                "Retainer inventories cannot be read unless you are at a retainer, so they are never counted."))
+                "Retainer inventories are never counted; they cannot be read away from a retainer."))
         {
             configuration.CountInventoryAndEquipped = countInventory;
             changed = true;
@@ -168,8 +165,7 @@ public class ConfigWindow : Window
         if (ImGui.IsItemHovered())
         {
             ImGui.SetTooltip(
-                "A piece can appear in more than one outfit set. The strict option only calls it\n" +
-                "collected once you have stored every set that includes it.");
+                "A piece can belong to several sets. Strict requires all of them stored.");
         }
 
         ImGui.Spacing();
@@ -206,7 +202,7 @@ public class ConfigWindow : Window
 
         var closeOnLeave = configuration.CloseWhenLeavingDuty;
         if (UiParts.Toggle("Close again when I leave the duty", ref closeOnLeave,
-                "A duty you pinned yourself stays open - only the automatic tracking closes."))
+                "A pinned duty stays open."))
         {
             configuration.CloseWhenLeavingDuty = closeOnLeave;
             changed = true;
@@ -312,28 +308,24 @@ public class ConfigWindow : Window
 
         changed |= DrawPanelSection(
             "Vendor windows", "vendor", configuration.VendorPanel,
-            "Lists the glamour gear the vendor is currently showing, marked by where you already\n" +
-            "have each piece. Items that cannot be kept as a glamour are left out entirely.\n" +
-            "Run \"/dungeondrip shop\" at a vendor it does not recognise to identify it.",
+            "Glamour gear the vendor is currently showing, marked by where it is in your\n" +
+            "collection. Non-glamour items are left out.\n" +
+            "\"/dungeondrip shop\" identifies an unrecognised vendor window.",
             null);
 
         changed |= DrawPanelSection(
             "Market board", "market", configuration.MarketBoardPanel,
-            "Lists the gear the board's browse list is currently showing, marked by where you\n" +
-            "already have each piece. The listings for one item get no panel - by then you have\n" +
-            "chosen it, and every row would be the same piece.",
+            "Gear in the board's browse list, marked by where it is in your collection.\n" +
+            "The listings for a single item get no panel.",
             null);
 
         changed |= DrawPanelSection(
             "Glamour Dresser", "dresser", configuration.DresserPanel,
-            "Lists what you are carrying that is not in the dresser or Armoire yet.",
-            "The one panel whose list means the opposite of the others: what you have on you and\n" +
-            "have not stored, rather than what you are being shown and do not own.\n\n" +
-            "Its markers say where the piece is rather than whether you own it, since by\n" +
-            "construction you do:\n" +
-            "    case: in your bags        box: in the armoury chest\n" +
-            "    figure: worn, take it off first        horse: in the saddlebag, fetch it first\n" +
-            "An amber row needs something doing before it can be stored.");
+            "Carried gear that is not in the dresser or Armoire.",
+            "Markers give the location, not ownership:\n" +
+            "    case: bags        box: armoury chest\n" +
+            "    figure: worn        horse: saddlebag\n" +
+            "Amber: something is required first.");
 
         DrawSharedSettingsNote();
         return changed;
@@ -389,6 +381,17 @@ public class ConfigWindow : Window
             changed = true;
         }
 
+        if (id == "dresser")
+        {
+            var armoury = configuration.DresserPanelIncludesArmoury;
+            if (UiParts.Toggle("Include armoury chest gear##dresser", ref armoury,
+                    "Armoury gear may belong to a gearset."))
+            {
+                configuration.DresserPanelIncludesArmoury = armoury;
+                changed = true;
+            }
+        }
+
         ImGui.Spacing();
         return changed;
     }
@@ -409,8 +412,7 @@ public class ConfigWindow : Window
 
         var contextMenu = configuration.ShowGameContextMenu;
         if (UiParts.Toggle("Add gear options to the game's right-click menus", ref contextMenu,
-                "Try on outfit, and where a piece drops.\n" +
-                "Only options the game does not already offer are added."))
+                "Adds: try on outfit, where a piece drops."))
         {
             configuration.ShowGameContextMenu = contextMenu;
             changed = true;
@@ -428,7 +430,7 @@ public class ConfigWindow : Window
 
         var tooltipLine = configuration.ShowTooltipLine;
         if (UiParts.Toggle("Mark the game's item tooltips", ref tooltipLine,
-                "Adds an icon and a word to the tooltip's category row, saying where the piece is.\n\n" +
+                "Adds an icon and a word to the tooltip's category row.\n\n" +
                 "gold star: put away, in the Dresser, the Armoire or a finished outfit\n" +
                 "silver star: in a stored outfit that still has gaps\n" +
                 "orange diamond: on you, in no box at all\n" +

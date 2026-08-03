@@ -25,10 +25,33 @@ public sealed class DresserPanelWindow(Plugin plugin)
 
     protected override IReadOnlyList<GearRow>? ResolveRows() => Plugin.Dresser.Resolve();
 
+    /// <summary>Every row here is unstored by construction, so the filter has nothing to act on.</summary>
+    protected override bool HasOwnedRows => false;
+
     /// <summary>An empty list here means you are done, which is worth saying in the good colour.</summary>
     protected override string EmptyMessage => "Nothing on you that is not already stored.";
 
     protected override bool EmptyIsGood => true;
+
+    protected override bool DrawExtraToolbarButtons()
+    {
+        var armoury = Plugin.Configuration.DresserPanelIncludesArmoury;
+
+        ImGui.SameLine();
+
+        if (!UiParts.ToolButton(
+                "##dresserArmoury",
+                armoury ? FontAwesomeIcon.Archive : FontAwesomeIcon.BoxOpen,
+                armoury
+                    ? "Listing armoury chest gear. Click to list only bags and saddlebag."
+                    : "Skipping armoury chest gear. Click to list it."))
+        {
+            return false;
+        }
+
+        Plugin.Configuration.DresserPanelIncludesArmoury = !armoury;
+        return true;
+    }
 
     /// <summary>
     /// How full the box is, and whether what is on this list would even fit.

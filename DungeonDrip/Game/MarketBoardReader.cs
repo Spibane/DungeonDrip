@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Dalamud.Utility;
+using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 using FFXIVClientStructs.FFXIV.Client.UI.Info;
 
 namespace DungeonDrip.Game;
@@ -13,11 +14,15 @@ namespace DungeonDrip.Game;
 /// search agent, and the agent is both easier to read and stable while you scroll - the values
 /// block holds category icons and nothing about what is listed.
 ///
-/// <para>Read from the catalogue proxy's own entries rather than the agent's page of ids. The
-/// agent's array is a cache the game writes over and does not shrink, so it keeps whatever the last
-/// category left behind - and searching within a category leaves both sets of results in it at
-/// once, which put the category's gear on the panel beside the search's. The proxy holds the result
-/// set the board is actually showing.</para>
+/// <para>The agent holds the ids and the catalogue proxy holds the count. The agent's array is a
+/// cache the game writes over without shrinking, so it keeps whatever the last category left
+/// behind; the count is what says how much of it is current.</para>
+///
+/// <para><b>Known wrong for text searches.</b> Searching inside a category leaves both sets of
+/// results in the array and the count covers both, so the panel lists the category's gear as well
+/// as the search's. Reading the proxy's own entries instead was tried and is worse - it lags a
+/// category behind and drops results - so this is the better of the two until the search case has
+/// actually been measured rather than guessed at.</para>
 /// </remarks>
 public static unsafe class MarketBoardReader
 {
@@ -31,12 +36,16 @@ public static unsafe class MarketBoardReader
         if (proxy == null)
             return false;
 
-        var entries = proxy->Entries;
-        var count = Math.Clamp((int)proxy->EntryCount, 0, entries.Length);
+        var agent = AgentItemSearch.Instance();
+        if (agent == null)
+            return false;
+
+        var ids = agent->ListingPageItemIds;
+        var count = Math.Clamp((int)proxy->EntryCount, 0, ids.Length);
 
         for (var i = 0; i < count; i++)
         {
-            var rawId = entries[i].ItemId;
+            var rawId = ids[i];
             if (rawId == 0)
                 continue;
 

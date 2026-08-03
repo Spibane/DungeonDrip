@@ -116,6 +116,15 @@ public abstract unsafe class AddonPanelWindow : Window
     /// <summary>Extra buttons after the shared filters. Returns whether a setting moved.</summary>
     protected virtual bool DrawExtraToolbarButtons() => false;
 
+    /// <summary>
+    /// Whether the show-owned filter means anything here.
+    /// </summary>
+    /// <remarks>
+    /// False on a panel whose rows are all one state by construction, where the button would sit
+    /// there doing nothing on either setting.
+    /// </remarks>
+    protected virtual bool HasOwnedRows => true;
+
     /// <summary>What to add to a row's tooltip when the snapshot cannot be trusted about it.</summary>
     protected virtual string? UncertainNote => null;
 
@@ -387,19 +396,22 @@ public abstract unsafe class AddonPanelWindow : Window
         var configuration = Plugin.Configuration;
         var changed = false;
 
-        var showOwned = configuration.ShowOwnedItems;
-        if (UiParts.ToolButton(
-                $"##{toolbarId}Owned",
-                showOwned ? FontAwesomeIcon.Eye : FontAwesomeIcon.EyeSlash,
-                showOwned
-                    ? "Showing pieces you already have. Click to list only what you are missing.\n" + SharedNote
-                    : "Hiding pieces you already have. Click to list them too.\n" + SharedNote))
+        if (HasOwnedRows)
         {
-            configuration.ShowOwnedItems = !showOwned;
-            changed = true;
-        }
+            var showOwned = configuration.ShowOwnedItems;
+            if (UiParts.ToolButton(
+                    $"##{toolbarId}Owned",
+                    showOwned ? FontAwesomeIcon.Eye : FontAwesomeIcon.EyeSlash,
+                    showOwned
+                        ? "Showing pieces you already have. Click to list only what you are missing.\n" + SharedNote
+                        : "Hiding pieces you already have. Click to list them too.\n" + SharedNote))
+            {
+                configuration.ShowOwnedItems = !showOwned;
+                changed = true;
+            }
 
-        ImGui.SameLine();
+            ImGui.SameLine();
+        }
 
         var jobOnly = configuration.OnlyCurrentJobEquippable;
         if (UiParts.ToolButton(

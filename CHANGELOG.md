@@ -1,6 +1,8 @@
 # Changelog
 
 ### Unreleased
+- The Glamour Dresser panel can leave out armoury chest gear, from its toolbar or Settings > Panels. That gear usually belongs to a gearset rather than being loose
+- Its show-owned button is gone: every row on that panel is unstored by definition, so the button did nothing on either setting
 - **Added an optional marker to the game's own item tooltips**, saying where the piece is in your collection. It goes on the category row - the one that says Body or Hands - as one of the game's own icons plus a single word, because that row is not wide and the tooltip's rows sit at fixed positions, so a second line would draw over the row beneath. Off by default under Settings > In-game UI: it is the only thing in the plugin that changes what a game window contains rather than sitting beside it, and the only thing that hooks a game function. It appends and never replaces, and marks its own line so it cannot double up or overwrite another plugin's. If a patch moves what it hooks the line just does not appear, and Settings says so rather than offering a switch that does nothing
 - **Added a panel beside the market board**, marking which of the gear in the browse list you already have. Only the browse list gets one: by the time the listings for a single item are open you have chosen the piece, and every row there would be the same piece once per seller. Results arrive in pages of twenty so the panel fills in as a category loads, and scrolling re-reads nothing
 - The board is where a stale dresser snapshot matters most, since you get there by travelling and zoning is what wipes the data. The amber x carries its usual meaning and the tooltip says to check before spending
