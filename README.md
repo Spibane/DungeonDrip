@@ -4,7 +4,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-0.11.0-121212)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.12.0-121212)](./CHANGELOG.md)
 [![Status](https://img.shields.io/badge/status-Beta-yellow)](./CHANGELOG.md)
 [![Changelog](https://img.shields.io/badge/changelog-blue)](./CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-AGPL--3.0-663366)](./LICENSE)
@@ -190,10 +190,9 @@ when that lands back here and a thumbtack when it lands on the duty you are stan
 The toolbar's first button swaps the window between duty loot and your collection as a whole. Three
 sections, none of which involves a duty:
 
-**Sets in progress** — outfit sets you are part way through, closest to done first, with what is
-missing from each and where it drops. Two counts per row, because they are different questions:
-what you *own* says whether the set is worth chasing, what is *filled in the stored copy* says
-whether the dresser needs topping up.
+**Sets in progress** — outfit sets you are part way through, closest to done first. Expanding one
+lists what is missing and where each piece drops. A set you own nothing from is not "in progress",
+and neither is a finished one; that definition is what keeps the list a readable length.
 
 **Glamour Dresser** — how full the box is and what would free space. An outfit stored a piece at a
 time could be one set item instead; a piece in both the dresser and the Armoire is duplicated.
@@ -205,7 +204,8 @@ the space only appears once you clear them.
 rather than the conclusion: it reports that a piece is also stored and leaves the decision to you,
 because that decision is irreversible and is being read off a snapshot that may be days old. Split
 by bags, armoury and saddlebag, since what is safe to do differs; nothing you are wearing is ever
-listed. The plugin deletes nothing and cannot see retainers, and the section says so every time.
+listed. Retainers cannot be read, so they are never counted, and the section says how old the
+snapshot behind it is.
 
 ## In the game's menus
 
@@ -477,7 +477,7 @@ switched off under **Settings → In-game UI**.
 Pushing a tag does everything:
 
 ```bash
-git tag v0.11.0 && git push origin v0.11.0
+git tag v0.12.0 && git push origin v0.12.0
 ```
 
 `.github/workflows/release.yml` then builds on `windows-latest`, attaches `DungeonDrip.zip`
