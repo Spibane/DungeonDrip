@@ -17,10 +17,10 @@ public sealed record VendorRow(
     ushort ItemLevel,
     int SlotOrder,
     string SlotName,
-    VendorMarker Marker,
+    CollectionMarker Marker,
     bool JobEquippable)
 {
-    public bool IsOwned => Marker is not (VendorMarker.NotCollected or VendorMarker.Unknown);
+    public bool IsOwned => Marker is not (CollectionMarker.NotCollected or CollectionMarker.Unknown);
 }
 
 /// <summary>
@@ -228,7 +228,7 @@ public sealed class ShopWatcher : IDisposable
                 continue;
 
             rows.Add(row);
-            if (row.Marker == VendorMarker.NotCollected)
+            if (row.Marker == CollectionMarker.NotCollected)
                 notCollected++;
         }
 
@@ -294,7 +294,7 @@ public sealed class ShopWatcher : IDisposable
             (ushort)item.LevelItem.RowId,
             slotOrder,
             slotName,
-            VendorMarkers.For(source, plugin.Ownership.HasDresserData, completed),
+            CollectionMarkers.For(source, plugin.Ownership.HasDresserData, completed),
             plugin.JobFilter.CanEquip(item));
     }
 

@@ -388,15 +388,15 @@ public sealed unsafe class VendorPanelWindow : Window
 
     private void DrawRow(VendorRow row, bool stale)
     {
-        var uncertain = VendorMarkers.IsUncertain(row.Marker, stale);
+        var uncertain = CollectionMarkers.IsUncertain(row.Marker, stale);
 
         // The glyph carries the state; the name only says whether you need the thing. Hence the
         // untinted name - any colour on it would compete with the glyph for meaning.
         var glyphColour = row.Marker switch
         {
-            VendorMarker.OutfitComplete => Palette.Good,
-            VendorMarker.NotCollected => uncertain ? Palette.Warning : Palette.NotOwned,
-            VendorMarker.Unknown => Palette.Warning,
+            CollectionMarker.OutfitComplete => Palette.Good,
+            CollectionMarker.NotCollected => uncertain ? Palette.Warning : Palette.NotOwned,
+            CollectionMarker.Unknown => Palette.Warning,
             _ => Palette.Muted,
         };
 
@@ -409,9 +409,9 @@ public sealed unsafe class VendorPanelWindow : Window
         ImGui.SameLine();
         UiParts.ItemIcon(row.IconId, 20);
 
-        if (row.Marker == VendorMarker.NotCollected)
+        if (row.Marker == CollectionMarker.NotCollected)
             ImGui.Text(row.Name);
-        else if (row.Marker == VendorMarker.Unknown)
+        else if (row.Marker == CollectionMarker.Unknown)
             ImGui.TextColored(Palette.Warning, row.Name);
         else
             ImGui.TextColored(Palette.Muted, row.Name);
@@ -428,9 +428,9 @@ public sealed unsafe class VendorPanelWindow : Window
         using var tooltip = ImRaii.Tooltip();
         ImGui.Text(row.Name);
         ImGui.TextColored(Palette.Muted, $"iLvl {row.ItemLevel}");
-        ImGui.TextColored(glyphColour, VendorMarkers.Describe(row.Marker));
+        ImGui.TextColored(glyphColour, CollectionMarkers.Describe(row.Marker));
 
-        if (uncertain && row.Marker == VendorMarker.NotCollected)
+        if (uncertain && row.Marker == CollectionMarker.NotCollected)
             ImGui.TextColored(Palette.Warning, "Your dresser snapshot predates this - check before buying.");
 
         ImGui.Spacing();
@@ -441,14 +441,14 @@ public sealed unsafe class VendorPanelWindow : Window
     /// The star marks a finished outfit and nothing else. A star is a reward everywhere else in the
     /// game, so it must never land on the pieces you are missing.
     /// </remarks>
-    private static FontAwesomeIcon Glyph(VendorMarker marker) => marker switch
+    private static FontAwesomeIcon Glyph(CollectionMarker marker) => marker switch
     {
-        VendorMarker.Dresser => FontAwesomeIcon.Check,
-        VendorMarker.Outfit => FontAwesomeIcon.LayerGroup,
-        VendorMarker.OutfitComplete => FontAwesomeIcon.Star,
-        VendorMarker.Armoire => FontAwesomeIcon.Archive,
-        VendorMarker.Inventory => FontAwesomeIcon.Briefcase,
-        VendorMarker.NotCollected => FontAwesomeIcon.Times,
+        CollectionMarker.Dresser => FontAwesomeIcon.Check,
+        CollectionMarker.Outfit => FontAwesomeIcon.LayerGroup,
+        CollectionMarker.OutfitComplete => FontAwesomeIcon.Star,
+        CollectionMarker.Armoire => FontAwesomeIcon.Archive,
+        CollectionMarker.Inventory => FontAwesomeIcon.Briefcase,
+        CollectionMarker.NotCollected => FontAwesomeIcon.Times,
         _ => FontAwesomeIcon.Question,
     };
 
@@ -500,7 +500,7 @@ public sealed unsafe class VendorPanelWindow : Window
             }
 
             group.Rows.Add(row);
-            if (row.Marker == VendorMarker.NotCollected)
+            if (row.Marker == CollectionMarker.NotCollected)
                 group.NotCollected++;
         }
 
