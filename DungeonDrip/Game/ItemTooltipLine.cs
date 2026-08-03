@@ -58,6 +58,17 @@ public sealed unsafe class ItemTooltipLine : IDisposable
     /// <summary>The category's text node, which has to be told it may wrap.</summary>
     private const uint CategoryNodeId = 35;
 
+    /// <summary>
+    /// The "Extractable / Projectable / Desynthesizable" row, at the top of the tooltip's bottom
+    /// block - where other plugins put their lines.
+    /// </summary>
+    /// <remarks>
+    /// Preferred, but not guaranteed: gear that is none of those three has nothing to say here, and
+    /// a row the game left empty is a row it will not draw. When that happens the line falls back
+    /// to the category, which is always drawn. Better a line in the wrong place than no line.
+    /// </remarks>
+    private const int ExtraInfo = 35;
+
     /// <summary>Ours, so the line can recognise itself and never double up.</summary>
     private const uint MarkerCommandId = 0x44445F31;
 
@@ -208,12 +219,15 @@ public sealed unsafe class ItemTooltipLine : IDisposable
             return;
         }
 
-        var raw = strings->StringArray[ItemUiCategory];
-        var present = raw.Value == null
-            ? new SeString()
-            : MemoryHelper.ReadSeStringNullTerminated((nint)raw.Value);
+        // The bottom block if the game filled it in, the category row if it did not.
+        var field = ExtraInfo;
+        var existing = Rebase(Read(strings, ExtraInfo));
 
-        var existing = Rebase(present);
+        if (strings->Size <= ExtraInfo || existing.TextValue.Trim().Length == 0)
+        {
+            field = ItemUiCategory;
+            existing = Rebase(Read(strings, ItemUiCategory));
+        }
 
         var stale = plugin.Ownership.IsDresserStale;
         var colour = marker0 switch
@@ -235,17 +249,19 @@ public sealed unsafe class ItemTooltipLine : IDisposable
 
         // Attributed, because an unexplained line in a game tooltip is the kind of thing that gets
         // reported to Square Enix. Short, because this shares a line with the item's category.
+        // On its own line in the bottom block, where there is room and where the eye already goes
+        // looking for this sort of thing. Inline on the category row, where there is not.
         built.Add(marker)
             .Add(RawPayload.LinkTerminator)
-            .AddText("   ")
+            .AddText(field == ExtraInfo ? "\n" : "   ")
             .AddUiForeground(colour)
             .AddText($"Drip: {note}")
             .AddUiForegroundOff();
 
         var bytes = built.Build().EncodeWithNullTerminator();
-        strings->SetValue(ItemUiCategory, bytes, false);
+        strings->SetValue(field, bytes, false);
 
-        Trace(itemId, $"WROTE {bytes.Length} bytes ({note}); base was {existing.TextValue.Length} chars");
+        Trace(itemId, $"WROTE {bytes.Length} bytes to field {field} ({note})");
     }
 
     /// <summary>
@@ -258,6 +274,17 @@ public sealed unsafe class ItemTooltipLine : IDisposable
     /// each time is idempotent whether the field is fresh or not, which is the property actually
     /// wanted. A line another plugin added survives, since it lands before our marker.
     /// </remarks>
+    private static SeString Read(StringArrayData* strings, int field)
+    {
+        if (strings->Size <= field || strings->StringArray == null)
+            return new SeString();
+
+        var raw = strings->StringArray[field];
+        return raw.Value == null
+            ? new SeString()
+            : MemoryHelper.ReadSeStringNullTerminated((nint)raw.Value);
+    }
+
     private SeString Rebase(SeString present)
     {
         var kept = new SeString();
