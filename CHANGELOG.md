@@ -1,5 +1,8 @@
 # Changelog
 
+### Unreleased
+- Put back the line saying the "Already in your collection" list is read from your bags, armoury chest and saddlebag. Trimming that section took it with everything else, and it was the one line saying something rather than explaining something - without it an empty list does not tell you what was looked at
+
 ### v0.12.1 - 2026-08-03
 - Fixed a piece thrown away from your bags staying on the Collection view's "Already in your collection" list, with nothing that would ever clear it. That list reads your bags directly, on purpose, but it was being rebuilt only when the collection changed - and the collection only notices your bags when "also count bags" is on, which it is not by default
 - Trimmed what that section says. It was explaining the plugin's reasoning to somebody who only wanted to know what was on the list
