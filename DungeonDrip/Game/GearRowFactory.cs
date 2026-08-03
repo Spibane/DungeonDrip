@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Dalamud.Game.Player;
 using DungeonDrip.Core;
 using Lumina.Excel.Sheets;
 
@@ -91,6 +92,7 @@ public sealed class GearRowFactory(Plugin plugin)
             slotName,
             CollectionMarkers.For(source, plugin.Ownership.HasDresserData, completed, stored > 0),
             plugin.JobFilter.CanEquip(item),
+            plugin.EquipLocks.LocksOn(item),
             stored,
             total);
     }
@@ -101,7 +103,9 @@ public sealed class GearRowFactory(Plugin plugin)
         plugin.Configuration.Scope,
         plugin.Configuration.OutfitOwnership,
         plugin.Configuration.CountInventoryAndEquipped,
-        Plugin.PlayerState.IsLoaded ? Plugin.PlayerState.ClassJob.RowId : 0);
+        Plugin.PlayerState.IsLoaded ? Plugin.PlayerState.ClassJob.RowId : 0,
+        Plugin.PlayerState.IsLoaded ? Plugin.PlayerState.Sex : null,
+        Plugin.PlayerState.IsLoaded ? Plugin.PlayerState.Race.RowId : 0);
 
     /// <summary>
     /// Everything a cached row depends on. Compared by value once a frame, which keeps "what
@@ -109,8 +113,12 @@ public sealed class GearRowFactory(Plugin plugin)
     /// </summary>
     /// <remarks>
     /// Staleness is absent on purpose: it changes how a marker is drawn, not which marker it is, so
-    /// an ageing snapshot never rebuilds the cache. The job is here because wearability is baked
-    /// into the row.
+    /// an ageing snapshot never rebuilds the cache. The job, the gender and the race are here because
+    /// wearability is baked into the row - the last two because a Fantasia mid-session would
+    /// otherwise leave every cached row answering for who you used to be.
+    ///
+    /// Neither of the filter toggles belongs here: they decide whether a row is drawn, not what it
+    /// says, so flipping one must not cost a rebuild.
     /// </remarks>
     private readonly record struct MarkerContext(
         int OwnershipRevision,
@@ -118,5 +126,7 @@ public sealed class GearRowFactory(Plugin plugin)
         CollectionScope Scope,
         OutfitOwnershipMode OutfitMode,
         bool CountInventory,
-        uint ClassJob);
+        uint ClassJob,
+        Sex? Sex,
+        uint Race);
 }

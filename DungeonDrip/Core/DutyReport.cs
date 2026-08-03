@@ -28,7 +28,8 @@ public sealed record DutyReport(
     int MissingCount,
     int TotalCount,
     int HiddenByJobFilter,
-    int HiddenWeapons);
+    int HiddenWeapons,
+    int HiddenUnwearable = 0);
 
 /// <summary>Turns a territory plus an ownership snapshot into the list the window draws.</summary>
 public sealed class DutyReportBuilder(
@@ -37,7 +38,8 @@ public sealed class DutyReportBuilder(
     OutfitCatalog outfits,
     JobRoleIndex jobRoles,
     StorageEligibility storage,
-    JobFilter jobFilter)
+    JobFilter jobFilter,
+    EquipLockFilter equipLocks)
 {
     public DutyReport? Build(uint territoryId, OwnershipView ownership, Configuration configuration)
     {
@@ -47,6 +49,7 @@ public sealed class DutyReportBuilder(
         var items = Plugin.DataManager.GetExcelSheet<Item>();
         var results = new List<ReportItem>(itemIds.Length);
         var hiddenByJob = 0;
+        var hiddenUnwearable = 0;
         var hiddenWeapons = 0;
 
         foreach (var itemId in itemIds)
@@ -61,6 +64,14 @@ public sealed class DutyReportBuilder(
             if (configuration.OnlyCurrentJobEquippable && !jobFilter.CanEquip(item))
             {
                 hiddenByJob++;
+                continue;
+            }
+
+            // Counted separately from the job filter. The two are not the same news: one is "wrong
+            // job today", the other is "this character will never wear it".
+            if (equipLocks.Hides(item, configuration))
+            {
+                hiddenUnwearable++;
                 continue;
             }
 
@@ -106,6 +117,7 @@ public sealed class DutyReportBuilder(
             results.Count(r => !r.IsOwned),
             results.Count,
             hiddenByJob,
-            hiddenWeapons);
+            hiddenWeapons,
+            hiddenUnwearable);
     }
 }

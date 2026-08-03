@@ -87,6 +87,35 @@ public class ConfigWindow : Window
             changed = true;
         }
 
+        // The two locks are one idea with two switches, so they sit together under one line rather
+        // than as two unrelated toggles in the run of filters above.
+        ImGui.Spacing();
+        ImGui.TextColored(Palette.Muted, "Leave out gear this character can never wear:");
+
+        var genderOnly = configuration.OnlyCurrentGenderEquippable;
+        if (UiParts.Toggle("Locked to the other gender", ref genderOnly,
+                "A couple of hundred pieces are locked to one gender, and 97 outfit sets are\n" +
+                "nothing but those - the summer halters and tops, the Moonfire attire.\n" +
+                "A set with no wearable pieces left stops being one you are part way through,\n" +
+                "and a partly locked set counts out of the pieces you can wear."))
+        {
+            configuration.OnlyCurrentGenderEquippable = genderOnly;
+            changed = true;
+        }
+
+        var raceOnly = configuration.OnlyCurrentRaceEquippable;
+        if (UiParts.Toggle("Locked to another race", ref raceOnly,
+                "The 56 pieces of another race's starting gear - the Hyuran Tunic, the\n" +
+                "Elezen Surcoat and their kin.\n" +
+                "Every race-locked piece is gender-locked as well, so with both on this adds\n" +
+                "the same-gender half of what the other setting has not already taken out."))
+        {
+            configuration.OnlyCurrentRaceEquippable = raceOnly;
+            changed = true;
+        }
+
+        ImGui.Spacing();
+
         var hideWeapons = configuration.HideWeapons;
         if (UiParts.Toggle("Skip weapons", ref hideWeapons,
                 "Main hands and off-hands."))

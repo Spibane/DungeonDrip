@@ -82,6 +82,36 @@ public class Configuration : IPluginConfiguration
     /// <summary>Restrict every gear list to what the current job can actually wear.</summary>
     public bool OnlyCurrentJobEquippable { get; set; }
 
+    /// <summary>
+    /// Leave out gear locked to the other gender, everywhere, including whole outfit sets that turn
+    /// out to be nothing but such pieces.
+    /// </summary>
+    /// <remarks>
+    /// Separate from the job filter although it reads like a second helping of it. That one is about
+    /// what you have equipped this minute and flips several times an evening; this is a standing fact
+    /// about the character, and the two are wanted independently - "everything I could ever wear" is
+    /// the common case and needs this on and that off.
+    ///
+    /// Off by default, like every other filter here. Neither lock is quite permanent - a Fantasia
+    /// changes both - so a collector keeping the other half in mind is not doing anything odd, and the
+    /// plugin should not decide for them.
+    /// </remarks>
+    public bool OnlyCurrentGenderEquippable { get; set; }
+
+    /// <summary>
+    /// The same for gear locked to races this character is not.
+    /// </summary>
+    /// <remarks>
+    /// Its own setting rather than folded in with the gender one, because they are not the same size
+    /// of thing: the gender lock covers a couple of hundred pieces and 97 whole outfit sets, the race
+    /// lock the 56 pieces of another race's starting gear. Somebody who wants the sets out of the way
+    /// does not necessarily want the racial pieces out of the way as well.
+    ///
+    /// Every race-locked row in the game's sheet locks a gender too, so with both on the second one
+    /// only adds the same-gender half of another race's wardrobe.
+    /// </remarks>
+    public bool OnlyCurrentRaceEquippable { get; set; }
+
     /// <summary>Leave weapons and off-hands out of every gear list.</summary>
     public bool HideWeapons { get; set; }
 

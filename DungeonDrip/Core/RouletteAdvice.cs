@@ -53,7 +53,8 @@ public sealed class RouletteAdviceBuilder(
     ContentFinderIndex duties,
     OutfitCatalog outfits,
     JobRoleIndex jobRoles,
-    StorageEligibility storage)
+    StorageEligibility storage,
+    EquipLockFilter equipLocks)
 {
     public IReadOnlyList<RouletteAdvice> Build(OwnershipView ownership, Configuration configuration)
     {
@@ -85,9 +86,14 @@ public sealed class RouletteAdviceBuilder(
                     if (!items.TryGetRow(itemId, out var item))
                         continue;
 
-                    // Same two filters the missing list uses, so the two views cannot disagree
-                    // about what counts as a piece worth having.
+                    // The same filters the missing list uses, so the two views cannot disagree about
+                    // what counts as a piece worth having. The job filter is deliberately not among
+                    // them - the whole question here is which job to queue as, so a pool cannot be
+                    // judged by the one you happen to be standing in.
                     if (!storage.MatchesScope(storage.Of(item), configuration.Scope))
+                        continue;
+
+                    if (equipLocks.Hides(item, configuration))
                         continue;
 
                     var (slot, _) = EquipSlots.Describe(item.EquipSlotCategory.Value);

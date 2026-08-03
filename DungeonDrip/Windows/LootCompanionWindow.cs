@@ -115,6 +115,11 @@ public sealed unsafe class LootCompanionWindow : Window
             if (!storage.MatchesScope(storage.Of(item), plugin.Configuration.Scope))
                 continue;
 
+            // The job filter is deliberately absent here - anyone may roll on anything - but a piece
+            // this character can never wear is not a piece to spend a Need on.
+            if (plugin.EquipLocks.Hides(item, plugin.Configuration))
+                continue;
+
             var source = MissingItems.Resolve(
                 itemId, view, outfits.SetsContaining(itemId), mode, plugin.Configuration.Scope);
             var owned = source != OwnershipSource.None;

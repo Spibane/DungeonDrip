@@ -7,6 +7,8 @@ namespace DungeonDrip.Windows;
 public readonly record struct ViewOptions(
     bool ShowOwned,
     bool JobOnly,
+    bool GenderOnly,
+    bool RaceOnly,
     bool HideWeapons,
     bool GroupBySlot);
 
@@ -54,6 +56,12 @@ internal static class PanelGrouping
             }
 
             if (options.JobOnly && !row.JobEquippable)
+            {
+                hiddenByFilter++;
+                continue;
+            }
+
+            if (EquipLockFilter.Excludes(row.Locks, options.GenderOnly, options.RaceOnly))
             {
                 hiddenByFilter++;
                 continue;
