@@ -363,9 +363,14 @@ public sealed class CollectionView(Plugin plugin)
 
         var stale = plugin.Ownership.IsDresserStale;
 
+        // Where the list comes from, which is not guessable from its contents and changes what an
+        // empty one means. Trimmed away with the rest of this section's text and put straight back:
+        // it was the one line that was saying something rather than explaining something.
+        ImGui.TextColored(Palette.Muted, "From your bags, armoury chest and saddlebag.");
+
         if (carried.AlreadyStored.Count == 0 && carried.OnlyInsideAnOutfit.Count == 0)
         {
-            ImGui.TextColored(Palette.Good, "Nothing carried is already stored.");
+            ImGui.TextColored(Palette.Good, "Nothing there is already stored.");
             DrawCaveats(stale);
             return;
         }
