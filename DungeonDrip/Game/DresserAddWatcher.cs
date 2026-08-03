@@ -45,7 +45,7 @@ public sealed unsafe class DresserAddWatcher : IDisposable
     private int seenRowRevision = -1;
     private ulong seenInventory;
     private bool open;
-    private bool seenArmoury = true;
+    private (bool Armoury, bool Equipped) seenFilters = (true, true);
 
     public DresserAddWatcher(Plugin plugin)
     {
@@ -91,20 +91,39 @@ public sealed unsafe class DresserAddWatcher : IDisposable
         plugin.Rows.Revalidate();
 
         var inventory = InventoryReader.Fingerprint();
-        var armoury = plugin.Configuration.DresserPanelIncludesArmoury;
+        var filters = Filters();
 
         if (rows != null && plugin.Rows.Revision == seenRowRevision &&
-            inventory == seenInventory && armoury == seenArmoury)
+            inventory == seenInventory && filters == seenFilters)
         {
             return rows;
         }
 
-        seenArmoury = armoury;
+        seenFilters = filters;
         seenRowRevision = plugin.Rows.Revision;
         seenInventory = inventory;
         rows = Build();
         return rows;
     }
+
+    /// <summary>
+    /// Which locations the panel is currently listing.
+    /// </summary>
+    /// <remarks>
+    /// Both of these are gear that is spoken for. Armoury pieces are usually a gearset's, and one
+    /// you are wearing has to come off before it can go anywhere - so a list of things to store is
+    /// often better without them, and both are switchable rather than assumed either way.
+    /// </remarks>
+    private (bool Armoury, bool Equipped) Filters() => (
+        plugin.Configuration.DresserPanelIncludesArmoury,
+        plugin.Configuration.DresserPanelIncludesEquipped);
+
+    private bool Included(CarryLocation location) => location switch
+    {
+        CarryLocation.Armoury => plugin.Configuration.DresserPanelIncludesArmoury,
+        CarryLocation.Equipped => plugin.Configuration.DresserPanelIncludesEquipped,
+        _ => true,
+    };
 
     private List<DresserAddRow>? Forget()
     {
@@ -119,11 +138,9 @@ public sealed unsafe class DresserAddWatcher : IDisposable
 
         var built = new List<DresserAddRow>(report.NotStored.Count);
 
-        var armoury = plugin.Configuration.DresserPanelIncludesArmoury;
-
         foreach (var piece in report.NotStored)
         {
-            if (!armoury && piece.Location == CarryLocation.Armoury)
+            if (!Included(piece.Location))
                 continue;
 
             // Through the shared factory, so job filtering and the marker vocabulary match every
