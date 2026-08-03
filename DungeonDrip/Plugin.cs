@@ -67,6 +67,9 @@ public sealed class Plugin : IDalamudPlugin
     /// <summary>The vendor currently in front of the player, and what it is selling.</summary>
     public ShopWatcher Shop { get; }
 
+    /// <summary>One resolved-row cache, shared by every panel.</summary>
+    public GearRowFactory Rows { get; }
+
     private readonly WindowSystem windowSystem = new("DungeonDrip");
     private readonly ContentFinderIndex contentFinder;
     private readonly JobRoleIndex jobRoles;
@@ -108,6 +111,7 @@ public sealed class Plugin : IDalamudPlugin
 
         LearnedLoot = new LearnedLootStore(configDirectory);
         lootObserver = new LootObserver(Configuration, LearnedLoot, contentFinder, Storage);
+        Rows = new GearRowFactory(this);
         Shop = new ShopWatcher(this);
         gameContextMenu = new GameContextMenu(this);
         Wiki = new WikiLootSource(configDirectory, Configuration, http);

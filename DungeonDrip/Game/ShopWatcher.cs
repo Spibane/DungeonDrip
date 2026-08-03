@@ -33,14 +33,11 @@ public sealed class ShopWatcher : IDisposable
     /// <summary>Reused every frame so the read path allocates nothing.</summary>
     private readonly List<uint> scratch = new(256);
 
-    /// <summary>Null values are remembered too - "not glamour gear" is worth caching.</summary>
-    private readonly Dictionary<uint, GearRow?> rowCache = [];
-
     private ShopAddonDescriptor? active;
     private string? loggedFor;
     private uint[] currentIds = [];
     private List<GearRow>? stock;
-    private MarkerContext context;
+    private int seenRowRevision = -1;
     private int framesUntilSweep;
 
     public ShopWatcher(Plugin plugin)
@@ -92,12 +89,12 @@ public sealed class ShopWatcher : IDisposable
             return Forget();
         }
 
-        // Ownership or the settings behind it moved, so every cached answer is suspect.
-        var fresh = CaptureContext();
-        if (fresh != context)
+        // Ownership or the settings behind it may have moved, in which case the shared cache has
+        // just been emptied and this list was built from rows that no longer stand.
+        plugin.Rows.Revalidate();
+        if (plugin.Rows.Revision != seenRowRevision)
         {
-            context = fresh;
-            rowCache.Clear();
+            seenRowRevision = plugin.Rows.Revision;
             stock = null;
         }
 
@@ -209,7 +206,7 @@ public sealed class ShopWatcher : IDisposable
             if (!seen.Add(id))
                 continue;
 
-            var row = Resolve(id);
+            var row = plugin.Rows.Row(id);
             if (row == null)
                 continue;
 
@@ -236,61 +233,6 @@ public sealed class ShopWatcher : IDisposable
 
         return rows;
     }
-
-    private GearRow? Resolve(uint itemId)
-    {
-        if (rowCache.TryGetValue(itemId, out var cached))
-            return cached;
-
-        var row = BuildRow(itemId);
-        rowCache[itemId] = row;
-        return row;
-    }
-
-    private GearRow? BuildRow(uint itemId)
-    {
-        if (!Plugin.DataManager.GetExcelSheet<Item>().TryGetRow(itemId, out var item))
-            return null;
-
-        var storage = plugin.Storage;
-        var kind = storage.Of(item);
-
-        // Absence of a row must mean exactly one thing: "not glamour gear". If a dye ever appears
-        // here, absence starts reading as "you already have it" instead.
-        if (kind == StorageKind.None || !storage.MatchesScope(kind, plugin.Configuration.Scope))
-            return null;
-
-        var view = plugin.Ownership.Current;
-        var source = MissingItems.Resolve(
-            itemId,
-            view,
-            plugin.Outfits.SetsContaining(itemId),
-            plugin.Configuration.OutfitOwnership,
-            plugin.Configuration.Scope);
-
-        // Meaningless for anything not held in a set, and walking a set's pieces is not free.
-        var completed = source == OwnershipSource.Outfit && plugin.Outfits.IsInCompletedSet(itemId, view);
-
-        var (slotOrder, slotName) = EquipSlots.Describe(item.EquipSlotCategory.Value);
-
-        return new GearRow(
-            itemId,
-            item.Name.ExtractText(),
-            (ushort)item.Icon,
-            (ushort)item.LevelItem.RowId,
-            slotOrder,
-            slotName,
-            CollectionMarkers.For(source, plugin.Ownership.HasDresserData, completed),
-            plugin.JobFilter.CanEquip(item));
-    }
-
-    private MarkerContext CaptureContext() => new(
-        plugin.Ownership.Revision,
-        plugin.Ownership.HasDresserData,
-        plugin.Configuration.Scope,
-        plugin.Configuration.OutfitOwnership,
-        plugin.Configuration.CountInventoryAndEquipped,
-        Plugin.PlayerState.IsLoaded ? Plugin.PlayerState.ClassJob.RowId : 0);
 
     private unsafe void WarnOnce(ShopAddonDescriptor descriptor, AtkUnitBase* unit)
     {
@@ -324,20 +266,4 @@ public sealed class ShopWatcher : IDisposable
         loggedFor = null;
     }
 
-    /// <summary>
-    /// Everything a cached row's marker depends on. Compared by value once a frame, which keeps
-    /// "what invalidates this" to a single line instead of five scattered checks.
-    /// </summary>
-    /// <remarks>
-    /// Staleness is absent on purpose: it changes how a marker is drawn, not which marker it is, so
-    /// an aging snapshot never rebuilds the cache. The job is here because wearability is baked into
-    /// the row.
-    /// </remarks>
-    private readonly record struct MarkerContext(
-        int OwnershipRevision,
-        bool HasDresserData,
-        CollectionScope Scope,
-        OutfitOwnershipMode OutfitMode,
-        bool CountInventory,
-        uint ClassJob);
 }
