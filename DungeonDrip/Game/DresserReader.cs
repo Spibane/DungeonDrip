@@ -22,6 +22,16 @@ public sealed class DresserSnapshot
 
     public int SlotsUsed { get; init; }
 
+    /// <summary>How many slots the box has room for at all.</summary>
+    /// <remarks>
+    /// Read off the length of the client's own box array rather than hardcoded, so a patch that
+    /// grows the dresser is followed rather than fought. It is the structural ceiling and nothing
+    /// finer: the client exposes no per-account unlocked count, so this cannot say how many of those
+    /// slots a given character has actually paid for. Anything drawing a "used of total" has to
+    /// decide whether that distinction matters to what it is claiming.
+    /// </remarks>
+    public int SlotCapacity { get; init; }
+
     /// <summary>
     /// Hash of the raw box this was read from, for telling "read again" from "changed".
     /// </summary>
@@ -37,6 +47,17 @@ public sealed class DresserSnapshot
 
 public static unsafe class DresserReader
 {
+    /// <summary>
+    /// Box size to assume for a snapshot cached before <see cref="DresserSnapshot.SlotCapacity"/>
+    /// existed.
+    /// </summary>
+    /// <remarks>
+    /// The client's box array is a fixed size, so this is exactly what a live read of that cache's
+    /// vintage would have returned - reconstructing it is not a guess. Replaced by the real length
+    /// the first time the box is read.
+    /// </remarks>
+    public const int AssumedCapacity = 800;
+
     /// <summary>
     /// Reads the Glamour Dresser, expanding stored outfit sets into their component pieces.
     /// </summary>
@@ -108,6 +129,7 @@ public static unsafe class DresserReader
             ItemsInStoredOutfits = viaOutfits,
             StoredOutfits = storedOutfits,
             SlotsUsed = used,
+            SlotCapacity = boxItems.Length,
             Fingerprint = fingerprint,
         };
     }

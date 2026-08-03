@@ -5,13 +5,25 @@ using System.Linq;
 
 namespace DungeonDrip.Game;
 
+/// <summary>How full the Glamour Dresser is.</summary>
+/// <remarks>
+/// Occupancy used to live only on the tracker, which meant pure query code - the part that is
+/// deliberately kept free of Dalamud so it can be reasoned about on its own - could not see it.
+/// <see cref="Capacity"/> carries the caveat from <see cref="DresserSnapshot.SlotCapacity"/>: it is
+/// the box's structural size, not a per-account unlocked count.
+/// </remarks>
+public sealed record DresserSpace(int Used, int Capacity);
+
 /// <summary>An immutable view of what one character owns, safe to hand to pure query code.</summary>
 public sealed record OwnershipView(
     IReadOnlySet<uint> DresserDirect,
     IReadOnlyDictionary<uint, HashSet<uint>> DresserOutfits,
     IReadOnlySet<uint> Armoire,
     IReadOnlySet<uint>? Inventory,
-    IReadOnlySet<uint> StoredOutfits)
+    IReadOnlySet<uint> StoredOutfits,
+    // Defaulted so the existing construction sites keep compiling; null means no dresser data,
+    // matching how Inventory says "not counted".
+    DresserSpace? Space = null)
 {
     public static readonly OwnershipView Empty = new(
         new HashSet<uint>(), new Dictionary<uint, HashSet<uint>>(), new HashSet<uint>(), null, new HashSet<uint>());
@@ -43,6 +55,7 @@ public sealed class OwnershipTracker
     public DateTime? DresserUpdatedUtc { get; private set; }
     public DateTime? ArmoireUpdatedUtc { get; private set; }
     public int DresserSlotsUsed { get; private set; }
+    public int DresserSlotCapacity { get; private set; }
     public string CharacterName { get; private set; } = string.Empty;
 
     /// <summary>Bumped whenever the underlying sets change, so callers can invalidate derived state.</summary>
@@ -66,7 +79,8 @@ public sealed class OwnershipTracker
         dresser?.ItemsInStoredOutfits ?? OwnershipView.Empty.DresserOutfits,
         armoire ?? OwnershipView.Empty.Armoire,
         configuration.CountInventoryAndEquipped ? inventory : null,
-        dresser?.StoredOutfits ?? OwnershipView.Empty.StoredOutfits);
+        dresser?.StoredOutfits ?? OwnershipView.Empty.StoredOutfits,
+        dresser == null ? null : new DresserSpace(DresserSlotsUsed, DresserSlotCapacity));
 
     /// <summary>Makes the next <see cref="Update"/> re-read everything immediately.</summary>
     public void RequestRefresh() => nextPoll = DateTime.MinValue;
@@ -99,8 +113,13 @@ public sealed class OwnershipTracker
         if (freshDresser != null)
         {
             dirty |= freshDresser.Fingerprint != dresser?.Fingerprint;
+            // Not in the fingerprint, which covers the box's contents rather than its size. Compared
+            // separately so a cache written before capacity was recorded picks it up on the first
+            // live read instead of waiting for the contents to happen to change.
+            dirty |= freshDresser.SlotCapacity != DresserSlotCapacity;
             dresser = freshDresser;
             DresserSlotsUsed = freshDresser.SlotsUsed;
+            DresserSlotCapacity = freshDresser.SlotCapacity;
             DresserUpdatedUtc = DateTime.UtcNow;
         }
 
@@ -136,11 +155,15 @@ public sealed class OwnershipTracker
         DresserUpdatedUtc = null;
         ArmoireUpdatedUtc = null;
         DresserSlotsUsed = 0;
+        DresserSlotCapacity = 0;
         Revision++;
 
         var dto = Data.JsonStore.Read<CacheFile>(CachePath);
         if (dto == null)
             return;
+
+        // Zero means the cache predates the field rather than meaning an empty box.
+        var capacity = dto.DresserSlotCapacity > 0 ? dto.DresserSlotCapacity : DresserReader.AssumedCapacity;
 
         dresser = new DresserSnapshot
             {
@@ -152,9 +175,11 @@ public sealed class OwnershipTracker
                     ? [.. dto.StoredOutfits]
                     : [.. dto.DresserOutfits.Values.SelectMany(v => v)],
                 SlotsUsed = dto.DresserSlotsUsed,
+                SlotCapacity = capacity,
             };
         armoire = dto.ArmoireUpdatedUtc.HasValue ? [.. dto.Armoire] : null;
         DresserSlotsUsed = dto.DresserSlotsUsed;
+        DresserSlotCapacity = capacity;
         DresserUpdatedUtc = dto.DresserUpdatedUtc;
         ArmoireUpdatedUtc = dto.ArmoireUpdatedUtc;
 
@@ -176,6 +201,7 @@ public sealed class OwnershipTracker
             DresserOutfits = dresser?.ItemsInStoredOutfits.ToDictionary(kv => kv.Key, kv => kv.Value.ToList()) ?? [],
             StoredOutfits = dresser?.StoredOutfits.ToList() ?? [],
             DresserSlotsUsed = DresserSlotsUsed,
+            DresserSlotCapacity = DresserSlotCapacity,
             Armoire = armoire?.ToList() ?? [],
             DresserUpdatedUtc = DresserUpdatedUtc,
             ArmoireUpdatedUtc = ArmoireUpdatedUtc,
@@ -192,6 +218,7 @@ public sealed class OwnershipTracker
         public Dictionary<uint, List<uint>> DresserOutfits { get; set; } = [];
         public List<uint> StoredOutfits { get; set; } = [];
         public int DresserSlotsUsed { get; set; }
+        public int DresserSlotCapacity { get; set; }
         public List<uint> Armoire { get; set; } = [];
         public DateTime? DresserUpdatedUtc { get; set; }
         public DateTime? ArmoireUpdatedUtc { get; set; }
