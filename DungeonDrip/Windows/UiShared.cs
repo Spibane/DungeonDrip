@@ -1,7 +1,6 @@
 using System;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
-using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Interface;
 using Dalamud.Interface.Components;
 using Dalamud.Interface.Textures;
@@ -82,8 +81,8 @@ internal static class UiParts
     /// drawn - and so must <see cref="ImGui.IsItemHovered()"/>, which is why callers take their hover
     /// flag before this rather than after.
     ///
-    /// Trying on is the one thing here that reaches into the game, so it is kept off the rows the
-    /// game will not preview: an entry that silently does nothing is worse than no entry.
+    /// What goes in the menu lives in <see cref="ItemActions"/>, shared with the game's own
+    /// right-click menu. This is only the ImGui rendering of it.
     /// </remarks>
     public static void ItemContextMenu(Plugin plugin, uint itemId, string name)
     {
@@ -91,27 +90,37 @@ internal static class UiParts
         if (!context.Success)
             return;
 
-        if (TryOnService.CanTryOn(itemId))
-        {
-            if (ImGui.Selectable("Try on"))
-                plugin.TryOn.QueuePiece(itemId);
+        foreach (var action in ItemActions.For(plugin, itemId, name, ItemActionSurface.PluginWindow))
+            DrawAction(action);
+    }
 
-            // Named rather than a bare "Try on outfit", because a piece is often in several sets and
-            // the whole point of the entry is choosing which of them to look at.
-            foreach (var (setId, setName) in plugin.Outfits.NamedSetsContaining(itemId))
+    private static void DrawAction(ItemAction action)
+    {
+        if (action.StartsGroup)
+            ImGui.Separator();
+
+        if (!action.IsSubmenu)
+        {
+            // A choice with nothing behind it is a label - the drop list uses those to explain
+            // itself. Disabled rather than absent, because a missing row reads as a broken menu.
+            if (action.Invoke == null)
             {
-                if (ImGui.Selectable($"Try on outfit: {setName}"))
-                    plugin.TryOn.QueueOutfit(setId);
+                ImGui.TextColored(Palette.Muted, action.Label);
+                return;
             }
 
-            ImGui.Separator();
+            if (ImGui.Selectable(action.Label))
+                action.Invoke();
+
+            return;
         }
 
-        if (ImGui.Selectable("Link in chat"))
-            Plugin.ChatGui.Print(new SeStringBuilder().AddItemLink(itemId, false).Build());
+        using var submenu = ImRaii.Menu(action.Label);
+        if (!submenu.Success)
+            return;
 
-        if (ImGui.Selectable("Copy name"))
-            ImGui.SetClipboardText(name);
+        foreach (var entry in action.Submenu!)
+            DrawAction(entry);
     }
 
     /// <summary>
