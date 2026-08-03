@@ -15,6 +15,7 @@ namespace DungeonDrip.Windows;
 public class MissingItemsWindow : Window
 {
     private readonly Plugin plugin;
+    private readonly CollectionView collection;
 
     private string dutyFilter = string.Empty;
     private bool pickerOpen;
@@ -23,6 +24,7 @@ public class MissingItemsWindow : Window
         : base("Dungeon Drip###DungeonDripMain")
     {
         this.plugin = plugin;
+        collection = new CollectionView(plugin);
         SizeConstraints = new WindowSizeConstraints
         {
             MinimumSize = new Vector2(420, 320),
@@ -42,13 +44,26 @@ public class MissingItemsWindow : Window
     public override void PreDraw()
     {
         var report = plugin.Report;
-        var title = report == null ? "Dungeon Drip" : report.Name;
+        var title = plugin.Mode == MainWindowMode.Collection
+            ? "Collection"
+            : report == null ? "Dungeon Drip" : report.Name;
+
         WindowName = $"{title}###DungeonDripMain";
     }
 
     public override void Draw()
     {
         DrawToolbar();
+
+        // Above the loot-data check on purpose: none of the collection view needs a loot table, and
+        // someone on a first run with nothing downloaded yet should still be able to see how full
+        // their dresser is.
+        if (plugin.Mode == MainWindowMode.Collection)
+        {
+            DrawFreshnessBanner();
+            collection.Draw();
+            return;
+        }
 
         if (plugin.Duties == null)
         {
@@ -91,6 +106,35 @@ public class MissingItemsWindow : Window
     /// </summary>
     private void DrawToolbar()
     {
+        var collectionMode = plugin.Mode == MainWindowMode.Collection;
+
+        if (UiParts.ToolButton(
+                "##mode",
+                collectionMode ? FontAwesomeIcon.BoxOpen : FontAwesomeIcon.Dungeon,
+                collectionMode
+                    ? "Showing your collection. Click to go back to duty loot."
+                    : "Showing duty loot. Click to show your collection."))
+        {
+            plugin.SetMode(collectionMode ? MainWindowMode.Duty : MainWindowMode.Collection);
+        }
+
+        // The middle of the toolbar belongs to the duty view and is hidden rather than greyed out
+        // in the other one. Disabling says "this could work but not right now"; these are simply
+        // not part of what is on screen, and a row of dead buttons above a list they cannot affect
+        // reads as broken. Settings stays on the end of both.
+        if (!collectionMode)
+            DrawDutyToolbar();
+
+        ImGui.SameLine();
+
+        if (UiParts.ToolButton("##settings", FontAwesomeIcon.Cog, "Settings."))
+            plugin.ToggleConfigUi();
+    }
+
+    private void DrawDutyToolbar()
+    {
+        ImGui.SameLine();
+
         if (UiParts.ToolButton(
                 "##dutyList",
                 pickerOpen ? FontAwesomeIcon.SearchMinus : FontAwesomeIcon.Search,
@@ -154,11 +198,6 @@ public class MissingItemsWindow : Window
             plugin.Configuration.ShowOwnedItems = !showOwned;
             plugin.Configuration.Save();
         }
-
-        ImGui.SameLine();
-
-        if (UiParts.ToolButton("##settings", FontAwesomeIcon.Cog, "Settings."))
-            plugin.ToggleConfigUi();
     }
 
     private void DrawFreshnessBanner()

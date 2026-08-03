@@ -30,6 +30,16 @@ public enum CollectionScope
     ArmoireOnly,
 }
 
+/// <summary>Which of the main window's two jobs it is currently doing.</summary>
+public enum MainWindowMode
+{
+    /// <summary>Loot for one duty, or the roulette advice when you are not standing in one.</summary>
+    Duty,
+
+    /// <summary>Your collection as a whole, which no duty is involved in.</summary>
+    Collection,
+}
+
 /// <summary>How the missing list is grouped.</summary>
 public enum MissingGrouping
 {
@@ -81,6 +91,12 @@ public class Configuration : IPluginConfiguration
 
     /// <summary>Group the missing list by slot, or by who can roll Need on it.</summary>
     public MissingGrouping Grouping { get; set; } = MissingGrouping.Slot;
+
+    /// <summary>
+    /// Which view the main window was last showing. Window state rather than a preference, so it
+    /// has no control in Settings - like the vendor panel's dragged size.
+    /// </summary>
+    public MainWindowMode MainWindowMode { get; set; } = MainWindowMode.Duty;
 
     /// <summary>Headings the user has collapsed, remembered between sessions.</summary>
     public List<string> CollapsedGroups { get; set; } = [];
