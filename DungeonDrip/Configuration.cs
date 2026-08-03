@@ -15,7 +15,12 @@ public enum OutfitOwnershipMode
     AllOutfits,
 }
 
-public enum LootCompanionSide
+/// <summary>Which side of the game window a pinned panel rides on.</summary>
+/// <remarks>
+/// Serialised as an integer, so the rename from the loot companion's own name costs existing
+/// configs nothing. The properties keep their names for the same reason - those are the JSON keys.
+/// </remarks>
+public enum PanelSide
 {
     Auto,
     Left,
@@ -114,13 +119,13 @@ public class Configuration : IPluginConfiguration
     public bool ShowLootCompanion { get; set; } = true;
 
     /// <summary>Which side of the loot window the companion sits on. Auto flips if space is tight.</summary>
-    public LootCompanionSide LootCompanionSide { get; set; } = LootCompanionSide.Auto;
+    public PanelSide LootCompanionSide { get; set; } = PanelSide.Auto;
 
     /// <summary>Show a panel beside vendor windows marking which of their stock you already have.</summary>
     public bool ShowVendorPanel { get; set; } = true;
 
     /// <summary>Which side of the vendor window the panel sits on. Auto flips if space is tight.</summary>
-    public LootCompanionSide VendorPanelSide { get; set; } = LootCompanionSide.Auto;
+    public PanelSide VendorPanelSide { get; set; } = PanelSide.Auto;
 
     /// <summary>
     /// Size the user dragged the vendor panel to. Zero means follow the vendor window's height and

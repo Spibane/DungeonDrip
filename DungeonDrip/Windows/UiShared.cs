@@ -155,15 +155,15 @@ internal static unsafe class AddonAnchor
     private const float Gap = 6f;
 
     /// <summary>Top-left corner for a panel of <paramref name="ownSize"/> beside this addon.</summary>
-    public static Vector2 Beside(AtkUnitBase* unit, LootCompanionSide side, Vector2 ownSize)
+    public static Vector2 Beside(AtkUnitBase* unit, PanelSide side, Vector2 ownSize)
     {
         var display = ImGui.GetIO().DisplaySize;
         var width = unit->GetScaledWidth(true);
 
         var toRight = side switch
         {
-            LootCompanionSide.Left => false,
-            LootCompanionSide.Right => true,
+            PanelSide.Left => false,
+            PanelSide.Right => true,
             _ => unit->X + width + Gap + ownSize.X <= display.X,
         };
 
