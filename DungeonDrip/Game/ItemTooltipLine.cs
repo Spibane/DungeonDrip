@@ -189,17 +189,11 @@ public sealed unsafe class ItemTooltipLine : IDisposable
         }
 
         var raw = strings->StringArray[ItemDescription];
-        var existing = raw.Value == null
+        var present = raw.Value == null
             ? new SeString()
             : MemoryHelper.ReadSeStringNullTerminated((nint)raw.Value);
 
-        // The generator runs more than once per hover, so without this the line would stack up.
-        // The payload is namespaced by plugin, so ours and another plugin's cannot be confused.
-        if (AlreadyMarked(existing))
-        {
-            Trace(itemId, "already marked");
-            return;
-        }
+        var existing = Rebase(present, itemId);
 
         var stale = plugin.Ownership.IsDresserStale;
         var colour = marker0 switch
@@ -229,22 +223,50 @@ public sealed unsafe class ItemTooltipLine : IDisposable
         var bytes = built.Build().EncodeWithNullTerminator();
         strings->SetValue(ItemDescription, bytes, false);
 
-        Trace(itemId, $"WROTE {bytes.Length} bytes to field {ItemDescription} ({note}); " +
-                      $"existing was {existing.TextValue.Length} chars");
+        Trace(itemId, $"WROTE {bytes.Length} bytes ({note}); base was {existing.TextValue.Length} chars");
     }
 
-    private bool AlreadyMarked(SeString text)
+    /// <summary>
+    /// What the description field ought to contain before this adds anything to it.
+    /// </summary>
+    /// <remarks>
+    /// The field cannot be trusted on its own. The game only writes it when the item actually has a
+    /// description, and most gear has none, so it keeps whatever was there for the last item that
+    /// did - which after one pass through here includes our own line. Reading it naively meant the
+    /// first piece got a line and every piece after it was skipped for looking already done.
+    ///
+    /// So the sheet decides. Anything from our marker onwards is ours and is dropped, and what is
+    /// left is only kept if it is actually this item's description; otherwise it belongs to some
+    /// earlier item and goes. That also makes repeated calls idempotent by construction, which is
+    /// what the marker was there for in the first place.
+    ///
+    /// A line another plugin added survives this, because it lands after the real description and
+    /// before our marker.
+    /// </remarks>
+    private SeString Rebase(SeString present, uint itemId)
     {
-        foreach (var payload in text.Payloads)
+        var kept = new SeString();
+
+        foreach (var payload in present.Payloads)
         {
             if (payload is DalamudLinkPayload link &&
                 link.CommandId == MarkerCommandId &&
                 link.Plugin == Plugin.PluginInterface.InternalName)
             {
-                return true;
+                break;
             }
+
+            kept.Payloads.Add(payload);
         }
 
-        return false;
+        var expected = Plugin.DataManager.GetExcelSheet<Lumina.Excel.Sheets.Item>()
+            .TryGetRow(itemId, out var row) ? row.Description.ExtractText() : string.Empty;
+
+        // Held over from a previous item. The sheet says this piece has nothing of its own, or has
+        // something the field does not contain.
+        if (expected.Length == 0 || !kept.TextValue.Contains(expected, StringComparison.Ordinal))
+            return expected.Length == 0 ? new SeString() : new SeString().Append(expected);
+
+        return kept;
     }
 }
