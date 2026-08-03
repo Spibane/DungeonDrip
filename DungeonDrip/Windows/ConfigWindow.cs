@@ -39,10 +39,10 @@ public class ConfigWindow : Window
                 changed |= DrawDutiesTab();
         }
 
-        using (var vendors = ImRaii.TabItem("Vendors"))
+        using (var panels = ImRaii.TabItem("Panels"))
         {
-            if (vendors.Success)
-                changed |= DrawVendorsTab();
+            if (panels.Success)
+                changed |= DrawPanelsTab();
         }
 
         using (var inGame = ImRaii.TabItem("In-game UI"))
@@ -284,62 +284,100 @@ public class ConfigWindow : Window
         return changed;
     }
 
-    private bool DrawVendorsTab()
+    /// <summary>
+    /// The panels that ride beside a game window. One drawing routine, three callers.
+    /// </summary>
+    /// <remarks>
+    /// The marker legend is shown once at the top rather than per panel, since they all speak the
+    /// same vocabulary, and a third copy of the enable/side/grouping block is where hand-written
+    /// copies would start to drift.
+    /// </remarks>
+    private bool DrawPanelsTab()
     {
         var changed = false;
 
         ImGui.Spacing();
-        ImGui.TextColored(Palette.Muted, "Vendor panel");
+        ImGui.TextColored(Palette.Muted, "What the markers mean");
+        ImGui.BulletText("x - not collected");
+        ImGui.BulletText("tick - in the Glamour Dresser");
+        ImGui.BulletText("layers - in a stored outfit set that still has gaps");
+        ImGui.BulletText("star - in an outfit set you have completed");
+        ImGui.BulletText("box - in the Armoire");
+        ImGui.BulletText("case - carried or equipped");
+        ImGui.BulletText("? - no dresser data, so nothing can be said either way");
+        ImGui.TextColored(Palette.Muted, "An old dresser snapshot turns the x amber, not the ticks:");
+        ImGui.TextColored(Palette.Muted, "what it says you own stays true far longer than what it says you lack.");
 
-        var vendorPanel = configuration.VendorPanel.Enabled;
-        if (UiParts.Toggle("Show a panel beside vendor windows", ref vendorPanel,
-                "Lists the glamour gear the vendor is currently showing, marked by where you already\n" +
-                "have each piece. Items that cannot be kept as a glamour are left out entirely.\n" +
-                "Run \"/dungeondrip shop\" at a vendor it does not recognise to identify it."))
+        ImGui.Spacing();
+
+        changed |= DrawPanelSection(
+            "Vendor windows", "vendor", configuration.VendorPanel,
+            "Lists the glamour gear the vendor is currently showing, marked by where you already\n" +
+            "have each piece. Items that cannot be kept as a glamour are left out entirely.\n" +
+            "Run \"/dungeondrip shop\" at a vendor it does not recognise to identify it.",
+            null);
+
+        changed |= DrawPanelSection(
+            "Glamour Dresser", "dresser", configuration.DresserPanel,
+            "Lists what you are carrying that is not in the dresser or Armoire yet.",
+            "This is the one panel whose list means the opposite of the others: it is what you have\n" +
+            "on you and have not stored, rather than what you are being shown and do not own.");
+
+        DrawSharedSettingsNote();
+        return changed;
+    }
+
+    private bool DrawPanelSection(
+        string heading, string id, PanelSettings settings, string enableTooltip, string? note)
+    {
+        if (!ImGui.CollapsingHeader($"{heading}###panel{id}"))
+            return false;
+
+        var changed = false;
+
+        if (note != null)
         {
-            configuration.VendorPanel.Enabled = vendorPanel;
+            ImGui.TextColored(Palette.Muted, note);
+            ImGui.Spacing();
+        }
+
+        var enabled = settings.Enabled;
+        if (UiParts.Toggle($"Show this panel##{id}", ref enabled, enableTooltip))
+        {
+            settings.Enabled = enabled;
             changed = true;
         }
 
-        if (vendorPanel)
+        if (!enabled)
         {
-            var vendorSide = configuration.VendorPanel.Side;
-            ImGui.SetNextItemWidth(200 * ImGuiHelpers.GlobalScale);
-            if (ImGui.BeginCombo("Side##vendor", vendorSide.ToString()))
-            {
-                foreach (var option in Enum.GetValues<PanelSide>())
-                {
-                    if (ImGui.Selectable($"{option}##vendor", vendorSide == option))
-                    {
-                        configuration.VendorPanel.Side = option;
-                        changed = true;
-                    }
-                }
-
-                ImGui.EndCombo();
-            }
-
-            var vendorGrouped = configuration.VendorPanel.GroupBySlot;
-            if (UiParts.Toggle("Group by equipment slot##vendor", ref vendorGrouped))
-            {
-                configuration.VendorPanel.GroupBySlot = vendorGrouped;
-                changed = true;
-            }
-
             ImGui.Spacing();
-            ImGui.TextColored(Palette.Muted, "What the markers mean");
-            ImGui.BulletText("x - not collected");
-            ImGui.BulletText("tick - in the Glamour Dresser");
-            ImGui.BulletText("layers - in a stored outfit set that still has gaps");
-            ImGui.BulletText("star - in an outfit set you have completed");
-            ImGui.BulletText("box - in the Armoire");
-            ImGui.BulletText("case - carried or equipped");
-            ImGui.BulletText("? - no dresser data, so nothing can be said either way");
-            ImGui.TextColored(Palette.Muted, "An old dresser snapshot turns the x amber, not the ticks:");
-            ImGui.TextColored(Palette.Muted, "what it says you own stays true far longer than what it says you lack.");
+            return changed;
         }
 
-        DrawSharedSettingsNote();
+        var side = settings.Side;
+        ImGui.SetNextItemWidth(200 * ImGuiHelpers.GlobalScale);
+        if (ImGui.BeginCombo($"Side##{id}", side.ToString()))
+        {
+            foreach (var option in Enum.GetValues<PanelSide>())
+            {
+                if (ImGui.Selectable($"{option}##{id}", side == option))
+                {
+                    settings.Side = option;
+                    changed = true;
+                }
+            }
+
+            ImGui.EndCombo();
+        }
+
+        var grouped = settings.GroupBySlot;
+        if (UiParts.Toggle($"Group by equipment slot##{id}", ref grouped))
+        {
+            settings.GroupBySlot = grouped;
+            changed = true;
+        }
+
+        ImGui.Spacing();
         return changed;
     }
 

@@ -65,12 +65,18 @@ lands.
                                    │                        │
                    ┌───────────────┴───────────────┐        └────────────┐
                    ▼                               ▼                     ▼
-              main window                  companion window beside   panel beside
-        (grouped by slot or role)             the Need/Greed roll     vendor stock
+              main window                  companion window beside   panel beside vendor
+        (grouped by slot or role)             the Need/Greed roll    stock, panel beside
+                   │                                                 the dresser, and the
+                   ▼                                                 game's own menus
+            collection view
+     (sets in progress, dresser
+      pressure, carried gear)
 ```
 
-The vendor panel branches straight off the collection: it asks only "do I have this?", so it needs
-no loot data and works for any shop, not just the ones that stock duty gear.
+Everything on the right branches straight off the collection: those ask only "do I have this?", so
+they need no loot data and work for any shop, any dresser, any tooltip — not just the ones that
+involve duty gear.
 
 **The Glamour Dresser needs opening now and then.** The game wipes dresser data on every zone change
 and only loads the Armoire on demand, so nothing is readable from inside a dungeon. Dungeon Drip
@@ -115,6 +121,25 @@ It reads the shop window's position and stock but never draws into it, so it can
 plugins that do. Covered: gil vendors and Calamity Salvagers, item-exchange counters, currency and
 scrip exchanges, Grand Company quartermasters, free-item counters and the Firmament. Anything else
 gets no panel — run `/dungeondrip shop` there and report the addon name it prints.
+
+## At the Glamour Dresser
+
+Open a dresser and a panel appears beside it listing what you are carrying that is **not** stored
+yet — the mirror of every other panel, which ask whether you need what the game is showing you.
+This is the one surface where the answer is something you can act on without going anywhere.
+
+The marker column shows where the piece is rather than whether you own it, since by construction you
+do not: bags, armoury chest, worn, or saddlebag. A row is amber when something has to happen first —
+taking it off, fetching it from the saddlebag, or spiritbonding a tradeable piece the box would
+refuse. The header says how full the box is, because "which of these do I put in" only becomes a
+question when they will not all fit.
+
+Rows read **not stored** rather than "you can add this". Some of the dresser's refusals are not
+readable from outside it, so a few pieces the game turns down will still appear.
+
+The panel waits for the box's contents to arrive rather than the window: a list built against an
+unloaded dresser would claim everything you own is unstored, at exactly the moment you would act
+on it.
 
 ## Roulettes
 
@@ -208,8 +233,9 @@ what is specific to that surface.
 | Call out the role with the most missing | Duties | on |
 | Group the list by slot or by role | Duties | slot |
 | Companion list beside the loot window | Duties | on |
-| Panel beside vendor windows | Vendors | on |
-| Group the vendor panel by slot | Vendors | on |
+| Panel beside vendor windows | Panels | on |
+| Panel beside the Glamour Dresser | Panels | on |
+| Group each panel by slot | Panels | on |
 | Gear options on the game's right-click menus | In-game UI | on |
 | Warn when dresser data is older than | Data | 7 days |
 | Record gear that drops in duties | Data | on |
@@ -349,11 +375,15 @@ DungeonDrip/
 │   ├── TryOnService.cs          feeds the fitting room, one piece per frame
 │   ├── ItemActions.cs           what the right-click menus offer, in one list
 │   ├── GameContextMenu.cs       that list, rendered into the game's own menus
+│   ├── GearRowFactory.cs        item id -> drawable row, cached, shared by the panels
+│   ├── ShopWatcher.cs           which vendor is open and what it is selling
+│   ├── DresserAddWatcher.cs     what you carry that the dresser has not got
 │   ├── OwnershipTracker.cs      per-character snapshot and staleness
 │   └── LootObserver.cs          records gear seen dropping
 ├── Core/
 │   ├── MissingItems.cs          the ownership decision
 │   ├── CollectionMarkers.cs     that decision turned into a glyph
+│   ├── GearRow.cs               one resolved row, shared by every panel
 │   ├── DutyReport.cs            territory + ownership → the drawn list
 │   ├── DutyCatalog.cs           duty list for the picker
 │   ├── DropSources.cs           the loot tables backwards: piece → duties
@@ -371,6 +401,10 @@ DungeonDrip/
 └── Windows/
     ├── MissingItemsWindow.cs    picker, freshness banner, item list, roulette advice
     ├── CollectionView.cs        the window's other mode: sets, dresser, carried gear
+    ├── AddonPanelWindow.cs      anchoring, sizing and the drag latch every panel shares
+    ├── VendorPanelWindow.cs     what is vendor-specific about the vendor panel
+    ├── DresserPanelWindow.cs    the add list beside the Glamour Dresser
+    ├── PanelGrouping.cs         slot headings and the filter counts
     ├── LootCompanionWindow.cs   read-only list beside the Need/Greed window
     └── ConfigWindow.cs
 ```
