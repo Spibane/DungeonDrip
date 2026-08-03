@@ -442,8 +442,9 @@ public class ConfigWindow : Window
         if (UiParts.Toggle("Mark the game's item tooltips", ref tooltipLine,
                 "Adds an icon and a word to the tooltip's category line - the row that says Body or\n" +
                 "Hands - saying where the piece is in your collection.\n\n" +
-                "green dot: in the Dresser or Armoire    silver star: in a set with gaps\n" +
-                "gold star: in a completed set    orange diamond: carried    no entry: not owned"))
+                "gold star: put away, in the Dresser, the Armoire or a finished outfit\n" +
+                "silver star: yours, but in a set with gaps or loose in your bags\n" +
+                "no entry: not collected"))
         {
             configuration.ShowTooltipLine = tooltipLine;
             changed = true;
