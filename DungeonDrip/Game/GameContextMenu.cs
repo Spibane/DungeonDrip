@@ -86,20 +86,13 @@ public sealed class GameContextMenu : IDisposable
         if (actions.Count == 0)
             return;
 
-        // One entry when there is one thing to offer; a single named submenu when there are
-        // several, so a piece belonging to four outfit sets does not add five rows to every
-        // right-click in the game.
-        args.AddMenuItem(actions.Count == 1
-            ? Build(actions[0])
-            : new MenuItem
-            {
-                Name = "Dungeon Drip",
-                PrefixChar = 'D',
-                PrefixColor = 541,
-                Priority = Priority,
-                IsSubmenu = true,
-                OnClicked = clicked => clicked.OpenSubmenu("Dungeon Drip", [.. actions.Select(Build)]),
-            });
+        // Flat, rather than gathered under one "Dungeon Drip" heading. Trying an outfit on is the
+        // whole reason this is here and it was the thing buried a level down - two clicks and a
+        // hover to reach something the game itself would have offered in one. A piece in several
+        // sets does add a row each, which is the cost of that; the prefix keeps them recognisable
+        // as one plugin's without a heading to group them.
+        foreach (var action in actions)
+            args.AddMenuItem(Build(action));
     }
 
     private static MenuItem Build(ItemAction action) => new()

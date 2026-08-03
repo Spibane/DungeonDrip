@@ -215,6 +215,10 @@ dresser, a vendor, the market board — and the plugin's options are there:
 Only what the game does not already offer is added. It has its own Try On, Link and Copy, and a
 second of each would sit next to the real one saying the same word.
 
+The entries sit directly on the menu rather than under a heading of their own, so trying an outfit
+on is one click. A piece belonging to several sets gets a row each; the **D** marks them all as
+this plugin's.
+
 **Settings → In-game UI** can also mark the game's own item tooltips, adding an icon and a word to
 the category row — the one that says *Body* or *Hands* — saying where the piece is in your
 collection. Shorthand rather than a sentence, because that row is not wide.
