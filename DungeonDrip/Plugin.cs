@@ -167,9 +167,28 @@ public sealed class Plugin : IDalamudPlugin
 
     public bool IsPinned => pinnedTerritory.HasValue;
 
+    /// <summary>Which of the main window's two views is showing.</summary>
+    public MainWindowMode Mode => Configuration.MainWindowMode;
+
+    public void SetMode(MainWindowMode mode)
+    {
+        if (Configuration.MainWindowMode == mode)
+            return;
+
+        Configuration.MainWindowMode = mode;
+        Configuration.Save();
+    }
+
+    /// <remarks>
+    /// Forces the duty view, because every route into here - the command, the picker, the drop
+    /// submenu - is someone asking about a specific duty, and landing them on the collection view
+    /// instead would ignore what they just asked for. Doing it here rather than at each call site
+    /// is what makes that true of routes added later too.
+    /// </remarks>
     public void PinTerritory(uint territoryId)
     {
         pinnedTerritory = territoryId;
+        SetMode(MainWindowMode.Duty);
         InvalidateReport();
     }
 
@@ -266,8 +285,13 @@ public sealed class Plugin : IDalamudPlugin
             return;
 
         autoOpenForTerritory = null;
-        if (report.MissingCount > 0 || !Configuration.HideWhenNothingMissing)
-            mainWindow.IsOpen = true;
+        if (report.MissingCount == 0 && Configuration.HideWhenNothingMissing)
+            return;
+
+        // Zoning into a dungeon has to land on the duty, not on wherever the window was left. A
+        // window that pops itself open to show dresser pressure as the gate drops is noise.
+        SetMode(MainWindowMode.Duty);
+        mainWindow.IsOpen = true;
     }
 
     /// <summary>
