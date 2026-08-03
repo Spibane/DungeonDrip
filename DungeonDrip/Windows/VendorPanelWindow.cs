@@ -41,17 +41,17 @@ public sealed unsafe class VendorPanelWindow : Window
     private readonly Plugin plugin;
 
     /// <summary>Resolved in DrawConditions and reused for the rest of the frame.</summary>
-    private IReadOnlyList<VendorRow>? rows;
+    private IReadOnlyList<GearRow>? rows;
 
     /// <summary>Regrouping only happens when the stock or the view options actually change.</summary>
     private readonly List<SlotGroup> groups = [];
-    private IReadOnlyList<VendorRow>? groupedFrom;
+    private IReadOnlyList<GearRow>? groupedFrom;
     private ViewOptions groupedWith;
     private int hiddenByFilter;
 
     /// <summary>Width the longest name in the current stock needs, measured when it changes.</summary>
     private float contentWidth = FallbackWidth;
-    private IReadOnlyList<VendorRow>? measuredFrom;
+    private IReadOnlyList<GearRow>? measuredFrom;
 
     /// <summary>The size PreDraw wants, so a size we chose is not mistaken for a drag.</summary>
     private Vector2 appliedSize;
@@ -386,7 +386,7 @@ public sealed unsafe class VendorPanelWindow : Window
         ImGui.Spacing();
     }
 
-    private void DrawRow(VendorRow row, bool stale)
+    private void DrawRow(GearRow row, bool stale)
     {
         var uncertain = CollectionMarkers.IsUncertain(row.Marker, stale);
 
@@ -452,7 +452,7 @@ public sealed unsafe class VendorPanelWindow : Window
         _ => FontAwesomeIcon.Question,
     };
 
-    private void Regroup(IReadOnlyList<VendorRow> fresh, ViewOptions options)
+    private void Regroup(IReadOnlyList<GearRow> fresh, ViewOptions options)
     {
         if (ReferenceEquals(groupedFrom, fresh) && groupedWith == options)
             return;
@@ -515,7 +515,7 @@ public sealed unsafe class VendorPanelWindow : Window
     /// Fixing the height means fixing the width too, and a constant would clip exactly the long
     /// names that are hardest to recognise from their first half.
     /// </remarks>
-    private void Measure(IReadOnlyList<VendorRow> fresh)
+    private void Measure(IReadOnlyList<GearRow> fresh)
     {
         var widest = 0f;
         foreach (var row in fresh)
@@ -545,7 +545,7 @@ public sealed unsafe class VendorPanelWindow : Window
     {
         public string Label { get; } = label;
         public int Order { get; } = order;
-        public List<VendorRow> Rows { get; } = [];
+        public List<GearRow> Rows { get; } = [];
         public int NotCollected { get; set; }
 
         /// <summary>Owned rows filtered out, so the heading can still account for them.</summary>

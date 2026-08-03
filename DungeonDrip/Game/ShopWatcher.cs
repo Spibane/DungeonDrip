@@ -9,20 +9,6 @@ using Lumina.Excel.Sheets;
 
 namespace DungeonDrip.Game;
 
-/// <summary>One piece of a vendor's stock, resolved and ready to draw.</summary>
-public sealed record VendorRow(
-    uint ItemId,
-    string Name,
-    ushort IconId,
-    ushort ItemLevel,
-    int SlotOrder,
-    string SlotName,
-    CollectionMarker Marker,
-    bool JobEquippable)
-{
-    public bool IsOwned => Marker is not (CollectionMarker.NotCollected or CollectionMarker.Unknown);
-}
-
 /// <summary>
 /// Tracks which vendor window is open and what it is selling, and answers the ownership question
 /// for each piece of that stock.
@@ -48,12 +34,12 @@ public sealed class ShopWatcher : IDisposable
     private readonly List<uint> scratch = new(256);
 
     /// <summary>Null values are remembered too - "not glamour gear" is worth caching.</summary>
-    private readonly Dictionary<uint, VendorRow?> rowCache = [];
+    private readonly Dictionary<uint, GearRow?> rowCache = [];
 
     private ShopAddonDescriptor? active;
     private string? loggedFor;
     private uint[] currentIds = [];
-    private List<VendorRow>? stock;
+    private List<GearRow>? stock;
     private MarkerContext context;
     private int framesUntilSweep;
 
@@ -78,7 +64,7 @@ public sealed class ShopWatcher : IDisposable
     /// The stock in front of the player, or null when there is no vendor open or it could not be
     /// read. Call once per frame.
     /// </summary>
-    public unsafe IReadOnlyList<VendorRow>? Resolve()
+    public unsafe IReadOnlyList<GearRow>? Resolve()
     {
         if (!plugin.Configuration.ShowVendorPanel || Plugin.GameGui.GameUiHidden)
             return null;
@@ -156,7 +142,7 @@ public sealed class ShopWatcher : IDisposable
             : $"Dungeon Drip: could not read \"{name}\" - its layout has changed. Details in the log.";
     }
 
-    private List<VendorRow>? Forget()
+    private List<GearRow>? Forget()
     {
         stock = null;
         return null;
@@ -210,9 +196,9 @@ public sealed class ShopWatcher : IDisposable
         return true;
     }
 
-    private List<VendorRow> Build(ShopAddonDescriptor descriptor, uint[] ids)
+    private List<GearRow> Build(ShopAddonDescriptor descriptor, uint[] ids)
     {
-        var rows = new List<VendorRow>(ids.Length);
+        var rows = new List<GearRow>(ids.Length);
         var seen = new HashSet<uint>(ids.Length);
         var notCollected = 0;
 
@@ -251,7 +237,7 @@ public sealed class ShopWatcher : IDisposable
         return rows;
     }
 
-    private VendorRow? Resolve(uint itemId)
+    private GearRow? Resolve(uint itemId)
     {
         if (rowCache.TryGetValue(itemId, out var cached))
             return cached;
@@ -261,7 +247,7 @@ public sealed class ShopWatcher : IDisposable
         return row;
     }
 
-    private VendorRow? BuildRow(uint itemId)
+    private GearRow? BuildRow(uint itemId)
     {
         if (!Plugin.DataManager.GetExcelSheet<Item>().TryGetRow(itemId, out var item))
             return null;
@@ -287,7 +273,7 @@ public sealed class ShopWatcher : IDisposable
 
         var (slotOrder, slotName) = EquipSlots.Describe(item.EquipSlotCategory.Value);
 
-        return new VendorRow(
+        return new GearRow(
             itemId,
             item.Name.ExtractText(),
             (ushort)item.Icon,
