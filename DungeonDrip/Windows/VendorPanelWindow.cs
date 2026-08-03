@@ -459,53 +459,7 @@ public sealed unsafe class VendorPanelWindow : Window
 
         groupedFrom = fresh;
         groupedWith = options;
-        groups.Clear();
-        hiddenByFilter = 0;
-
-        var byLabel = new Dictionary<string, SlotGroup>();
-
-        foreach (var row in fresh)
-        {
-            // Dropped, not counted: these say nothing about your collection, only that you asked
-            // not to see them.
-            if (options.HideWeapons && EquipSlots.IsWeaponSlot(row.SlotOrder))
-            {
-                hiddenByFilter++;
-                continue;
-            }
-
-            if (options.JobOnly && !row.JobEquippable)
-            {
-                hiddenByFilter++;
-                continue;
-            }
-
-            var hidden = !options.ShowOwned && row.IsOwned;
-
-            // One bucket when flat, so the same drawing path serves both layouts.
-            var label = options.GroupBySlot ? row.SlotName : string.Empty;
-            var order = options.GroupBySlot ? row.SlotOrder : 0;
-
-            if (!byLabel.TryGetValue(label, out var group))
-            {
-                group = new SlotGroup(label, order);
-                byLabel[label] = group;
-                groups.Add(group);
-            }
-
-            if (hidden)
-            {
-                group.Hidden++;
-                continue;
-            }
-
-            group.Rows.Add(row);
-            if (row.Marker == CollectionMarker.NotCollected)
-                group.NotCollected++;
-        }
-
-        groups.RemoveAll(group => group.Rows.Count == 0);
-        groups.Sort((a, b) => a.Order.CompareTo(b.Order));
+        hiddenByFilter = PanelGrouping.Regroup(fresh, options, groups);
     }
 
     /// <summary>
@@ -534,21 +488,4 @@ public sealed unsafe class VendorPanelWindow : Window
         contentWidth = Math.Max(FallbackWidth * ImGuiHelpers.GlobalScale, widest + furniture);
     }
 
-    /// <summary>Everything that changes the shape of the list, compared by value in one go.</summary>
-    private readonly record struct ViewOptions(
-        bool ShowOwned,
-        bool JobOnly,
-        bool HideWeapons,
-        bool GroupBySlot);
-
-    private sealed class SlotGroup(string label, int order)
-    {
-        public string Label { get; } = label;
-        public int Order { get; } = order;
-        public List<GearRow> Rows { get; } = [];
-        public int NotCollected { get; set; }
-
-        /// <summary>Owned rows filtered out, so the heading can still account for them.</summary>
-        public int Hidden { get; set; }
-    }
 }
