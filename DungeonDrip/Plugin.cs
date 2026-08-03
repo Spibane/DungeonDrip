@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Dalamud.Game.Command;
+using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Interface.Windowing;
 using Dalamud.IoC;
 using Dalamud.Plugin;
@@ -43,6 +44,9 @@ public sealed class Plugin : IDalamudPlugin
 
     /// <summary>The loot tables read backwards, for "where does this drop?".</summary>
     public DropSources? Drops { get; private set; }
+
+    /// <summary>Names of the gear <see cref="Drops"/> knows a source for, for looking one up.</summary>
+    public GearNameIndex? GearNames { get; private set; }
 
     /// <summary>Outfit-set membership, needed anywhere ownership is judged.</summary>
     public OutfitCatalog Outfits { get; }
@@ -227,6 +231,7 @@ public sealed class Plugin : IDalamudPlugin
             seenLootRevision = LootData.Revision;
             Duties = DutyCatalog.Build(LootData.Data, contentFinder);
             Drops = DropSources.Build(LootData.Data, Duties);
+            GearNames = GearNameIndex.Build(Drops.Items);
             reportBuilder = new DutyReportBuilder(LootData.Data, Duties, Outfits, jobRoles, Storage, JobFilter);
             adviceBuilder = new RouletteAdviceBuilder(LootData.Data, contentFinder, Outfits, jobRoles, Storage);
             reportDirty = true;
@@ -323,6 +328,14 @@ public sealed class Plugin : IDalamudPlugin
                 return;
         }
 
+        // Duty search is a substring match, so a piece whose name appears inside a duty's would
+        // never be reachable otherwise. This is the way to say "I meant the gear".
+        if (args.StartsWith("item ", StringComparison.OrdinalIgnoreCase))
+        {
+            LookUpGear(args[5..].Trim());
+            return;
+        }
+
         if (Duties == null)
         {
             ChatGui.PrintError($"Dungeon Drip: loot data is not loaded yet ({LootData.StatusMessage})");
@@ -332,8 +345,10 @@ public sealed class Plugin : IDalamudPlugin
         var matches = Duties.Search(args).ToList();
         switch (matches.Count)
         {
+            // Falls through to gear rather than erroring. Duty names keep absolute priority, so
+            // nothing that worked before behaves differently.
             case 0:
-                ChatGui.PrintError($"Dungeon Drip: no duty matching \"{args}\".");
+                LookUpGear(args);
                 return;
 
             case 1:
@@ -356,4 +371,113 @@ public sealed class Plugin : IDalamudPlugin
                 return;
         }
     }
+
+    /// <summary>
+    /// Answers "do I own this, and where does it come from" for a piece named by hand.
+    /// </summary>
+    /// <remarks>
+    /// The answer goes to chat rather than the window. The window is territory-shaped all the way
+    /// through - its title comes from the duty, it pins one, and it opens itself when you zone into
+    /// one - so an item view would be fighting all three. Chat also gets the item link for free,
+    /// which makes the answer hoverable and linkable in a way a window row is not.
+    /// </remarks>
+    private void LookUpGear(string query)
+    {
+        if (GearNames == null || Drops == null)
+        {
+            ChatGui.PrintError($"Dungeon Drip: loot data is not loaded yet ({LootData.StatusMessage})");
+            return;
+        }
+
+        if (query.Length == 0)
+        {
+            ChatGui.PrintError("Dungeon Drip: name a duty or a piece of gear.");
+            return;
+        }
+
+        // An exact name beats any number of partial ones, matching how the duty search resolves the
+        // same tie a few lines up.
+        if (!GearNames.TryGetExact(query, out var itemId))
+        {
+            var matches = GearNames.Search(query, MaxGearMatches + 1);
+            switch (matches.Count)
+            {
+                case 0:
+                    ChatGui.PrintError(
+                        $"Dungeon Drip: nothing matching \"{query}\". Duty names and gear that " +
+                        "drops in a dungeon or alliance raid are what can be looked up.");
+                    return;
+
+                case 1:
+                    itemId = matches[0].ItemId;
+                    break;
+
+                default:
+                    DescribeAmbiguity(query, matches);
+                    return;
+            }
+        }
+
+        DescribeGear(itemId);
+    }
+
+    private void DescribeAmbiguity(string query, IReadOnlyList<(uint ItemId, string Name)> matches)
+    {
+        if (matches.Count > MaxGearMatches)
+        {
+            ChatGui.Print(
+                $"Dungeon Drip: more than {MaxGearMatches} pieces match \"{query}\" - try more of the name.");
+            return;
+        }
+
+        var line = new SeStringBuilder().AddText($"Dungeon Drip: {matches.Count} pieces match \"{query}\" - ");
+        for (var i = 0; i < matches.Count; i++)
+        {
+            if (i > 0)
+                line.AddText("  ");
+
+            line.AddItemLink(matches[i].ItemId, false);
+        }
+
+        ChatGui.Print(line.Build());
+    }
+
+    private void DescribeGear(uint itemId)
+    {
+        ChatGui.Print(new SeStringBuilder()
+            .AddText("Dungeon Drip: ")
+            .AddItemLink(itemId, false)
+            .Build());
+
+        var source = MissingItems.Resolve(
+            itemId, Ownership.Current, Outfits.SetsContaining(itemId),
+            Configuration.OutfitOwnership, Configuration.Scope);
+
+        // Reported through the same resolver every list uses, so it obeys the storage scope and
+        // outfit mode rather than quietly answering a different question from the windows.
+        ChatGui.Print(Ownership.HasDresserData
+            ? $"   {MissingItems.Describe(source)}."
+            : "   No dresser data yet - open a Glamour Dresser once so this can be answered.");
+
+        var sources = Drops!.For(itemId);
+        if (sources.Count == 0)
+        {
+            ChatGui.Print("   Nothing in the loot data lists this piece.");
+            return;
+        }
+
+        var named = sources.Take(MaxNamedDuties)
+            .Select(entry => entry.Level > 0 ? $"{entry.DutyName} (Lv. {entry.Level})" : entry.DutyName);
+
+        var rest = sources.Count - MaxNamedDuties;
+        var tail = rest > 0 ? $" and {rest} more" : string.Empty;
+
+        ChatGui.Print($"   Drops in: {string.Join(", ", named)}{tail}.");
+    }
+
+    /// <summary>Partial matches to list before asking for a longer query.</summary>
+    private const int MaxGearMatches = 8;
+
+    /// <summary>Duties to name in the chat answer before collapsing the rest into a count.</summary>
+    private const int MaxNamedDuties = 3;
 }

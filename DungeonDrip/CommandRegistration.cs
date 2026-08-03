@@ -27,7 +27,8 @@ public sealed class CommandRegistration : IDisposable
         Claim(primary, new CommandInfo(handler)
         {
             HelpMessage = "Show dungeon gear you are missing. "
-                        + $"\"{primary} <duty name>\" looks up any duty, \"config\" opens settings, "
+                        + $"\"{primary} <duty name>\" looks up any duty and \"<gear name>\" any piece, "
+                        + $"\"{primary} item <name>\" forces the latter, \"config\" opens settings, "
                         + "\"refresh\" re-reads your dresser, \"update\" re-downloads the loot data.",
         });
 
