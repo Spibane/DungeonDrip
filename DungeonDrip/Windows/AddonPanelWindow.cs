@@ -290,6 +290,10 @@ public abstract unsafe class AddonPanelWindow : Window
         {
             CollectionMarker.OutfitComplete => Palette.Good,
             CollectionMarker.NotCollected => uncertain ? Palette.Warning : Palette.NotOwned,
+
+            // Warning rather than the missing red: the piece is in the box, the rule is what is
+            // unsatisfied, and the hover says by how much.
+            CollectionMarker.OutfitPartial => Palette.Warning,
             CollectionMarker.Unknown => Palette.Warning,
             _ => Palette.Muted,
         };
@@ -303,7 +307,7 @@ public abstract unsafe class AddonPanelWindow : Window
         ImGui.SameLine();
         UiParts.ItemIcon(row.IconId, 20);
 
-        if (row.Marker == CollectionMarker.NotCollected)
+        if (CollectionMarkers.IsMissing(row.Marker))
             ImGui.Text(row.Name);
         else if (row.Marker == CollectionMarker.Unknown)
             ImGui.TextColored(Palette.Warning, row.Name);
@@ -321,7 +325,7 @@ public abstract unsafe class AddonPanelWindow : Window
 
         using var tooltip = ImRaii.Tooltip();
         ImGui.Text(row.Name);
-        ImGui.Text(CollectionMarkers.Describe(row.Marker));
+        ImGui.Text(CollectionMarkers.Describe(row.Marker, row.OutfitsStored, row.OutfitsTotal));
 
         if (uncertain && UncertainNote != null)
             ImGui.TextColored(Palette.Warning, UncertainNote);
@@ -546,6 +550,10 @@ public abstract unsafe class AddonPanelWindow : Window
         CollectionMarker.Dresser => FontAwesomeIcon.Check,
         CollectionMarker.Outfit => FontAwesomeIcon.LayerGroup,
         CollectionMarker.OutfitComplete => FontAwesomeIcon.Star,
+
+        // Half-filled, not a cross and not a star: the outfit-shaped states share the layered look
+        // and this one is the one that is partway there.
+        CollectionMarker.OutfitPartial => FontAwesomeIcon.Adjust,
         CollectionMarker.Armoire => FontAwesomeIcon.Archive,
         CollectionMarker.Inventory => FontAwesomeIcon.Briefcase,
         CollectionMarker.NotCollected => FontAwesomeIcon.Times,

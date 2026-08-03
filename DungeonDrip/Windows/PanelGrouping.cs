@@ -79,7 +79,7 @@ internal static class PanelGrouping
             }
 
             group.Rows.Add(row);
-            if (row.Marker == CollectionMarker.NotCollected)
+            if (CollectionMarkers.IsMissing(row.Marker))
                 group.NotCollected++;
         }
 

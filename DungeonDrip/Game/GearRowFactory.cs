@@ -65,15 +65,21 @@ public sealed class GearRowFactory(Plugin plugin)
             return null;
 
         var view = plugin.Ownership.Current;
+        var sets = plugin.Outfits.SetsContaining(itemId);
         var source = MissingItems.Resolve(
             itemId,
             view,
-            plugin.Outfits.SetsContaining(itemId),
+            sets,
             plugin.Configuration.OutfitOwnership,
             plugin.Configuration.Scope);
 
         // Meaningless for anything not held in a set, and walking a set's pieces is not free.
         var completed = source == OwnershipSource.Outfit && plugin.Outfits.IsInCompletedSet(itemId, view);
+
+        // The other half of the same question: a piece the rule rejected while a stored outfit is
+        // holding it, which is a shortfall to report rather than a piece to go and find.
+        var (stored, total) = MissingItems.Shortfall(
+            itemId, view, sets, source, plugin.Configuration.OutfitOwnership, plugin.Configuration.Scope);
 
         var (slotOrder, slotName) = EquipSlots.Describe(item.EquipSlotCategory.Value);
 
@@ -83,8 +89,10 @@ public sealed class GearRowFactory(Plugin plugin)
             (ushort)item.Icon,
             slotOrder,
             slotName,
-            CollectionMarkers.For(source, plugin.Ownership.HasDresserData, completed),
-            plugin.JobFilter.CanEquip(item));
+            CollectionMarkers.For(source, plugin.Ownership.HasDresserData, completed, stored > 0),
+            plugin.JobFilter.CanEquip(item),
+            stored,
+            total);
     }
 
     private MarkerContext Capture() => new(

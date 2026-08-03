@@ -1,6 +1,7 @@
 # Changelog
 
 ### Unreleased
+- Fixed a piece sitting in your Glamour Dresser being marked "not owned" with no hint why. With "owned only if every outfit with that piece is stored" on, a piece used by two outfit sets where you have stored one of them is not owned by that rule - correctly - but saying so with the same words and icon as a piece you have never seen reads as the plugin being wrong. It now gets its own marker and says which fraction you have: `Outfit 1/2` on the game's tooltip line, and the full sentence on the panels. Nothing about which pieces count as owned changed
 - Put back the line saying the "Already in your collection" list is read from your bags, armoury chest and saddlebag. Trimming that section took it with everything else, and it was the one line saying something rather than explaining something - without it an empty list does not tell you what was looked at
 
 ### v0.12.1 - 2026-08-03
