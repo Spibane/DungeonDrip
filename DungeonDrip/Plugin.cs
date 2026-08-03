@@ -41,6 +41,9 @@ public sealed class Plugin : IDalamudPlugin
     /// <summary>Rebuilt whenever the loot dataset changes; null until the first dataset arrives.</summary>
     public DutyCatalog? Duties { get; private set; }
 
+    /// <summary>The loot tables read backwards, for "where does this drop?".</summary>
+    public DropSources? Drops { get; private set; }
+
     /// <summary>Outfit-set membership, needed anywhere ownership is judged.</summary>
     public OutfitCatalog Outfits { get; }
 
@@ -213,6 +216,7 @@ public sealed class Plugin : IDalamudPlugin
         {
             seenLootRevision = LootData.Revision;
             Duties = DutyCatalog.Build(LootData.Data, contentFinder);
+            Drops = DropSources.Build(LootData.Data, Duties);
             reportBuilder = new DutyReportBuilder(LootData.Data, Duties, Outfits, jobRoles, Storage, JobFilter);
             adviceBuilder = new RouletteAdviceBuilder(LootData.Data, contentFinder, Outfits, jobRoles, Storage);
             reportDirty = true;
