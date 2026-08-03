@@ -63,7 +63,7 @@ public sealed class ShopWatcher : IDisposable
     /// </summary>
     public unsafe IReadOnlyList<GearRow>? Resolve()
     {
-        if (!plugin.Configuration.ShowVendorPanel || Plugin.GameGui.GameUiHidden)
+        if (!plugin.Configuration.VendorPanel.Enabled || Plugin.GameGui.GameUiHidden)
             return null;
 
         var descriptor = FindActive();

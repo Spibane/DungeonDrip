@@ -121,23 +121,50 @@ public class Configuration : IPluginConfiguration
     /// <summary>Which side of the loot window the companion sits on. Auto flips if space is tight.</summary>
     public PanelSide LootCompanionSide { get; set; } = PanelSide.Auto;
 
-    /// <summary>Show a panel beside vendor windows marking which of their stock you already have.</summary>
-    public bool ShowVendorPanel { get; set; } = true;
+    /// <summary>The panel beside vendor windows, marking which of their stock you already have.</summary>
+    public PanelSettings VendorPanel { get; set; } = new();
 
-    /// <summary>Which side of the vendor window the panel sits on. Auto flips if space is tight.</summary>
-    public PanelSide VendorPanelSide { get; set; } = PanelSide.Auto;
+    /// <summary>The panel beside the Glamour Dresser, listing what you carry that is not stored.</summary>
+    public PanelSettings DresserPanel { get; set; } = new();
+
+    // The vendor panel's settings used to be five flat properties. They are nullable so that
+    // "absent" stays distinguishable from "the user turned this off", and they are cleared once
+    // folded in, so a second run is a no-op even if the version number is wrong.
+    public bool? ShowVendorPanel { get; set; }
+    public PanelSide? VendorPanelSide { get; set; }
+    public float? VendorPanelWidth { get; set; }
+    public float? VendorPanelHeight { get; set; }
+    public bool? VendorGroupBySlot { get; set; }
 
     /// <summary>
-    /// Size the user dragged the vendor panel to. Zero means follow the vendor window's height and
-    /// fit the width to the longest name, which is the default and what the reset button restores.
+    /// Folds any pre-v2 flat vendor settings into their panel object.
     /// </summary>
-    public float VendorPanelWidth { get; set; }
+    /// <returns>Whether anything moved, and the caller therefore has to save.</returns>
+    public bool MigrateIfNeeded()
+    {
+        if (ShowVendorPanel == null && VendorPanelSide == null && VendorPanelWidth == null &&
+            VendorPanelHeight == null && VendorGroupBySlot == null)
+        {
+            Version = 2;
+            return false;
+        }
 
-    /// <inheritdoc cref="VendorPanelWidth"/>
-    public float VendorPanelHeight { get; set; }
+        VendorPanel.Enabled = ShowVendorPanel ?? VendorPanel.Enabled;
+        VendorPanel.Side = VendorPanelSide ?? VendorPanel.Side;
+        VendorPanel.Width = VendorPanelWidth ?? VendorPanel.Width;
+        VendorPanel.Height = VendorPanelHeight ?? VendorPanel.Height;
+        VendorPanel.GroupBySlot = VendorGroupBySlot ?? VendorPanel.GroupBySlot;
 
-    /// <summary>Group the vendor panel by equipment slot rather than listing it flat.</summary>
-    public bool VendorGroupBySlot { get; set; } = true;
+        ShowVendorPanel = null;
+        VendorPanelSide = null;
+        VendorPanelWidth = null;
+        VendorPanelHeight = null;
+        VendorGroupBySlot = null;
+        Version = 2;
+
+        Plugin.Log.Information("Migrated the vendor panel's settings into their own object.");
+        return true;
+    }
 
     /// <summary>
     /// Offer the plugin's gear actions on the game's own right-click menus.

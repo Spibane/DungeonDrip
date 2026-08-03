@@ -120,8 +120,8 @@ public sealed unsafe class VendorPanelWindow : Window
         // Matching the shop's height keeps a long list on screen, and lines the two windows up.
         // A size the user dragged to wins.
         var configuration = plugin.Configuration;
-        var desired = configuration is { VendorPanelWidth: > 0, VendorPanelHeight: > 0 }
-            ? new Vector2(configuration.VendorPanelWidth, configuration.VendorPanelHeight)
+        var desired = configuration.VendorPanel is { Width: > 0, Height: > 0 }
+            ? new Vector2(configuration.VendorPanel.Width, configuration.VendorPanel.Height)
             : new Vector2(contentWidth, unit->GetScaledHeight(true));
 
         // Against the constraints as ImGui will enforce them, not as they were written: a floor the
@@ -155,7 +155,7 @@ public sealed unsafe class VendorPanelWindow : Window
             SizeCondition = ImGuiCond.Appearing;
         }
 
-        Position = AddonAnchor.Beside(unit, configuration.VendorPanelSide, desired);
+        Position = AddonAnchor.Beside(unit, configuration.VendorPanel.Side, desired);
         PositionCondition = ImGuiCond.Always;
     }
 
@@ -198,7 +198,7 @@ public sealed unsafe class VendorPanelWindow : Window
             plugin.Configuration.ShowOwnedItems,
             plugin.Configuration.OnlyCurrentJobEquippable,
             plugin.Configuration.HideWeapons,
-            plugin.Configuration.VendorGroupBySlot);
+            plugin.Configuration.VendorPanel.GroupBySlot);
 
         Regroup(rows, options);
 
@@ -268,8 +268,8 @@ public sealed unsafe class VendorPanelWindow : Window
         if (settled)
             return;
 
-        plugin.Configuration.VendorPanelWidth = size.X;
-        plugin.Configuration.VendorPanelHeight = size.Y;
+        plugin.Configuration.VendorPanel.Width = size.X;
+        plugin.Configuration.VendorPanel.Height = size.Y;
         plugin.Configuration.Save();
     }
 
@@ -327,7 +327,7 @@ public sealed unsafe class VendorPanelWindow : Window
         }
 
         // Only once there is something to undo. Without it a drag is a one-way door.
-        if (configuration is { VendorPanelWidth: > 0, VendorPanelHeight: > 0 })
+        if (configuration.VendorPanel is { Width: > 0, Height: > 0 })
         {
             ImGui.SameLine();
 
@@ -336,8 +336,8 @@ public sealed unsafe class VendorPanelWindow : Window
                     FontAwesomeIcon.ArrowsAltV,
                     "Using a size you set. Click to match the vendor window again."))
             {
-                configuration.VendorPanelWidth = 0;
-                configuration.VendorPanelHeight = 0;
+                configuration.VendorPanel.Width = 0;
+                configuration.VendorPanel.Height = 0;
                 changed = true;
             }
         }
