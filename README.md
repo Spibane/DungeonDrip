@@ -25,6 +25,10 @@ window beside it marks the pieces still missing. And at a vendor, a panel beside
 glamour gear it stocks, marked by where you already have each piece. Outside a duty it names the
 role to queue each roulette as.
 
+Its answers also reach the game's own right-click menus, and the window has a second view for the
+collection as a whole — which outfit sets you are closest to finishing, how full your dresser is,
+and what you are carrying that a box already has.
+
 ## Installing
 
 Not yet in the official Dalamud plugin list. In the meantime it is available from a
@@ -135,6 +139,41 @@ readable. Roles you have nothing levelled enough for, and duties above your leve
 Looking a duty up replaces the table; the toolbar's pin button lets go of it again, showing a die
 when that lands back here and a thumbtack when it lands on the duty you are standing in.
 
+## Collection
+
+The toolbar's first button swaps the window between duty loot and your collection as a whole. Three
+sections, none of which involves a duty:
+
+**Sets in progress** — outfit sets you are part way through, closest to done first, with what is
+missing from each and where it drops. Two counts per row, because they are different questions:
+what you *own* says whether the set is worth chasing, what is *filled in the stored copy* says
+whether the dresser needs topping up.
+
+**Glamour Dresser** — how full the box is and what would free space. An outfit stored a piece at a
+time could be one set item instead; a piece in both the dresser and the Armoire is duplicated.
+Collapsing is phrased as a conditional, because it needs the outfit item — a tradeable attire box —
+and owning all the pieces does not give you one. The loose copies also come back to your bags, so
+the space only appears once you clear them.
+
+**Already in your collection** — gear you are carrying that a box already has. Named for the fact
+rather than the conclusion: it reports that a piece is also stored and leaves the decision to you,
+because that decision is irreversible and is being read off a snapshot that may be days old. Split
+by bags, armoury and saddlebag, since what is safe to do differs; nothing you are wearing is ever
+listed. The plugin deletes nothing and cannot see retainers, and the section says so every time.
+
+## In the game's menus
+
+Right-click gear anywhere the game offers a menu — inventory, armoury, inspect, a chat link, the
+dresser, a vendor, the market board — and the plugin's options are there:
+
+| Option | |
+| --- | --- |
+| Try on outfit: *name* | One per set the piece belongs to; fills the fitting room with the whole set |
+| Where does this drop? | The duties that drop it, and takes you to whichever you pick |
+
+Only what the game does not already offer is added. It has its own Try On, Link and Copy, and a
+second of each would sit next to the real one saying the same word.
+
 ## Commands
 
 | Command | What it does |
@@ -142,6 +181,8 @@ when that lands back here and a thumbtack when it lands on the duty you are stan
 | `/dungeondrip` | Toggle the window |
 | `/drip`, `/ddrip` | Aliases, claimed only if no other plugin owns them |
 | `/dungeondrip <duty name>` | Show that duty; an ambiguous name opens the picker |
+| `/dungeondrip <gear name>` | Say where a piece is in your collection and where it drops |
+| `/dungeondrip item <name>` | The same, forced — for a piece whose name is inside a duty's |
 | `/dungeondrip config` | Settings |
 | `/dungeondrip refresh` | Re-read the dresser and armoire |
 | `/dungeondrip update` | Re-download the loot data |
@@ -169,6 +210,7 @@ what is specific to that surface.
 | Companion list beside the loot window | Duties | on |
 | Panel beside vendor windows | Vendors | on |
 | Group the vendor panel by slot | Vendors | on |
+| Gear options on the game's right-click menus | In-game UI | on |
 | Warn when dresser data is older than | Data | 7 days |
 | Record gear that drops in duties | Data | on |
 | Fill gaps from the wiki | Data | on |
@@ -302,24 +344,33 @@ DungeonDrip/
 ├── Game/
 │   ├── DresserReader.cs         prism box and outfit-set expansion
 │   ├── ArmoireReader.cs
-│   ├── InventoryReader.cs
-│   ├── OutfitCatalog.cs         which sets a piece belongs to
+│   ├── InventoryReader.cs       ids in bulk, and stack by stack with locations
+│   ├── OutfitCatalog.cs         which sets a piece belongs to, and how far along each is
 │   ├── TryOnService.cs          feeds the fitting room, one piece per frame
+│   ├── ItemActions.cs           what the right-click menus offer, in one list
+│   ├── GameContextMenu.cs       that list, rendered into the game's own menus
 │   ├── OwnershipTracker.cs      per-character snapshot and staleness
 │   └── LootObserver.cs          records gear seen dropping
 ├── Core/
 │   ├── MissingItems.cs          the ownership decision
+│   ├── CollectionMarkers.cs     that decision turned into a glyph
 │   ├── DutyReport.cs            territory + ownership → the drawn list
 │   ├── DutyCatalog.cs           duty list for the picker
+│   ├── DropSources.cs           the loot tables backwards: piece → duties
+│   ├── SetCompletion.cs         how far through each outfit set you are
+│   ├── DresserPressure.cs       how full the box is and what would free space
+│   ├── CarriedGear.cs           what you carry, split by whether it is stored
 │   ├── ContentFinderIndex.cs    duty names; coverage; roulette pools
 │   ├── RouletteAdvice.cs        which job to queue each roulette as
 │   ├── JobRoles.cs              who can roll Need on a piece
 │   ├── StorageEligibility.cs    what each store can hold
 │   ├── ItemNameIndex.cs         item name → id, for the wiki
+│   ├── GearNameIndex.cs         the same for gear that drops, for the command
 │   ├── EquipSlots.cs
 │   └── Format.cs
 └── Windows/
     ├── MissingItemsWindow.cs    picker, freshness banner, item list, roulette advice
+    ├── CollectionView.cs        the window's other mode: sets, dresser, carried gear
     ├── LootCompanionWindow.cs   read-only list beside the Need/Greed window
     └── ConfigWindow.cs
 ```
@@ -330,6 +381,11 @@ plugins that recolour game UI nodes.
 Try-on is the one place the plugin asks the game to do something rather than reading what it has
 already done, and it only ever happens because you picked it out of a right-click menu. Everything
 else - dresser, armoire, inventory, shop and loot addons - is read and nothing more.
+
+The game's right-click menus are the one place the plugin appears inside the game's own UI rather
+than beside it. That goes through the interface Dalamud provides for exactly this, which composes
+plugin entries rather than letting one overwrite another, so no game UI node is touched. It can be
+switched off under **Settings → In-game UI**.
 
 ## Releasing
 
