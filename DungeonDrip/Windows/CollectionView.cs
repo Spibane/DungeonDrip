@@ -33,8 +33,18 @@ public sealed class CollectionView(Plugin plugin)
     private int seenOwnershipRevision = -1;
     private Inputs seenInputs;
 
+    /// <summary>Sets listed before the "show all" toggle earns its place.</summary>
+    private const int InitialSetsShown = 25;
+
     private DresserPressureReport? pressure;
     private CarriedGearReport? carried;
+    private IReadOnlyList<SetStanding> sets = [];
+
+    /// <summary>
+    /// Per-session, not a setting. The config file is documentation of what the user chose, and
+    /// "I expanded a list once" is not a choice worth writing down.
+    /// </summary>
+    private bool showAllSets;
 
     public void Draw()
     {
@@ -71,6 +81,10 @@ public sealed class CollectionView(Plugin plugin)
 
         carried = CarriedGear.Build(
             Game.InventoryReader.ReadDetailed(), ownership, plugin.Outfits, plugin.Storage);
+
+        sets = plugin.Ownership.HasDresserData
+            ? SetCompletion.InProgress(plugin.Outfits, ownership, plugin.Configuration)
+            : [];
     }
 
     private Inputs Capture()
@@ -84,8 +98,92 @@ public sealed class CollectionView(Plugin plugin)
             configuration.OnlyCurrentJobEquippable);
     }
 
-    private void DrawSetsInProgress() =>
-        ImGui.TextColored(Palette.Muted, "Nothing yet.");
+    /// <summary>
+    /// Outfit sets you are part way through, closest to done first.
+    /// </summary>
+    /// <remarks>
+    /// Two counts per row, because they answer different questions with different next actions.
+    /// What you own decides whether the set is worth chasing; what is filled in the stored copy
+    /// decides whether the dresser needs topping up. A set can be nine tenths owned and barely
+    /// stored, and only one of those is a shopping list.
+    /// </remarks>
+    private void DrawSetsInProgress()
+    {
+        if (!plugin.Ownership.HasDresserData)
+        {
+            ImGui.TextColored(Palette.Muted,
+                "No Glamour Dresser data yet - open a dresser once so this can be answered.");
+            return;
+        }
+
+        if (sets.Count == 0)
+        {
+            ImGui.TextColored(Palette.Muted,
+                "No outfit set is part way done - every set is either finished or untouched.");
+            return;
+        }
+
+        var shown = showAllSets ? sets.Count : System.Math.Min(sets.Count, InitialSetsShown);
+
+        for (var i = 0; i < shown; i++)
+            DrawSetRow(sets[i]);
+
+        if (sets.Count <= InitialSetsShown)
+            return;
+
+        ImGui.Spacing();
+        if (ImGui.SmallButton(showAllSets
+                ? $"Show the closest {InitialSetsShown}###setsAll"
+                : $"Show all {sets.Count}###setsAll"))
+        {
+            showAllSets = !showAllSets;
+        }
+    }
+
+    private void DrawSetRow(SetStanding standing)
+    {
+        UiParts.ItemIcon(standing.IconId, 20);
+
+        var open = ImGui.TreeNodeEx(
+            $"{standing.Name}###set{standing.SetId}", ImGuiTreeNodeFlags.SpanAvailWidth);
+
+        ImGui.SameLine();
+        ImGui.TextColored(Palette.Muted, $"{standing.Owned}/{standing.Total} owned");
+
+        if (standing.StoredAsSet)
+        {
+            ImGui.SameLine();
+            ImGui.TextColored(
+                standing.FilledInStoredSet == standing.Total ? Palette.Good : Palette.Warning,
+                $"({standing.FilledInStoredSet} filled in the stored set)");
+        }
+
+        if (!open)
+            return;
+
+        foreach (var piece in standing.Missing)
+            DrawMissingPiece(piece);
+
+        ImGui.TreePop();
+    }
+
+    private void DrawMissingPiece(SetPieceState piece)
+    {
+        UiParts.ItemIcon(piece.IconId, 18);
+        ImGui.Text(piece.Name);
+
+        UiParts.ItemContextMenu(plugin, piece.ItemId, piece.Name);
+
+        var sources = plugin.Drops?.For(piece.ItemId);
+        if (sources is not { Count: > 0 })
+            return;
+
+        var best = sources[0];
+        ImGui.SameLine();
+        ImGui.TextColored(Palette.Muted, best.Level > 0
+            ? $"- {best.DutyName} (Lv. {best.Level})"
+            : $"- {best.DutyName}");
+    }
 
     private void DrawDresserPressure()
     {
