@@ -425,6 +425,11 @@ sets it belongs to and where each stands:
 A piece can belong to more than one set, so settings offer two readings: owned when **any** set
 containing it is stored, or only once **all** of them are.
 
+**The strict reading reaches the store lists too.** Under *all of them*, a piece one of its two sets is
+holding is one the plugin says is not owned — so a loose copy of it appears on the panel beside the
+dresser, and the row says which rule put it there and that storing that copy on its own settles it.
+Under *any*, nothing changes: one stored set is enough, and there is nothing left to put in.
+
 ## Loot data
 
 The game ships no loot tables, so drop lists come from elsewhere. Each entry's source is named in its

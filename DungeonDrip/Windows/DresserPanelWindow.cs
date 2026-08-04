@@ -43,15 +43,36 @@ public sealed class DresserPanelWindow(Plugin plugin)
     }
 
     /// <summary>
-    /// Says when a piece has a second home that costs no dresser slot.
+    /// Says when a piece has a second home that costs no dresser slot, and when the dresser can be
+    /// seen to be holding the piece already.
     /// </summary>
     /// <remarks>
-    /// Only on this panel. Beside the dresser it is a way out of spending a slot; beside the Armoire it
-    /// would be saying that the box being stood at is the box to use.
+    /// The first note is only on this panel: beside the dresser a slot-free home is a way out of
+    /// spending a slot, while beside the Armoire it would be saying that the box being stood at is the
+    /// box to use.
+    ///
+    /// The second is the caveat that would otherwise bite hardest here. Under "owned only if every
+    /// outfit with that piece is stored", a row can be a piece the dresser is visibly holding inside
+    /// one of its sets - correct, and indistinguishable from a bug unless the row says which rule put
+    /// it on the list.
     /// </remarks>
     protected override void DrawRowNotes(HeldGearRow row)
     {
-        if (((DresserAddRow)row).ArmoireWouldTake)
+        var add = (DresserAddRow)row;
+
+        if (add.ArmoireWouldTake)
             ImGui.TextColored(Palette.Good, "The Armoire would take this, at no dresser slot.");
+
+        if (add.OutfitsStored > 0 && add.OutfitsTotal > add.OutfitsStored)
+        {
+            // Split across lines by hand: a tooltip does not wrap, and one sentence of this length
+            // would drag it across the screen.
+            ImGui.TextColored(Palette.Warning,
+                $"Stored inside {add.OutfitsStored} of the {add.OutfitsTotal} outfit sets using it.");
+
+            ImGui.TextColored(Palette.Warning,
+                "Your setting only counts that as owned once every one of them is\n" +
+                "stored, so storing this copy on its own settles it.");
+        }
     }
 }

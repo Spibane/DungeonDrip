@@ -70,5 +70,9 @@ public record HeldGearRow(
     EquipLock Locks,
     CarryLocation Location,
     int Quantity,
-    string? Blocked)
-    : GearRow(ItemId, Name, IconId, SlotOrder, SlotName, Marker, JobEquippable, Locks);
+    string? Blocked,
+    int OutfitsStored = 0,
+    int OutfitsTotal = 0)
+    : GearRow(
+        ItemId, Name, IconId, SlotOrder, SlotName, Marker, JobEquippable, Locks,
+        OutfitsStored, OutfitsTotal);
