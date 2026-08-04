@@ -107,8 +107,8 @@ public sealed class JobRoleIndex
         groupByCategory.TryGetValue(classJobCategoryRow, out var groups) ? groups : UnknownOnly;
 
     /// <summary>
-    /// ClassJob rows for the jobs you could queue a heading as, so a caller can ask what level you
-    /// have in it. Classes and the limited jobs are absent: you cannot queue a roulette as one.
+    /// ClassJob rows for the jobs a heading can be queued as, so a caller can ask what level the
+    /// character has in it. Classes and the limited jobs are absent: no roulette takes one.
     /// </summary>
     public IReadOnlyList<uint> JobsIn(RoleGroup group) =>
         jobsByGroup.TryGetValue(group.Label, out var jobs) ? jobs : NoJobs;
@@ -178,7 +178,7 @@ public sealed class JobRoleIndex
             .Select((set, index) => (set, index))
             .ToDictionary(x => x.set, x => MeleeOrderBase + x.index);
 
-        // Jobs you can actually queue a roulette as: no classes, and no Blue Mage or Beastmaster.
+        // Jobs a roulette can actually be queued as: no classes, and no Blue Mage or Beastmaster.
         // Left in sheet order, which is the game's own, so advice lists jobs the way the character
         // sheet does rather than however a dictionary happened to fill.
         var playable = jobs.Where(job => job.IsFullJob && !job.IsLimited).ToList();

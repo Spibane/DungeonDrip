@@ -12,7 +12,7 @@ namespace DungeonDrip.Game;
 /// </summary>
 /// <remarks>
 /// Not read off the addon's AtkValues, unlike the shops. The board keeps its browse results in the
-/// search agent, and the agent is both easier to read and stable while you scroll - the values
+/// search agent, and the agent is both easier to read and stable while scrolling - the values
 /// block holds category icons and nothing about what is listed.
 ///
 /// <para>The agent holds the ids and the addon's own results list says how many of them are being

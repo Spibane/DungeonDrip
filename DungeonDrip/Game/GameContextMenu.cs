@@ -24,7 +24,7 @@ namespace DungeonDrip.Game;
 public sealed class GameContextMenu : IDisposable
 {
     /// <summary>
-    /// Default menus we will read the hovered item from.
+    /// Default menus the hovered item is read from.
     /// </summary>
     /// <remarks>
     /// An allow-list rather than "any default menu", because a default menu is usually about a

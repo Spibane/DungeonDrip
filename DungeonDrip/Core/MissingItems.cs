@@ -11,6 +11,18 @@ public enum OwnershipSource
     Outfit,
     Armoire,
     Inventory,
+
+    /// <summary>In a retainer's bags, as of the last time they were open.</summary>
+    Retainer,
+
+    /// <summary>
+    /// Worn by a retainer, which is not the same as being in their bags.
+    /// </summary>
+    /// <remarks>
+    /// Its own answer because the other one names the wrong place. "With a retainer" is read as an
+    /// instruction to open their bags, and gear the retainer has on is not in them.
+    /// </remarks>
+    RetainerEquipped,
 }
 
 /// <summary>
@@ -51,6 +63,15 @@ public static class MissingItems
         if (view.Inventory != null && view.Inventory.Contains(itemId))
             return OwnershipSource.Inventory;
 
+        // The "owned but in no glamour box" answers, in order of how much trouble the copy is to get
+        // at: the character's own bags first, then a retainer's, and a retainer's back last of all -
+        // that one has to come off them before it is anything.
+        if (view.Retainers != null && view.Retainers.Contains(itemId))
+            return OwnershipSource.Retainer;
+
+        if (view.RetainersWearing != null && view.RetainersWearing.Contains(itemId))
+            return OwnershipSource.RetainerEquipped;
+
         return OwnershipSource.None;
     }
 
@@ -60,7 +81,7 @@ public static class MissingItems
     /// <remarks>
     /// Only interesting once <see cref="Resolve"/> has said <see cref="OwnershipSource.None"/> in
     /// <see cref="OutfitOwnershipMode.AllOutfits"/>: a non-zero first number there is the difference
-    /// between "go and get one" and "you have one, your own rule wants the rest", which a flat "not
+    /// between "go and get one" and "one is stored, the chosen rule wants the rest", which a flat "not
     /// owned" was hiding on a piece the user could see in their dresser.
     ///
     /// Stored is counted by intersection rather than off <c>storedIn.Count</c> alone, so the numbers
@@ -113,6 +134,8 @@ public static class MissingItems
         OwnershipSource.Outfit => "Part of a stored outfit set",
         OwnershipSource.Armoire => "In your Armoire",
         OwnershipSource.Inventory => "Carried or equipped",
+        OwnershipSource.Retainer => "In a retainer's bags",
+        OwnershipSource.RetainerEquipped => "Worn by one of your retainers",
         _ => "Not collected",
     };
 }

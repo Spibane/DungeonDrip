@@ -19,9 +19,9 @@ public sealed record DropSource(uint TerritoryId, string DutyName, byte Level, L
 ///
 /// <para><b>This index is as complete as the loot data, which is not very.</b> Coverage comes from
 /// the downloaded dataset, plus whatever the wiki has been asked about - and the wiki is looked up
-/// one duty at a time, only for duties you have actually opened. For a dungeon new enough that the
-/// dataset has a couple of entries and the wiki has the whole table, this will know almost nothing
-/// until you have viewed it once. Anything drawing these results has to say "nothing in the loot
+/// one duty at a time, only for duties that have actually been opened. For a dungeon new enough that
+/// the dataset has a couple of entries and the wiki has the whole table, this will know almost nothing
+/// until it has been viewed once. Anything drawing these results has to say "nothing in the loot
 /// data lists this" and must never say "this does not drop anywhere".</para>
 /// </remarks>
 public sealed class DropSources
@@ -36,7 +36,7 @@ public sealed class DropSources
     public IReadOnlyList<DropSource> For(uint itemId) =>
         byItem.TryGetValue(itemId, out var sources) ? sources : None;
 
-    /// <summary>Every piece that drops somewhere we know about. Feeds the by-name lookup.</summary>
+    /// <summary>Every piece that drops somewhere known. Feeds the by-name lookup.</summary>
     public IReadOnlyCollection<uint> Items => byItem.Keys;
 
     public static DropSources Build(DungeonLootData loot, DutyCatalog duties)

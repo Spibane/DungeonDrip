@@ -6,10 +6,10 @@ using Lumina.Excel.Sheets;
 
 namespace DungeonDrip.Core;
 
-/// <summary>Where a carried piece is sitting, in terms of what you can do with it.</summary>
+/// <summary>Where a held piece is sitting, in terms of what can be done with it.</summary>
 public enum CarryLocation
 {
-    /// <summary>Loose in your bags. The only place a piece can be acted on with no preamble.</summary>
+    /// <summary>Loose in the bags. The only place a piece can be acted on with no preamble.</summary>
     Bags,
 
     /// <summary>In the armoury chest, where a gearset may quietly be depending on it.</summary>
@@ -20,9 +20,37 @@ public enum CarryLocation
 
     /// <summary>In a saddlebag, which has to be emptied at a bell before anything can happen.</summary>
     Saddlebag,
+
+    /// <summary>
+    /// In a retainer's bags, which means a trip to them before it is anything at all.
+    /// </summary>
+    /// <remarks>
+    /// A holding rather than a store, which is the whole reason it is in this enum: a piece with a
+    /// retainer is no more wearable as a glamour than one in the bags, so it is something not yet put
+    /// away rather than somewhere it has been put.
+    /// </remarks>
+    Retainer,
+
+    /// <summary>
+    /// Worn by a retainer, which is not in their bags and is not found by looking there.
+    /// </summary>
+    /// <remarks>
+    /// Apart from <see cref="Retainer"/> because a list that lumps them together names the wrong place,
+    /// and because the two want different advice: gear a retainer has on is deciding what their ventures
+    /// bring back, so it is the one holding on this list that is doing a job where it is.
+    /// </remarks>
+    RetainerEquipped,
 }
 
-/// <summary>One piece you are carrying, collapsed from however many stacks of it there were.</summary>
+/// <summary>One held piece, collapsed from however many stacks of it there were.</summary>
+/// <param name="Quantity">
+/// How many are there. Always 1 for a retainer, whose snapshot records ids and no counts - which
+/// is safe rather than a fib, because a count is only ever drawn when it is above one.
+/// </param>
+/// <param name="Holder">
+/// Which retainer is holding it, empty for anything on the character. What is worth doing about a
+/// spare copy depends on which trip it is on the other end of.
+/// </param>
 public sealed record CarriedPiece(
     uint ItemId,
     string Name,
@@ -32,7 +60,8 @@ public sealed record CarriedPiece(
     CarryLocation Location,
     int Quantity,
     OwnershipSource StoredIn,
-    StorageKind Storable)
+    StorageKind Storable,
+    string Holder = "")
 {
     /// <summary>The Armoire would take this and it is not in there yet - a dresser slot saved.</summary>
     public bool ArmoireWouldTake =>
@@ -40,19 +69,19 @@ public sealed record CarriedPiece(
 }
 
 /// <summary>
-/// What you are carrying, split by whether the collection already has it.
+/// Everything merely held, split by whether the collection already has it.
 /// </summary>
 /// <param name="AlreadyStored">
-/// Carried and also sitting in the Dresser or Armoire. Kept per location, because what you can
-/// safely do about it differs by where it is. Never contains anything equipped.
+/// Held and also sitting in the Dresser or Armoire. Kept per location, because what is safe to do
+/// about it differs by where it is. Never contains anything equipped.
 /// </param>
 /// <param name="OnlyInsideAnOutfit">
-/// Held only as a filled slot inside a stored outfit set. Accounted for, but pulling the set apart
-/// would strand it, so this is reported and never recommended.
+/// Held only as a filled slot inside a stored outfit set - so the dresser is holding a set rather than
+/// this piece, and the piece goes with the set if it ever leaves. Reported, never recommended.
 /// </param>
 /// <param name="NotStored">
-/// Carried and nowhere in the collection. One row per piece, offered from the easiest place to
-/// reach it from.
+/// Held and nowhere in the collection. One row per piece, offered from the easiest place to reach
+/// it from.
 /// </param>
 public sealed record CarriedGearReport(
     IReadOnlyList<CarriedPiece> AlreadyStored,
@@ -61,33 +90,42 @@ public sealed record CarriedGearReport(
     bool SaddlebagReadable);
 
 /// <summary>
-/// Answers "is what I am carrying already in my collection" - in both directions at once.
+/// Answers "is what I am only holding already in my collection" - in both directions at once.
 /// </summary>
 /// <remarks>
-/// The two questions are complements over one computation. What is carried but not stored is an
-/// add list; what is carried and already stored is a list of things taking up bag space for
-/// nothing. Splitting them here rather than computing each separately is the only way the two can
-/// be guaranteed not to contradict each other.
+/// The two questions are complements over one computation. What is held but not stored is an add
+/// list; what is held and already stored is a list of things taking up space for nothing. Splitting
+/// them here rather than computing each separately is the only way the two can be guaranteed not to
+/// contradict each other.
+///
+/// Retainers are holdings on the same footing as the bags, which is why they arrive here rather than
+/// being treated as another box to compare against. A piece with a retainer cannot be worn as a
+/// glamour any more than one in a bag can; it is owned and not put away.
 /// </remarks>
 public static class CarriedGear
 {
+    /// <param name="retainers">
+    /// The retainers whose bags have been read, which is allowed to be empty - and is, for the panel
+    /// beside the dresser, whose subject is what can be acted on without going anywhere.
+    /// </param>
     public static CarriedGearReport Build(
         IReadOnlyList<CarriedStack> carried,
+        IReadOnlyList<RetainerHolding> retainers,
         OwnershipView ownership,
         OutfitCatalog outfits,
         StorageEligibility storage)
     {
-        // The single most important line here. Every piece in `carried` is by definition in the
-        // inventory, so leaving the inventory in scope makes each of them own itself and both halves
-        // of the answer come out empty.
-        var stored = ownership with { Inventory = null };
+        // The single most important line here. Every piece being considered is by definition somewhere
+        // in the inventory or with a retainer, so leaving any of those in scope makes each of them own
+        // itself and both halves of the answer come out empty.
+        var stored = ownership with { Inventory = null, Retainers = null, RetainersWearing = null };
 
         var items = Plugin.DataManager.GetExcelSheet<Item>();
         var alreadyStored = new List<CarriedPiece>();
         var insideOutfit = new List<CarriedPiece>();
         var notStored = new Dictionary<uint, CarriedPiece>();
 
-        foreach (var group in Collapse(carried))
+        foreach (var group in Collapse(carried, retainers))
         {
             if (!items.TryGetRow(group.ItemId, out var item))
                 continue;
@@ -114,7 +152,8 @@ public static class CarriedGear
                 group.Location,
                 group.Quantity,
                 source,
-                storable);
+                storable,
+                group.Holder);
 
             switch (source)
             {
@@ -143,23 +182,39 @@ public static class CarriedGear
     }
 
     /// <summary>
-    /// Stacks to one row per piece per location, summing how many of it you have there.
+    /// Stacks to one row per piece per place, summing how many of it are there.
     /// </summary>
-    private static IEnumerable<Collapsed> Collapse(IReadOnlyList<CarriedStack> carried) =>
-        carried
+    /// <remarks>
+    /// Retainers come through as one row each rather than being merged into a single retainer bucket,
+    /// because "which one has it" is the only thing that makes a spare copy actionable.
+    /// </remarks>
+    private static IEnumerable<Collapsed> Collapse(
+        IReadOnlyList<CarriedStack> carried, IReadOnlyList<RetainerHolding> retainers)
+    {
+        var onYou = carried
             .GroupBy(stack => (stack.ItemId, Location: LocationOf(stack)))
             .Select(group => new Collapsed(
                 group.Key.ItemId,
                 group.Key.Location,
-                group.Sum(stack => stack.Quantity)));
+                group.Sum(stack => stack.Quantity),
+                string.Empty));
+
+        var inRetainerBags = retainers.SelectMany(retainer => retainer.Items.Select(
+            itemId => new Collapsed(itemId, CarryLocation.Retainer, 1, retainer.Name)));
+
+        var wornByRetainers = retainers.SelectMany(retainer => retainer.Equipped.Select(
+            itemId => new Collapsed(itemId, CarryLocation.RetainerEquipped, 1, retainer.Name)));
+
+        return onYou.Concat(inRetainerBags).Concat(wornByRetainers);
+    }
 
     /// <summary>
     /// Records a piece on the add list, keeping the copy that is least trouble to get at.
     /// </summary>
     /// <remarks>
-    /// An add list wants one row per piece, not one per place you happen to have it. Bags first
-    /// because nothing has to happen before you can use that copy; the saddlebag last because it
-    /// cannot be reached at all without a trip to a bell.
+    /// An add list wants one row per piece, not one per place it happens to sit. Bags first because
+    /// nothing has to happen before that copy can be used; then the saddlebag, which needs a
+    /// trip to a bell, and a retainer last, which needs the trip and a retainer opened at the end of it.
     /// </remarks>
     private static void Offer(Dictionary<uint, CarriedPiece> destination, CarriedPiece piece)
     {
@@ -177,7 +232,11 @@ public static class CarriedGear
         CarryLocation.Bags => 0,
         CarryLocation.Armoury => 1,
         CarryLocation.Equipped => 2,
-        _ => 3,
+        CarryLocation.Saddlebag => 3,
+        CarryLocation.Retainer => 4,
+
+        // Last, because it has to come off the retainer before it is even in their bags.
+        _ => 5,
     };
 
     private static CarryLocation LocationOf(CarriedStack stack)
@@ -201,5 +260,6 @@ public static class CarriedGear
             .ThenBy(piece => piece.Name, StringComparer.OrdinalIgnoreCase),
     ];
 
-    private readonly record struct Collapsed(uint ItemId, CarryLocation Location, int Quantity);
+    private readonly record struct Collapsed(
+        uint ItemId, CarryLocation Location, int Quantity, string Holder);
 }

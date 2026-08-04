@@ -70,7 +70,7 @@ public static class ItemActions
         }
 
         // Only on the game's menus. Inside the plugin's own windows the answer is already on
-        // screen: the duty list is a duty, the loot companion is the roll you are in, the vendor
+        // screen: the duty list is a duty, the loot companion is the roll in progress, the vendor
         // panel is stock rather than drops, and the collection view prints the source under each
         // missing piece.
         if (surface == ItemActionSurface.GameMenu)
@@ -100,7 +100,7 @@ public static class ItemActions
     /// </summary>
     /// <remarks>
     /// An empty answer still gets the entry, carrying the reason. Loot coverage is thin for new
-    /// content by design - the wiki is only read for duties you have opened - so "nothing lists
+    /// content by design - the wiki is only read for duties that have been opened - so "nothing lists
     /// this" and "this does not drop" are different statements and only the first can honestly be
     /// made here. Dropping the entry when there is no answer would read as the menu being broken,
     /// which is why it is a disabled line rather than an absence.

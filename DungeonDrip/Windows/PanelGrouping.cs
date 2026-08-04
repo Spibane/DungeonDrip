@@ -47,7 +47,7 @@ internal static class PanelGrouping
 
         foreach (var row in fresh)
         {
-            // Dropped, not counted: these say nothing about your collection, only that you asked
+            // Dropped, not counted: these say nothing about the collection, only that the user asked
             // not to see them.
             if (options.HideWeapons && EquipSlots.IsWeaponSlot(row.SlotOrder))
             {

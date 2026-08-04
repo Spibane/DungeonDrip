@@ -6,7 +6,7 @@ namespace DungeonDrip.Game;
 
 /// <summary>One stack of one item, where it is sitting.</summary>
 /// <remarks>
-/// Not deduplicated: the same piece can be in a bag, in the armoury and on your back at once, and
+/// Not deduplicated: the same piece can be in a bag, in the armoury and equipped at once, and
 /// which of those it is changes what can honestly be said about it. Callers collapse it themselves,
 /// keeping whichever location suits the advice they are giving.
 /// </remarks>
@@ -25,9 +25,13 @@ public readonly record struct CarriedStack(
 public static unsafe class InventoryReader
 {
     /// <summary>
-    /// Everywhere on your person a glamour piece can sit. Retainer bags are deliberately absent -
-    /// the client cannot read them without visiting the retainer.
+    /// Everywhere on the character a glamour piece can sit.
     /// </summary>
+    /// <remarks>
+    /// Retainer bags are absent because they are not on the character and cannot be read from here: the
+    /// client only loads them while that retainer is open, which is why they are snapshotted
+    /// separately by <see cref="RetainerReader"/> rather than read live alongside these.
+    /// </remarks>
     private static readonly InventoryType[] Containers =
     [
         InventoryType.Inventory1, InventoryType.Inventory2,
@@ -81,7 +85,7 @@ public static unsafe class InventoryReader
     /// <remarks>
     /// Kept apart from <see cref="Read"/> rather than layered under it. That one runs on a one-second
     /// poll and answers a yes/no question, so it allocates a single set; this allocates a record per
-    /// stack and runs only when something asks about what you are carrying. Sharing a body would make
+    /// stack and runs only when something asks what is being carried. Sharing a body would make
     /// the cheap path pay for the detailed one.
     ///
     /// Callable regardless of the count-inventory setting, deliberately. That setting decides whether
@@ -160,11 +164,11 @@ public static unsafe class InventoryReader
     }
 
     /// <summary>
-    /// Whether the saddlebag can be read from where you are standing.
+    /// Whether the saddlebag can be read from where the character is standing.
     /// </summary>
     /// <remarks>
     /// The client only loads it near a summoning bell, so away from one it reads as empty. Anything
-    /// listing what you are carrying has to be able to say "not readable here" rather than letting
+    /// listing carried gear has to be able to say "not readable here" rather than letting
     /// an unloaded container pass for an empty one.
     /// </remarks>
     public static bool SaddlebagLoaded()

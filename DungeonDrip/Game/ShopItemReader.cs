@@ -39,7 +39,7 @@ public static unsafe class ShopItemReader
 
         var handler = proxy->Handler;
 
-        // Buyback lists what you just sold - by definition things you owned moments ago.
+        // Buyback lists what was just sold - by definition things owned moments ago.
         if (handler->BuybackTabActive)
             return true;
 

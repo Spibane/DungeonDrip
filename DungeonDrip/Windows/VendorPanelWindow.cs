@@ -4,8 +4,8 @@ using DungeonDrip.Core;
 namespace DungeonDrip.Windows;
 
 /// <summary>
-/// A panel that rides alongside a vendor window, listing the glamour gear it stocks and where you
-/// already have each piece.
+/// A panel that rides alongside a vendor window, listing the glamour gear it stocks and where each
+/// piece is already held.
 /// </summary>
 /// <remarks>
 /// It lists what the vendor is currently showing, not what is on screen: a category change re-reads,
@@ -21,7 +21,7 @@ public sealed class VendorPanelWindow(Plugin plugin)
     protected override IReadOnlyList<GearRow>? ResolveRows() => Plugin.Shop.Resolve();
 
     /// <summary>
-    /// You reach a vendor by walking to one, so the dresser snapshot is usually old by then, and the
+    /// A vendor is reached on foot, so the dresser snapshot is usually old by then, and the
     /// mistake this prevents costs actual gil.
     /// </summary>
     protected override string? UncertainNote =>

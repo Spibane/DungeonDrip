@@ -78,7 +78,7 @@ public sealed class Plugin : IDalamudPlugin
     /// <summary>One resolved-row cache, shared by every panel.</summary>
     public GearRowFactory Rows { get; }
 
-    /// <summary>What you are carrying that the Glamour Dresser has not got.</summary>
+    /// <summary>Carried gear the Glamour Dresser has not got.</summary>
     public DresserAddWatcher Dresser { get; }
 
     /// <summary>The gear the market board is currently browsing.</summary>
@@ -192,7 +192,7 @@ public sealed class Plugin : IDalamudPlugin
 
     /// <summary>
     /// Which job to queue each roulette as. Built on first ask rather than alongside the report,
-    /// because it sweeps every duty in the game and is only wanted while you are not in one.
+    /// because it sweeps every duty in the game and is only wanted while outside one.
     /// </summary>
     public IReadOnlyList<RouletteAdvice> Roulettes =>
         advice ??= adviceBuilder?.Build(Ownership.Current, Configuration) ?? [];
@@ -328,7 +328,7 @@ public sealed class Plugin : IDalamudPlugin
         report = reportBuilder?.Build(SelectedTerritory, Ownership.Current, Configuration);
 
         // Everything that stales the report stales the advice too - it is the same ownership
-        // snapshot read a different way. Dropped rather than rebuilt, so a duty you pinned does
+        // snapshot read a different way. Dropped rather than rebuilt, so a pinned duty does
         // not pay for a sweep the window will not draw.
         advice = null;
 
@@ -452,7 +452,7 @@ public sealed class Plugin : IDalamudPlugin
     /// </summary>
     /// <remarks>
     /// The answer goes to chat rather than the window. The window is territory-shaped all the way
-    /// through - its title comes from the duty, it pins one, and it opens itself when you zone into
+    /// through - its title comes from the duty, it pins one, and it opens itself on zoning into
     /// one - so an item view would be fighting all three. Chat also gets the item link for free,
     /// which makes the answer hoverable and linkable in a way a window row is not.
     /// </remarks>

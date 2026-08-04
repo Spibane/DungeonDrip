@@ -1,6 +1,6 @@
 <h1 align="center">Dungeon Drip</h1>
 
-<h2 align="center"><strong>Knows what glamour you already own, and says so wherever the game shows you gear</strong></h2>
+<h2 align="center"><strong>Knows which glamour is already collected, and says so wherever the game shows gear</strong></h2>
 
 <div align="center">
 
@@ -16,18 +16,18 @@
 
 </div>
 
-Dungeon Drip keeps track of what is in your Glamour Dresser and Armoire, and answers the same
-question at each point where you might pick something up.
+Dungeon Drip keeps track of what is in the Glamour Dresser and Armoire, and answers the same question
+at each point where something might be picked up.
 
 On entering a dungeon or alliance raid it lists the gear that drops there and is not yet collected.
 Any duty can also be looked up without entering it. While a Need/Greed roll is open, a companion
 window beside it marks the pieces still missing. And at a vendor, a panel beside the shop lists the
-glamour gear it stocks, marked by where you already have each piece. Outside a duty it names the
-role to queue each roulette as.
+glamour gear it stocks, marked by where each piece is already held. Outside a duty it names the role
+to queue each roulette as.
 
 Its answers also reach the game's own right-click menus, and the window has a second view for the
-collection as a whole — which outfit sets you are closest to finishing, how full your dresser is,
-and what you are carrying that a box already has.
+collection as a whole — which outfit sets are closest to finished, how full the dresser is, and which
+carried pieces a box already has.
 
 ## Installing
 
@@ -44,9 +44,8 @@ https://raw.githubusercontent.com/Spibane/DungeonDrip/main/repo.json
 Dungeon Drip then appears in `/xlplugins` under **All Plugins**, and updates arrive the same
 way as any other plugin.
 
-Dalamud offers only minimal support for third-party repositories and would rather you used
-the official list, so treat this as temporary — it goes away once the official submission
-lands.
+Dalamud offers only minimal support for third-party repositories and would rather the official list
+were used, so treat this as temporary — it goes away once the official submission lands.
 
 ## Architecture
 
@@ -55,8 +54,10 @@ lands.
   ┌──────────────────────────────┐          ┌──────────────────────────────┐
   │ Teamcraft         every duty │          │ Glamour Dresser  + outfits   │
   │ Console Games Wiki  per duty │          │ Armoire                      │
+  │   with per-boss tables       │          ├──────────────────────────────┤
   │ drops seen in game     live  │          │ bags, armoury, saddlebags    │
-  │ loot-overrides.json  by hand │          │                      opt-in  │
+  │ loot-overrides.json  by hand │          │ retainers: bags, and worn    │
+  │                              │          │   separately - both opt-in   │
   └──────────────┬───────────────┘          └───────────────┬──────────────┘
                  │ merged, keyed by territory               │ snapshot per character
                  └─────────────────┬────────────────────────┤
@@ -66,7 +67,7 @@ lands.
                    ┌───────────────┴───────────────┐        └────────────┐
                    ▼                               ▼                     ▼
               main window                  companion window beside   panel beside vendor
-        (grouped by slot or role)             the Need/Greed roll    stock, panel beside
+    (by slot, role or boss)                   the Need/Greed roll    stock, panel beside
                    │                                                 the dresser, and the
                    ▼                                                 game's own menus
             collection view
@@ -82,40 +83,59 @@ involve duty gear.
 and only loads the Armoire on demand, so nothing is readable from inside a dungeon. Dungeon Drip
 works from the last snapshot it managed to take, per character, and the window reports its age.
 
+Retainers are read the same way and one at a time: their bags only load while that retainer is open,
+so each is snapshotted on a visit and answered from the cache afterwards. A retainer that has never
+been opened is simply not counted rather than counted as empty. **Settings → Data** lists each one with
+the age of its snapshot and can forget any of them — useful for a dismissed retainer, since nothing in
+the game ever comes back to say so.
+
+**A retainer is somewhere gear is held, not somewhere it is stored.** Nothing outside the Glamour
+Dresser and the Armoire can be worn as a glamour, so a piece with a retainer is one that is owned and
+not put away — the same footing as one in the bags. Counting either is opt-in, and both live under one
+heading in **Settings → General**.
+
+**Gear the retainer is wearing is counted separately, and is off even when retainers are on.** It is
+not in their bags, so a bare "one is owned" means seven pages searched for something that was never
+going to be there — and it is doing a job where it is, since a retainer's item level decides what their
+ventures bring back. Switch it on under the retainer setting and it is named for what it is: *worn by
+one of your retainers*, never *in their bags*.
+
 ## At vendors
 
 Open a shop and a panel appears beside it, listing only stock that can be kept as a glamour.
-Materials, dyes and food are left out entirely, so an unmarked row in the shop never means "you
-already have this".
+Materials, dyes and food are left out entirely, so an unmarked row in the shop never means "already
+collected".
 
 | Marker | Colour | Meaning |
 | --- | --- | --- |
 | x | red | Not collected |
 | tick | grey | In the Glamour Dresser |
 | layers | grey | In a stored outfit set that still has gaps |
-| star | green | In an outfit set you have completed |
+| star | green | In a completed outfit set |
 | archive box | grey | In the Armoire |
 | briefcase | grey | Carried or equipped |
+| figure | grey | In a retainer's bags |
+| figure in a tie | grey | Worn by a retainer, not in their bags |
 | question mark | amber | No dresser data — nothing can honestly be said either way |
 
-The marker carries the state; the name only says whether you need the thing. Missing pieces are
-named in plain white and everything you own is greyed out, so the only two things that catch the eye
-are the red x and the green star.
+The marker carries the state; the name only says whether the thing is needed. Missing pieces are named
+in plain white and everything already held is greyed out, so the only two things that catch the eye are
+the red x and the green star.
 
 **A stale snapshot turns the red x amber, not the grey ticks.** Dresser contents are near-monotonic:
-you add glamours far more often than you remove them, so an old snapshot's "you own this" almost
-always still holds, while its "you don't" is exactly what goes out of date. Amber on an x means
-*probably new, but worth checking*.
+glamours are added far more often than they are removed, so an old snapshot's "owned" almost always
+still holds, while its "not owned" is exactly what goes out of date. Amber on an x means *probably new,
+but worth checking*.
 
 Three buttons at the top flip the list filters without a trip to Settings — whether owned pieces are
-listed, whether the list is held to your current job, and whether weapons are included. They write
-the shared settings, so they change the duty list too, and each tooltip says so.
+listed, whether the list is held to the current job, and whether weapons are included. They write the
+shared settings, so they change the duty list too, and each tooltip says so.
 
 The panel lists whatever the vendor is currently showing: switching a category or tab re-reads it,
 scrolling does not. It opens at the shop window's height with the list scrolling inside so a long
 list cannot run off the screen, and its width fits the longest name. Drag it to any size and that
 size is remembered; a fourth button appears while a custom size is in use, to go back to matching the
-shop. It is pinned where you cannot move it, so fold it to its title bar when it is in the way.
+shop. It cannot be dragged elsewhere, so fold it to its title bar when it is in the way.
 
 It reads the shop window's position and stock but never draws into it, so it cannot fight with
 plugins that do. Covered: gil vendors and Calamity Salvagers, item-exchange counters, currency and
@@ -124,43 +144,42 @@ gets no panel — run `/dungeondrip shop` there and report the addon name it pri
 
 ## At the market board
 
-Open a board, pick a category, and a panel appears beside the browse list marking which of that
-gear you already have — the same markers as at a vendor, and the same amber-x rule.
+Open a board, pick a category, and a panel appears beside the browse list marking which of that gear
+is already held — the same markers as at a vendor, and the same amber-x rule.
 
-Only the **browse list** gets a panel. The listings for a single item do not: by the time that
-window is open you have chosen the piece, so the question was needed one screen earlier, and every
-row there would be the same piece repeated once per seller.
+Only the **browse list** gets a panel. The listings for a single item do not: by the time that window
+is open the piece has been chosen, so the question was needed one screen earlier, and every row there
+would be the same piece repeated once per seller.
 
 Results arrive from the server in pages of twenty, so the panel fills in as the category loads.
 Scrolling does not re-read anything, and a text search lists the search's results rather than the
 category's underneath them.
 
-This is where a stale snapshot matters most and where it costs the most, since you reach a board by
-travelling to one and zoning is exactly what wipes the dresser data. The amber x means *probably
-new, but worth checking before you spend the gil*.
+This is where a stale snapshot matters most and where it costs the most, since a board is reached by
+travelling to one and zoning is exactly what wipes the dresser data. The amber x means *probably new,
+but worth checking before the gil is spent*.
 
 ## At the Glamour Dresser
 
-Open a dresser and a panel appears beside it listing what you are carrying that is **not** stored
-yet — the mirror of every other panel, which ask whether you need what the game is showing you.
-This is the one surface where the answer is something you can act on without going anywhere.
+Open a dresser and a panel appears beside it listing carried gear that is **not** stored yet — the
+mirror of every other panel, which ask whether the gear the game is showing is needed. This is the one
+surface where the answer can be acted on without going anywhere.
 
-The marker column shows where the piece is rather than whether you own it, since by construction you
-do not: a case for your bags, a box for the armoury chest, a figure for something worn and a horse
-for the saddlebag. A row is amber when something has to happen first — taking it off, or fetching it
-from the saddlebag. **Settings → Panels → Glamour Dresser** lists the markers. The header says how
-full the box is, because "which of these do I put in" only becomes a question when they will not all
-fit.
+The marker column shows where the piece is rather than whether it is stored, since by construction it
+is not: a case for the bags, a box for the armoury chest, a figure for something worn and a horse for
+the saddlebag. A row is amber when something has to happen first — taking it off, or fetching it from
+the saddlebag. **Settings → Panels → Glamour Dresser** lists the markers. The header says how full the
+box is, because "which of these do I put in" only becomes a question when they will not all fit.
 
 A toolbar button drops armoury-chest gear from the list, since that gear usually belongs to a
 gearset rather than being loose.
 
-Rows read **not stored** rather than "you can add this". Some of the dresser's refusals are not
+Rows read **not stored** rather than "this can be added". Some of the dresser's refusals are not
 readable from outside it, so a few pieces the game turns down will still appear.
 
 The panel waits for the box's contents to arrive rather than the window: a list built against an
-unloaded dresser would claim everything you own is unstored, at exactly the moment you would act
-on it.
+unloaded dresser would claim every piece owned is unstored, at exactly the moment it would be acted
+on.
 
 ## Roulettes
 
@@ -179,45 +198,59 @@ Listed roulettes are Expert, Level Cap Dungeons, Alliance Raids, High-level Dung
 the ones whose gear is tracked. Membership and names come from the game's own sheets, so a renamed
 or re-pooled roulette follows the patch.
 
-Odds are per piece you can roll on, not per run, and assume the pool is unlocked; only your level is
-readable. Roles you have nothing levelled enough for, and duties above your level, are left out.
+Odds are per rollable piece, not per run, and assume the pool is unlocked; only the character's level
+is readable. Roles with nothing levelled enough, and duties above that level, are left out.
 
-Looking a duty up replaces the table; the toolbar's pin button lets go of it again, showing a die
-when that lands back here and a thumbtack when it lands on the duty you are standing in.
+Looking a duty up replaces the table; the toolbar's pin button lets go of it again, showing a die when
+that lands back here and a thumbtack when it lands on the duty currently being stood in.
 
 ## Collection
 
-The toolbar's first button swaps the window between duty loot and your collection as a whole. Three
+The toolbar's first button swaps the window between duty loot and the collection as a whole. Three
 sections, none of which involves a duty:
 
-**Sets in progress** — outfit sets you are part way through, closest to done first. Expanding one
-lists what is missing and where each piece drops. A set you own nothing from is not "in progress",
-and neither is a finished one; that definition is what keeps the list a readable length.
+**Sets in progress** — outfit sets part way through, closest to done first. Expanding one lists what is
+missing and where each piece drops. A set with nothing collected from it is not "in progress", and
+neither is a finished one; that definition is what keeps the list a readable length.
 
 **Glamour Dresser** — how full the box is and what would free space. An outfit stored a piece at a
 time could be one set item instead; a piece in both the dresser and the Armoire is duplicated.
-Collapsing is phrased as a conditional, because it needs the outfit item — a tradeable attire box —
-and owning all the pieces does not give you one. The loose copies also come back to your bags, so
-the space only appears once you clear them.
+Collapsing is phrased as a conditional, because it needs the outfit item — a tradeable attire box — and
+owning all the pieces does not produce one. The loose copies also come back to the bags, so the space
+only appears once those are cleared.
 
-**Already in your collection** — gear you are carrying that a box already has. Named for the fact
-rather than the conclusion: it reports that a piece is also stored and leaves the decision to you,
-because that decision is irreversible and is being read off a snapshot that may be days old. Split
-by bags, armoury and saddlebag, since what is safe to do differs; nothing you are wearing is ever
-listed. Retainers cannot be read, so they are never counted, and the section says how old the
-snapshot behind it is.
+**Already in your collection** — every row is **two copies of one piece**: one being held, and one the
+collection already has. Named for the fact rather than the conclusion: it reports the second copy and
+leaves the decision alone, because that decision is irreversible and is being read off a snapshot that
+may be days old. Split by where the held copy is — bags, armoury, saddlebag, then one heading per
+retainer, with **In Ysayle's bags** and **Worn by Ysayle** kept apart — since what is safe to do differs
+and a second copy is no use without knowing which retainer has it, let alone whether it is in a bag at
+all; nothing equipped is ever listed. The section says how old the snapshot behind it is, and says so
+when no retainer has been read.
+
+The heading says where the held copy is; the row says where the second one is — *also in your glamour
+dresser*, *also in your Armoire*, or amber for *also part of a stored outfit set*. Hovering names both
+in full.
+
+Amber is the one worth reading twice. There, the second copy is not a piece sitting in the dresser: it
+is one filled slot of a whole outfit set sitting in the dresser, so it only exists for as long as that
+set does. Take the set out and the held copy is all that is left. The row says so and stops there.
+
+Retainers appear here whether or not they are being counted as owning a piece — that setting decides
+what makes a piece *collected*, while this list is about the holdings themselves either way. The same is
+true of the bags.
 
 ## In the game's menus
 
 Right-click gear anywhere the game offers a menu — inventory, armoury, inspect, a chat link, the
 dresser, a vendor, the market board — and the plugin's options are there. This is the only place
-**Where does this drop?** appears: inside the plugin's own windows you can already see where you
-are, so it would only be restating the obvious.
+**Where does this drop?** appears: inside the plugin's own windows the duty is already on screen, so it
+would only be restating the obvious.
 
 | Option | |
 | --- | --- |
 | Try on outfit: *name* | One per set the piece belongs to; fills the fitting room with the whole set |
-| Where does this drop? | The duties that drop it, and takes you to whichever you pick |
+| Where does this drop? | The duties that drop it, and opens whichever one is picked |
 
 Only what the game does not already offer is added. It has its own Try On, Link and Copy, and a
 second of each would sit next to the real one saying the same word.
@@ -227,20 +260,20 @@ on is one click. A piece belonging to several sets gets a row each; the **D** ma
 this plugin's.
 
 **Settings → In-game UI** can also mark the game's own item tooltips, adding an icon and a word to
-the category row — the one that says *Body* or *Hands* — saying where the piece is in your
-collection. Shorthand rather than a sentence, because that row is not wide.
+the category row — the one that says *Body* or *Hands* — saying where the piece is in the collection.
+Shorthand rather than a sentence, because that row is not wide.
 
 | | |
 | --- | --- |
 | gold star | Put away — the Dresser, the Armoire, or a finished outfit |
 | silver star | In a stored outfit that still has gaps |
-| orange diamond | On you, in no box at all |
+| orange diamond | Carried or with a retainer, in no box at all — the word says which |
 | no entry | Not collected |
 
-Four icons for six states, because the word beside it already says which one. The stars are a scale
-of how well collected a piece is; the diamond is deliberately not a third grade of star, because
-gear on your back is not a worse kind of stored — it is a different thing, and one trip to a vendor
-from being gone. It is off by default: it is the only thing in the plugin that changes
+Four icons for seven states, because the word beside it already says which one. The stars are a scale
+of how well collected a piece is; the diamond is deliberately not a third grade of star, because gear
+being carried is not a worse kind of stored — it is a different thing, and one trip to a vendor from
+being gone. It is off by default: it is the only thing in the plugin that changes
 what a game window *contains* rather than sitting beside it, and the only thing that hooks a game
 function. It appends and never replaces, and marks its own line so it cannot double up or overwrite
 another plugin's. If a patch moves what it hooks, the line simply does not appear and Settings says
@@ -253,7 +286,7 @@ so — nothing else is affected.
 | `/dungeondrip` | Toggle the window |
 | `/drip`, `/ddrip` | Aliases, claimed only if no other plugin owns them |
 | `/dungeondrip <duty name>` | Show that duty; an ambiguous name opens the picker |
-| `/dungeondrip <gear name>` | Say where a piece is in your collection and where it drops |
+| `/dungeondrip <gear name>` | Say where a piece is in the collection and where it drops |
 | `/dungeondrip item <name>` | The same, forced — for a piece whose name is inside a duty's |
 | `/dungeondrip config` | Settings |
 | `/dungeondrip refresh` | Re-read the dresser and armoire |
@@ -275,12 +308,14 @@ what is specific to that surface.
 | Skip weapons, main hands and off-hands | General | off |
 | Compare against Dresser, Armoire or both | General | both |
 | Also count bags, armoury, equipped, saddlebags | General | off |
+| Also count gear in your retainers' bags | General | off |
+| ...including gear the retainer is wearing | General | off |
 | Outfit-set ownership: any set, or all sets | General | any |
 | Open automatically on entering a duty | Duties | on |
 | ...unless nothing is missing | Duties | on |
 | Close again on leaving the duty | Duties | on |
 | Call out the role with the most missing | Duties | on |
-| Group the list by slot or by role | Duties | slot |
+| Group the list by slot, role, or boss | Duties | slot |
 | Companion list beside the loot window | Duties | on |
 | Panel beside vendor windows | Panels | on |
 | Panel beside the market board | Panels | on |
@@ -295,6 +330,23 @@ what is specific to that surface.
 Labels above are shortened from the in-game wording. Everywhere the plugin lists gear, only pieces
 the chosen store can actually hold are shown. Duty coverage is dungeons and alliance raids; trials,
 8-player raids, deep dungeons and the rest are not tracked.
+
+### Starting again
+
+Every cache has a reset on the **Data** tab beside its refresh, and one button at the bottom does all
+four at once:
+
+| Reset | Throws away | Comes back |
+| --- | --- | --- |
+| Forget collection | This character's Dresser, Armoire and retainer snapshots | Whatever the game has loaded, immediately; the rest on the next visit |
+| Forget *one* retainer | That retainer's snapshot alone | Next time they are opened — or never, for a dismissed one |
+| Forget the download | The loot dataset and the tags that answer "nothing has changed" | Re-fetched at once, in full |
+| Forget every lookup | All cached wiki lookups | One duty at a time, as each is viewed |
+| Forget them | Drops learned from watching loot messages | Only what is seen dropping from here |
+
+Each takes two presses, since a dresser snapshot can be weeks of visits. Nothing in the game is ever
+touched, and **settings are not part of this** — every one of these is disposable cache that rebuilds
+itself, so a reset costs time rather than anything permanent.
 
 ## Grouping
 
@@ -315,6 +367,19 @@ pieces go to different jobs:
 
 Role view repeats a shared piece under every heading that can roll on it, so Slaying accessories also
 show under Maiming and Striking, and "of Aiming" shows under both Physical Ranged and Scouting.
+
+**By boss or coffer** — what each fight and each chest in the duty actually drops, in the order they are
+met, bosses first and coffers after. A piece in two coffers appears under both, since it really is in
+both.
+
+This one is only as complete as the wiki lookup for that duty: the downloaded dataset gives a duty one
+flat list with nothing saying where inside it anything comes from, and per-boss tables are read off the
+[Console Games Wiki](#loot-data) alone. A duty with no lookup groups into a single **not attributed**
+heading and says so above the list rather than leaving it to be guessed at. A lookup cached before
+per-boss
+tables were being read has no attribution either, until it next refreshes — **Settings → Data →
+Re-fetch this duty** does it now. Whichever grouping is on, a piece's tooltip names the bosses and
+coffers known to drop it.
 
 ## Outfit sets
 
@@ -338,12 +403,17 @@ tooltip.
 | Source | Covers | Refresh |
 | --- | --- | --- |
 | [FFXIV Teamcraft](https://github.com/ffxiv-teamcraft/ffxiv-teamcraft) | Every duty | Checked on each plugin load |
-| [Console Games Wiki](https://ffxiv.consolegameswiki.com) | The duty being viewed | Cached 14 days |
+| [Console Games Wiki](https://ffxiv.consolegameswiki.com) | The duty being viewed, per boss | Cached 14 days |
 | Drops seen in game | Duties played, including other players' rolls | Immediate |
 | `loot-overrides.json` | Hand-written additions | On reload |
 
 Teamcraft lags on brand-new dungeons, which is what the other three are for. Everything is cached on
 disk, so the plugin works offline and says when it is. Nothing is uploaded anywhere.
+
+The wiki is also the only source that says *where inside* a duty a piece drops, since its pages carry a
+drop table per boss and per coffer. Those headings are read alongside the items and are what the
+[by-boss grouping](#grouping) groups on; a page laid out some other way contributes its items as usual
+and simply attributes nothing.
 
 To add drops by hand, put a `loot-overrides.json` in the config folder
 (**Settings → Open config folder**), keyed by territory id:
@@ -361,9 +431,11 @@ All in the Dalamud plugin config folder:
 | File | Contents |
 | --- | --- |
 | `dungeon-loot-cache.json` | Downloaded dataset and its upstream ETags |
-| `wiki-loot-cache.json` | Per-duty wiki lookups |
+| `wiki-loot-cache.json` | Per-duty wiki lookups, including their per-boss tables |
 | `learned-loot.json` | Drops seen in game, per territory |
-| `ownership-<contentId>.json` | Per-character dresser and armoire snapshot |
+| `ownership-<contentId>.json` | Per-character dresser, armoire and retainer snapshots |
+
+Each has a reset in Settings; see [starting again](#starting-again).
 
 ## Building
 
@@ -414,14 +486,16 @@ DungeonDrip/
 │   ├── HttpFetcher.cs           the one HTTP client; capped, timed-out reads
 │   ├── JsonStore.cs             every cache file; atomic writes
 │   ├── LootDataService.cs       Teamcraft download, ETag revalidation, disk cache
-│   ├── WikiLootSource.cs        per-duty wiki lookup, parse, cache, backoff
+│   ├── WikiLootSource.cs        per-duty wiki lookup, cache, backoff
+│   ├── WikiDropTables.cs        the wikitext parse: items, and the boss each sits under
 │   ├── LearnedLootStore.cs      drops seen in game
-│   ├── DungeonLootData.cs       merges every source; territory → gear
+│   ├── DungeonLootData.cs       merges every source; territory → gear, and per boss
 │   └── LootModels.cs
 ├── Game/
 │   ├── DresserReader.cs         prism box and outfit-set expansion
 │   ├── ArmoireReader.cs
 │   ├── InventoryReader.cs       ids in bulk, and stack by stack with locations
+│   ├── RetainerReader.cs        the retainer currently open, snapshotted per retainer
 │   ├── OutfitCatalog.cs         which sets a piece belongs to, and how far along each is
 │   ├── TryOnService.cs          feeds the fitting room, one piece per frame
 │   ├── ItemActions.cs           what the right-click menus offer, in one list
@@ -429,7 +503,7 @@ DungeonDrip/
 │   ├── GearRowFactory.cs        item id -> drawable row, cached, shared by the panels
 │   ├── ShopWatcher.cs           which vendor is open and what it is selling
 │   ├── MarketBoardWatcher.cs    what the board's browse list is showing
-│   ├── DresserAddWatcher.cs     what you carry that the dresser has not got
+│   ├── DresserAddWatcher.cs     carried gear the dresser has not got
 │   ├── OwnershipTracker.cs      per-character snapshot and staleness
 │   └── LootObserver.cs          records gear seen dropping
 ├── Core/
@@ -439,9 +513,9 @@ DungeonDrip/
 │   ├── DutyReport.cs            territory + ownership → the drawn list
 │   ├── DutyCatalog.cs           duty list for the picker
 │   ├── DropSources.cs           the loot tables backwards: piece → duties
-│   ├── SetCompletion.cs         how far through each outfit set you are
+│   ├── SetCompletion.cs         how far through each outfit set the collection is
 │   ├── DresserPressure.cs       how full the box is and what would free space
-│   ├── CarriedGear.cs           what you carry, split by whether it is stored
+│   ├── CarriedGear.cs           held gear, split by whether it is stored
 │   ├── ContentFinderIndex.cs    duty names; coverage; roulette pools
 │   ├── RouletteAdvice.cs        which job to queue each roulette as
 │   ├── JobRoles.cs              who can roll Need on a piece
@@ -466,7 +540,7 @@ The companion window reads the loot addon and never draws into it, so it does no
 plugins that recolour game UI nodes.
 
 Try-on is the one place the plugin asks the game to do something rather than reading what it has
-already done, and it only ever happens because you picked it out of a right-click menu. Everything
+already done, and it only ever happens because it was picked out of a right-click menu. Everything
 else - dresser, armoire, inventory, shop and loot addons - is read and nothing more.
 
 The game's right-click menus are the one place the plugin appears inside the game's own UI rather
@@ -501,8 +575,11 @@ game install is needed, and uploads the packaged plugin.
 
 ## Not implemented
 
-- Retainer inventories, which the client only loads at a retainer.
-- Per-boss attribution of drops.
+- The retainer market. Gear listed for sale can sell while nobody is there, so a snapshot of it would
+  go wrong in the one direction that matters — calling off the hunt for a piece that is no longer
+  owned. The seven bag pages and whatever the retainer is wearing are read.
+- Per-boss attribution for duties the wiki has no page for, or lays out without a table per boss.
+  The downloaded dataset gives one flat list per duty and there is nothing to infer it from.
 - Nothing else currently planned.
 
 ## Licence

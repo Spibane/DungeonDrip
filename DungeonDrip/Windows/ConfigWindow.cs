@@ -11,6 +11,16 @@ public class ConfigWindow : Window
     private readonly Plugin plugin;
     private readonly Configuration configuration;
 
+    /// <summary>
+    /// Which reset button has been pressed once and is waiting to be confirmed.
+    /// </summary>
+    /// <remarks>
+    /// One at a time, deliberately: arming a second forgets the first, so there is never more than one
+    /// primed "yes" on screen to hit by accident. Per-session rather than saved - a half-pressed button
+    /// is not a preference.
+    /// </remarks>
+    private string? armedReset;
+
     public ConfigWindow(Plugin plugin)
         : base("Dungeon Drip Settings###DungeonDripConfig", ImGuiWindowFlags.AlwaysAutoResize)
     {
@@ -167,12 +177,52 @@ public class ConfigWindow : Window
                 "can also go in the Dresser, so Armoire-only is a narrower view of the same gear.");
         }
 
+        // The two holding places sit under one line rather than as unrelated toggles. Neither is a
+        // store: nothing outside the Dresser and the Armoire can be worn as a glamour, so both of
+        // these change the lists from "can I wear this" to "do I own one anywhere".
+        ImGui.Spacing();
+        ImGui.TextColored(Palette.Muted, "Also count gear you are only holding, which cannot be");
+        ImGui.TextColored(Palette.Muted, "worn as a glamour until it goes in a box:");
+
         var countInventory = configuration.CountInventoryAndEquipped;
-        if (UiParts.Toggle("Also count bags, armoury, equipped gear and saddlebags", ref countInventory,
-                "Retainer inventories are never counted; they cannot be read away from a retainer."))
+        if (UiParts.Toggle("Bags, armoury chest, equipped gear and saddlebags", ref countInventory))
         {
             configuration.CountInventoryAndEquipped = countInventory;
             changed = true;
+        }
+
+        var countRetainers = configuration.CountRetainers;
+        if (UiParts.Toggle("Gear in your retainers' bags", ref countRetainers,
+                "A retainer's bags can only be read while you have that retainer open, so this works\n" +
+                "from the last time you did - one snapshot per retainer, and a retainer you have never\n" +
+                "opened is simply not counted. Gear listed on the market board is left out, since it\n" +
+                "can sell without you being there.\n" +
+                "The Data tab lists each retainer, when it was last read, and can forget any of them."))
+        {
+            configuration.CountRetainers = countRetainers;
+            changed = true;
+        }
+
+        // Indented under the setting it narrows, and only offered while that one is on: counting what
+        // a retainer wears but not what they hold is a combination nobody means.
+        if (countRetainers)
+        {
+            ImGui.Indent();
+
+            var countWorn = configuration.CountRetainerEquipped;
+            if (UiParts.Toggle("...including gear the retainer is wearing", ref countWorn,
+                    "Off by default, because a retainer's own gear is the worst kind of owned.\n" +
+                    "It is not in their bags, so \"you have one\" sends you through seven pages looking\n" +
+                    "for something that was never going to be there - and it is doing a job where it is,\n" +
+                    "since a retainer's item level decides what their ventures bring back.\n" +
+                    "With this on, every list says \"worn by one of your retainers\" rather than naming\n" +
+                    "the bags."))
+            {
+                configuration.CountRetainerEquipped = countWorn;
+                changed = true;
+            }
+
+            ImGui.Unindent();
         }
 
         ImGui.Spacing();
@@ -249,18 +299,15 @@ public class ConfigWindow : Window
 
         var grouping = configuration.Grouping;
         ImGui.SetNextItemWidth(200 * ImGuiHelpers.GlobalScale);
-        if (ImGui.BeginCombo("Group the list by", grouping == MissingGrouping.Role ? "Role" : "Equipment slot"))
+        if (ImGui.BeginCombo("Group the list by", GroupingLabel(grouping)))
         {
-            if (ImGui.Selectable("Equipment slot", grouping == MissingGrouping.Slot))
+            foreach (var option in Enum.GetValues<MissingGrouping>())
             {
-                configuration.Grouping = MissingGrouping.Slot;
-                changed = true;
-            }
-
-            if (ImGui.Selectable("Role that can roll Need", grouping == MissingGrouping.Role))
-            {
-                configuration.Grouping = MissingGrouping.Role;
-                changed = true;
+                if (ImGui.Selectable(GroupingLabel(option), grouping == option))
+                {
+                    configuration.Grouping = option;
+                    changed = true;
+                }
             }
 
             ImGui.EndCombo();
@@ -270,7 +317,10 @@ public class ConfigWindow : Window
         {
             ImGui.SetTooltip(
                 "Role grouping buckets pieces by who is allowed to roll Need, which is what you want\n" +
-                "when claiming during a run. Headings can be collapsed and stay that way.");
+                "when claiming during a run.\n" +
+                "Boss and coffer grouping is only as complete as the wiki lookup for that duty: a duty\n" +
+                "covered by the downloaded dataset alone lands in one heading and says so.\n" +
+                "Headings can be collapsed and stay that way.");
         }
 
         ImGui.Spacing();
@@ -331,6 +381,8 @@ public class ConfigWindow : Window
         ImGui.BulletText("star - completed outfit set");
         ImGui.BulletText("box - Armoire");
         ImGui.BulletText("case - carried or equipped");
+        ImGui.BulletText("figure - in a retainer's bags");
+        ImGui.BulletText("figure in a tie - worn by a retainer, not in their bags");
         ImGui.BulletText("? - no dresser data");
 
         ImGui.Spacing();
@@ -484,7 +536,7 @@ public class ConfigWindow : Window
 
     /// <summary>
     /// The filters and the ownership rules are shared by every list, and the whole point of the tab
-    /// split is that you can see which settings reach this surface. Saying where they live beats
+    /// split is that it stays visible which settings reach this surface. Saying where they live beats
     /// repeating them per tab and letting the two drift apart.
     /// </summary>
     private static void DrawSharedSettingsNote()
@@ -528,11 +580,30 @@ public class ConfigWindow : Window
             ? "Armoire: never read."
             : $"Armoire: read {ownership.ArmoireUpdatedUtc:yyyy-MM-dd HH:mm} UTC.");
 
+        DrawRetainers();
+
         if (ImGui.Button("Refresh collection now"))
             ownership.RequestRefresh();
 
         if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("Re-reads the Glamour Dresser and Armoire, if the game currently has them loaded.");
+        {
+            ImGui.SetTooltip(
+                "Re-reads the Glamour Dresser, the Armoire and any retainer, if the game currently has\n" +
+                "them loaded.");
+        }
+
+        ImGui.SameLine();
+
+        if (ResetButton(
+                "ownership",
+                "Forget collection",
+                "Throws away this character's cached Dresser, Armoire and retainer snapshots, and the\n" +
+                "file they live in. Whatever the game has loaded right now is read again immediately, so\n" +
+                "you are left with only what can be seen to be true.\n" +
+                "Nothing in the game is touched - this is the plugin's copy."))
+        {
+            ownership.Forget();
+        }
 
         ImGui.Spacing();
         ImGui.Separator();
@@ -550,6 +621,19 @@ public class ConfigWindow : Window
 
         if (ImGui.Button("Check for updates now"))
             plugin.LootData.CheckForUpdates(force: true);
+
+        ImGui.SameLine();
+
+        if (ResetButton(
+                "loot",
+                "Forget the download",
+                "Deletes the cached copy, including the tags that let the check above be answered with\n" +
+                "\"nothing has changed\", and fetches the whole thing again. This is the one to reach for\n" +
+                "if the data on disk is wrong rather than merely old.\n" +
+                "The duty lists keep working from what is already loaded until the new copy arrives."))
+        {
+            plugin.LootData.Forget();
+        }
 
         ImGui.Spacing();
         ImGui.Separator();
@@ -578,6 +662,9 @@ public class ConfigWindow : Window
                 var detail = entry.Error != null ? $"failed: {entry.Error}"
                     : entry.NotFound ? "no matching page"
                     : $"{entry.Items.Length} items from \"{entry.Title}\"" +
+                      (entry.Attributions.Length > 0
+                          ? $" across {entry.Attributions.Length} bosses and coffers"
+                          : ", none attributed to a boss") +
                       (entry.UnmatchedNames > 0 ? $", {entry.UnmatchedNames} names unrecognised" : string.Empty);
 
                 ImGui.TextColored(Palette.Muted, $"This duty: {detail}");
@@ -591,8 +678,15 @@ public class ConfigWindow : Window
                 plugin.RefetchWikiForSelection();
 
             ImGui.SameLine();
-            if (ImGui.Button("Clear wiki cache"))
+
+            if (ResetButton(
+                    "wiki",
+                    "Forget every lookup",
+                    "Throws away every cached wiki lookup, per-boss tables and all. Each duty is looked\n" +
+                    "up again the next time you view it, one at a time."))
+            {
                 wiki.Clear();
+            }
         }
 
         ImGui.Spacing();
@@ -617,8 +711,16 @@ public class ConfigWindow : Window
         if (learned.ItemCount > 0)
         {
             ImGui.SameLine();
-            if (ImGui.Button("Forget all"))
+
+            if (ResetButton(
+                    "learned",
+                    "Forget them",
+                    "Throws away every drop recorded from watching loot messages. What you see drop from\n" +
+                    "here is recorded again; what you saw before this is gone unless upstream has it.",
+                    small: true))
+            {
                 learned.Clear();
+            }
         }
 
         ImGui.TextWrapped(
@@ -646,8 +748,168 @@ public class ConfigWindow : Window
             ImGui.SetClipboardText(configPath);
 
         ImGui.Spacing();
+        ImGui.Separator();
+        ImGui.TextColored(Palette.Muted, "Start again");
+
+        ImGui.TextWrapped(
+            "Everything above in one go: the collection snapshot for this character, the downloaded " +
+            "loot data, the wiki lookups and the drops learned in game. Each of them rebuilds itself " +
+            "from the game or from upstream, so this costs time rather than anything permanent.");
+
+        // Said plainly, because "reset everything" is exactly the phrase somebody reaches for when they
+        // want their settings back to defaults, and this button does not do that.
+        ImGui.TextColored(Palette.Muted, "Your settings are not touched.");
+
+        if (ResetButton(
+                "everything",
+                "Forget everything cached",
+                "The four resets above, together. Nothing in the game is touched and no setting changes."))
+        {
+            ForgetEverything();
+        }
+
+        ImGui.Spacing();
         return changed;
     }
+
+    /// <summary>Every cache the plugin keeps, dropped in one press.</summary>
+    /// <remarks>
+    /// Deliberately the same calls the per-section buttons make rather than a routine of its own, so
+    /// this cannot come to mean something different from the sum of them.
+    /// </remarks>
+    private void ForgetEverything()
+    {
+        plugin.Ownership.Forget();
+        plugin.Wiki.Clear();
+        plugin.LearnedLoot.Clear();
+        plugin.LootData.Forget();
+
+        Plugin.Log.Information("Forgot every cached file at the user's request");
+    }
+
+    /// <summary>
+    /// Every retainer read, and when. Longest unread first.
+    /// </summary>
+    /// <remarks>
+    /// Names them rather than counting them, because "3 retainers read" cannot answer the question
+    /// somebody looking at this has - which of my ten have been seen, and how long ago. Absent
+    /// entirely when retainers are switched off, since the list would be describing data nothing is
+    /// using.
+    /// </remarks>
+    private void DrawRetainers()
+    {
+        if (!configuration.CountRetainers)
+            return;
+
+        var retainers = plugin.Ownership.Retainers;
+        if (retainers.Count == 0)
+        {
+            ImGui.TextColored(Palette.Muted,
+                "Retainers: none read - open one at a bell to include what it is holding.");
+            return;
+        }
+
+        ImGui.TextColored(Palette.Muted, retainers.Count == 1
+            ? "Retainers: 1 read."
+            : $"Retainers: {retainers.Count} read.");
+
+        foreach (var retainer in retainers)
+        {
+            // The two counts apart, because they are not the same claim and only one of them is a
+            // place that can be gone to and searched.
+            var worn = retainer.Equipped.Count > 0
+                ? $", {retainer.Equipped.Count} worn"
+                : string.Empty;
+
+            ImGui.TextColored(Palette.Muted,
+                $"    {retainer.Name}: {retainer.Items.Count} in bags{worn}, " +
+                $"read {Core.Format.Age(retainer.UpdatedUtc)} ago.");
+
+            ImGui.SameLine();
+
+            // Per retainer as well as for the lot, because the case that needs it is one of them:
+            // dismiss a retainer in game and nothing ever comes back to say so, leaving the name here
+            // and its contents counted forever.
+            if (ResetButton(
+                    $"retainer{retainer.RetainerId}",
+                    "Forget",
+                    $"Throws away what was read from {retainer.Name}. Visiting them again records it\n" +
+                    "afresh; a retainer you have dismissed stays gone.",
+                    small: true))
+            {
+                plugin.Ownership.ForgetRetainer(retainer.RetainerId);
+
+                // The remaining rows describe a list that has just changed underneath them.
+                break;
+            }
+        }
+
+        if (retainers.Count > 1 &&
+            ResetButton(
+                "retainers",
+                "Forget every retainer",
+                "Throws away all the retainer snapshots and keeps the Dresser and Armoire ones.",
+                small: true))
+        {
+            plugin.Ownership.ForgetRetainers();
+        }
+    }
+
+    /// <summary>
+    /// A button that asks again before throwing something away.
+    /// </summary>
+    /// <remarks>
+    /// Two presses rather than a modal. Every one of these deletes a cache that rebuilds itself, so the
+    /// cost of a misfire is a re-download or a trip to a dresser rather than anything lost - but a
+    /// dresser snapshot can be weeks of visits, and a row of one-click "forget" buttons beside the
+    /// refresh button is a mistake waiting for a stray click.
+    ///
+    /// The confirmation replaces the button rather than appearing beside it, so nothing moves under the
+    /// cursor between the press that arms it and the press that means it.
+    /// </remarks>
+    /// <returns>Whether the user has just confirmed this one.</returns>
+    private bool ResetButton(string id, string label, string tooltip, bool small = false)
+    {
+        if (armedReset != id)
+        {
+            var pressed = small
+                ? ImGui.SmallButton($"{label}##{id}")
+                : ImGui.Button($"{label}##{id}");
+
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip(tooltip);
+
+            if (pressed)
+                armedReset = id;
+
+            return false;
+        }
+
+        ImGui.TextColored(Palette.Warning, "Sure?");
+        ImGui.SameLine();
+
+        var confirmed = small
+            ? ImGui.SmallButton($"Forget it##confirm{id}")
+            : ImGui.Button($"Forget it##confirm{id}");
+
+        ImGui.SameLine();
+
+        var cancelled = small
+            ? ImGui.SmallButton($"Keep it##cancel{id}")
+            : ImGui.Button($"Keep it##cancel{id}");
+
+        if (confirmed || cancelled)
+            armedReset = null;
+
+        return confirmed;
+    }
+
+    private static string GroupingLabel(MissingGrouping grouping) => grouping switch
+    {
+        MissingGrouping.Role => "Role that can roll Need",
+        MissingGrouping.Source => "Boss or coffer",
+        _ => "Equipment slot",
+    };
 
     private static string ScopeLabel(CollectionScope scope) => scope switch
     {

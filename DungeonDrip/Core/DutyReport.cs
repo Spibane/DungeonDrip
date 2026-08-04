@@ -7,6 +7,11 @@ using Lumina.Excel.Sheets;
 
 namespace DungeonDrip.Core;
 
+/// <param name="Origins">
+/// The bosses or coffers in this duty known to drop the piece. Routinely empty - only the wiki says
+/// where inside a duty something comes from - so anything drawing it says nothing rather than "drops
+/// nowhere in particular".
+/// </param>
 public sealed record ReportItem(
     uint ItemId,
     string Name,
@@ -16,11 +21,16 @@ public sealed record ReportItem(
     string SlotName,
     OwnershipSource Source,
     LootProvenance Provenance,
-    IReadOnlyList<RoleGroup> RoleGroups)
+    IReadOnlyList<RoleGroup> RoleGroups,
+    IReadOnlyList<DropOrigin> Origins)
 {
     public bool IsOwned => Source != OwnershipSource.None;
 }
 
+/// <param name="HasOrigins">
+/// Whether anything in this duty is attributed to a boss or coffer, so the by-source grouping can
+/// explain an empty result instead of presenting one unnamed heap.
+/// </param>
 public sealed record DutyReport(
     uint TerritoryId,
     string Name,
@@ -29,7 +39,8 @@ public sealed record DutyReport(
     int TotalCount,
     int HiddenByJobFilter,
     int HiddenWeapons,
-    int HiddenUnwearable = 0);
+    int HiddenUnwearable = 0,
+    bool HasOrigins = false);
 
 /// <summary>Turns a territory plus an ownership snapshot into the list the window draws.</summary>
 public sealed class DutyReportBuilder(
@@ -99,7 +110,8 @@ public sealed class DutyReportBuilder(
                 slotName,
                 source,
                 loot.ProvenanceOf(territoryId, itemId),
-                roleGroups));
+                roleGroups,
+                loot.OriginsOf(territoryId, itemId)));
         }
 
         // One entry per piece, always slot-sorted. The window buckets into headings, because with
@@ -118,6 +130,7 @@ public sealed class DutyReportBuilder(
             results.Count,
             hiddenByJob,
             hiddenWeapons,
-            hiddenUnwearable);
+            hiddenUnwearable,
+            loot.HasOrigins(territoryId));
     }
 }

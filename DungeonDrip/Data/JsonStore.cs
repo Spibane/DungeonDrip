@@ -78,4 +78,25 @@ public static class JsonStore
             Plugin.Log.Error(ex, $"Could not write {path}");
         }
     }
+
+    /// <summary>
+    /// Removes a file, for the resets in Settings.
+    /// </summary>
+    /// <remarks>
+    /// A file that is not there is the state being asked for, so an absent one is success rather than
+    /// something to report. A file that cannot be removed is logged and no more: every one of these is
+    /// disposable cache, and the in-memory half of the reset has happened either way - the worst case
+    /// is that it comes back on the next launch.
+    /// </remarks>
+    public static void Delete(string path)
+    {
+        try
+        {
+            File.Delete(path);
+        }
+        catch (Exception ex)
+        {
+            Plugin.Log.Error(ex, $"Could not delete {path}");
+        }
+    }
 }

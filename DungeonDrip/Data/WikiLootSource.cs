@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace DungeonDrip.Data;
 
-/// <summary>What the wiki had to say about one duty, and when we last asked.</summary>
+/// <summary>What the wiki had to say about one duty, and when it was last asked.</summary>
 public sealed class WikiEntry
 {
     public string? Title { get; set; }
@@ -26,6 +26,18 @@ public sealed class WikiEntry
 
     /// <summary>Listed names that matched no item row - the signal that parsing has drifted.</summary>
     public int UnmatchedNames { get; set; }
+
+    /// <summary>
+    /// The same items again, split by the boss or coffer whose table they were listed under.
+    /// </summary>
+    /// <remarks>
+    /// Kept alongside <see cref="Items"/> rather than replacing it. That one is the flat union the
+    /// loot merge wants and the only thing that decides whether a piece is listed at all; this is
+    /// extra detail on top, and it is normal for it to be empty - a page whose drops sit directly
+    /// under one heading attributes nothing, and every duty the wiki was never asked about has none
+    /// of this either.
+    /// </remarks>
+    public LootAttribution[] Attributions { get; set; } = [];
 }
 
 /// <summary>
@@ -35,7 +47,7 @@ public sealed class WikiEntry
 /// The primary dataset (Teamcraft, mirroring Garland) lags months behind on new dungeons - Mistwake
 /// listed 2 drops and the Clyteum 1 while the wiki had full tables for both. This fills that gap
 /// without replacing the primary source: it is strictly additive, per-duty, and every failure mode
-/// degrades to "keep whatever we already had".
+/// degrades to "keep whatever was already there".
 ///
 /// The wiki lists item *names*, which are resolved against the Item sheet, so a name the game does
 /// not know is dropped and counted rather than guessed at.
@@ -57,11 +69,6 @@ public sealed class WikiLootSource : IDisposable
     private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(20);
 
     private const int MaxResponseBytes = 4 * 1024 * 1024;
-    private const int MaxNamesPerPage = 2000;
-
-    private static readonly Regex DropRowPattern = new(
-        @"\{\{\s*Drops table row\s*\|\s*([^|}\n]+)",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     private readonly string path;
     private readonly Configuration configuration;
@@ -205,6 +212,7 @@ public sealed class WikiLootSource : IDisposable
                 entry.RevisionId = revisionId;
                 entry.Items = known.Items;
                 entry.UnmatchedNames = known.UnmatchedNames;
+                entry.Attributions = known.Attributions;
                 Publish(territoryId, entry);
                 return;
             }
@@ -220,13 +228,15 @@ public sealed class WikiLootSource : IDisposable
             // Store the post-redirect title so later checks go straight to the real article.
             entry.Title = page.Value.Title;
 
-            var (items, unmatched) = ExtractItems(page.Value.Text, names);
+            var (items, unmatched, attributions) = WikiDropTables.Parse(page.Value.Text, names);
             entry.RevisionId = revisionId;
             entry.Items = items;
             entry.UnmatchedNames = unmatched;
+            entry.Attributions = attributions;
 
             Plugin.Log.Information(
                 $"Wiki: \"{entry.Title}\" -> {items.Length} gear items" +
+                (attributions.Length > 0 ? $" across {attributions.Length} bosses and coffers" : string.Empty) +
                 (unmatched > 0 ? $" ({unmatched} listed names matched no item)" : string.Empty));
 
             Publish(territoryId, entry);
@@ -397,39 +407,6 @@ public sealed class WikiLootSource : IDisposable
 
     private async Task<string?> GetJsonAsync(string queryString, CancellationToken token) =>
         (await http.GetAsync(ApiUrl + queryString, null, RequestTimeout, MaxResponseBytes, token)).Body;
-
-    /// <summary>
-    /// Pulls item names out of the page's drop tables and resolves them to ids. Storability is left
-    /// to the merge step, which runs on the framework thread - nothing here may touch Lumina.
-    /// Unresolvable names are counted, not guessed at.
-    /// </summary>
-    private static (uint[] Items, int Unmatched) ExtractItems(
-        string wikitext, IReadOnlyDictionary<string, uint> names)
-    {
-        var resolved = new HashSet<uint>();
-        var unmatched = 0;
-        var seen = 0;
-
-        foreach (Match match in DropRowPattern.Matches(wikitext))
-        {
-            if (++seen > MaxNamesPerPage)
-                break;
-
-            var name = match.Groups[1].Value.Trim().Trim('[', ']').Trim();
-            if (name.Length == 0)
-                continue;
-
-            if (!names.TryGetValue(name, out var itemId))
-            {
-                unmatched++;
-                continue;
-            }
-
-            resolved.Add(itemId);
-        }
-
-        return ([.. resolved.Order()], unmatched);
-    }
 
     private void Load()
     {

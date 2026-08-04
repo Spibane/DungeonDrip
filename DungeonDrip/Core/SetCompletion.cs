@@ -14,7 +14,7 @@ public sealed record SetPieceState(
 }
 
 /// <summary>
-/// How far through an outfit set you are, under both readings of "have".
+/// How far through an outfit set the collection is, under both readings of "have".
 /// </summary>
 /// <param name="Owned">
 /// Pieces the collection holds anywhere, by the same rules every other list obeys.
@@ -45,7 +45,7 @@ public sealed record SetStanding(
 /// <remarks>
 /// This is the broader reading of "complete" that the outfit catalogue deliberately does not carry.
 /// The catalogue answers "is this set stored with every slot filled", which is about the box; this
-/// answers "do you have these pieces anywhere", which has to obey the storage scope and outfit mode
+/// answers "are these pieces held anywhere", which has to obey the storage scope and outfit mode
 /// like every other list the plugin draws. Both are shown, because they are different questions
 /// with different next actions.
 /// </remarks>
@@ -57,8 +57,8 @@ public static class SetCompletion
         var qualifying = new List<(uint SetId, int Owned, int Total)>();
 
         // First pass counts only. Naming a set costs a sheet lookup per piece, and the great
-        // majority of sets are ones you own nothing from, so nothing is named until it has earned
-        // a place on the list.
+        // majority of sets have nothing owned from them, so nothing is named until it has earned a
+        // place on the list.
         foreach (var setId in outfits.SetIds)
         {
             // Projected only when the filter is on, so the common path keeps handing the catalogue's
@@ -75,7 +75,7 @@ public static class SetCompletion
             var owned = pieces.Count(piece => Resolve(piece, outfits, view, configuration) != OwnershipSource.None);
 
             // "In progress" excludes both ends on purpose. A finished set has nothing to do about
-            // it, and a set you own nothing from is just the rest of the catalogue.
+            // it, and a set with nothing owned from it is just the rest of the catalogue.
             if (owned > 0 && owned < pieces.Count)
                 qualifying.Add((setId, owned, pieces.Count));
         }
@@ -113,8 +113,8 @@ public static class SetCompletion
                 continue;
 
             // Left out of the pieces and out of the totals both, so a set that is half unwearable
-            // reads as done when you have the half you can wear rather than stalling at 4 of 8
-            // against pieces you will never get.
+            // reads as done once the wearable half is collected rather than stalling at 4 of 8
+            // against pieces the character can never get.
             if (equipLocks.Hides(item, configuration))
                 continue;
 

@@ -19,9 +19,12 @@ public sealed class DungeonLootData
 {
     private const string OverridesFileName = "loot-overrides.json";
 
+    private static readonly DropOrigin[] NoOrigins = [];
+
     private readonly Dictionary<uint, uint[]> itemsByTerritory;
     private readonly Dictionary<uint, string> fallbackNames;
     private readonly Dictionary<uint, Dictionary<uint, LootProvenance>> provenance;
+    private readonly Dictionary<uint, Dictionary<uint, DropOrigin[]>> origins;
 
     /// <summary>When the underlying dataset was downloaded.</summary>
     public DateTime FetchedUtc { get; }
@@ -30,11 +33,13 @@ public sealed class DungeonLootData
         Dictionary<uint, uint[]> itemsByTerritory,
         Dictionary<uint, string> fallbackNames,
         Dictionary<uint, Dictionary<uint, LootProvenance>> provenance,
+        Dictionary<uint, Dictionary<uint, DropOrigin[]>> origins,
         DateTime fetchedUtc)
     {
         this.itemsByTerritory = itemsByTerritory;
         this.fallbackNames = fallbackNames;
         this.provenance = provenance;
+        this.origins = origins;
         FetchedUtc = fetchedUtc;
     }
 
@@ -43,6 +48,24 @@ public sealed class DungeonLootData
         provenance.TryGetValue(territoryId, out var items) && items.TryGetValue(itemId, out var source)
             ? source
             : LootProvenance.Dataset;
+
+    /// <summary>
+    /// Which bosses or coffers in a duty drop a piece. Empty when nothing knows.
+    /// </summary>
+    /// <remarks>
+    /// <b>Empty is the common case and never means "nowhere in this duty".</b> Only the wiki says
+    /// where inside a duty a piece comes from, and it is asked one duty at a time, only about duties that
+    /// have been opened - so a duty the downloaded dataset covers on its own has no attribution at all,
+    /// and a duty that has been looked up can still have pieces the dataset knows and the wiki's
+    /// tables do not list. Anything drawing this has to be able to say nothing rather than guess.
+    /// </remarks>
+    public IReadOnlyList<DropOrigin> OriginsOf(uint territoryId, uint itemId) =>
+        origins.TryGetValue(territoryId, out var byItem) && byItem.TryGetValue(itemId, out var found)
+            ? found
+            : NoOrigins;
+
+    /// <summary>Whether anything in this duty is attributed, so a UI can say why it is not.</summary>
+    public bool HasOrigins(uint territoryId) => origins.ContainsKey(territoryId);
 
     public IReadOnlyCollection<uint> Territories => itemsByTerritory.Keys;
 
@@ -106,7 +129,65 @@ public sealed class DungeonLootData
             .Where(kv => kv.Value.Count > 0)
             .ToDictionary(kv => kv.Key, kv => kv.Value.ToArray());
 
-        return new DungeonLootData(byTerritory, names, provenance, cache.FetchedUtc);
+        return new DungeonLootData(
+            byTerritory, names, provenance, BuildOrigins(wiki, duties, storage, accumulated), cache.FetchedUtc);
+    }
+
+    /// <summary>
+    /// Inverts the wiki's per-boss tables into piece -> the bosses and coffers that drop it.
+    /// </summary>
+    /// <remarks>
+    /// Independent of provenance, which answers a different question: a piece the downloaded dataset
+    /// already listed still gets its attribution if the wiki's tables happen to say where it comes
+    /// from. The two are only ever read together by the tooltip, which prints both.
+    ///
+    /// Held to the merged list rather than taking the wiki's word for it, so a piece filtered out for
+    /// being unstorable - or listed under a duty the plugin does not cover - cannot arrive here as an
+    /// attribution for a piece no list contains.
+    /// </remarks>
+    private static Dictionary<uint, Dictionary<uint, DropOrigin[]>> BuildOrigins(
+        WikiLootSource wiki,
+        Core.ContentFinderIndex duties,
+        Core.StorageEligibility storage,
+        Dictionary<uint, HashSet<uint>> merged)
+    {
+        var origins = new Dictionary<uint, Dictionary<uint, DropOrigin[]>>();
+
+        foreach (var (territoryId, entry) in wiki.All)
+        {
+            if (entry.Attributions.Length == 0 || !duties.IsSupportedDuty(territoryId))
+                continue;
+
+            if (!merged.TryGetValue(territoryId, out var listed))
+                continue;
+
+            var accumulated = new Dictionary<uint, List<DropOrigin>>();
+
+            foreach (var attribution in entry.Attributions)
+            {
+                var origin = new DropOrigin(attribution.Label, attribution.Order);
+
+                foreach (var itemId in attribution.Items)
+                {
+                    if (!listed.Contains(itemId) || !storage.CanBeStored(itemId))
+                        continue;
+
+                    if (!accumulated.TryGetValue(itemId, out var found))
+                        accumulated[itemId] = found = [];
+
+                    found.Add(origin);
+                }
+            }
+
+            if (accumulated.Count > 0)
+                origins[territoryId] = accumulated.ToDictionary(kv => kv.Key, kv => kv.Value.ToArray());
+        }
+
+        var attributed = origins.Sum(kv => kv.Value.Count);
+        if (attributed > 0)
+            Plugin.Log.Information($"Attributed {attributed} pieces to a boss or coffer across {origins.Count} duties");
+
+        return origins;
     }
 
     /// <summary>

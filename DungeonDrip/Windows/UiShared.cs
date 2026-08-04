@@ -59,7 +59,7 @@ internal static class UiParts
     /// <remarks>
     /// A toolbar of sentences forces a window wider than its list needs to be, so these are icons.
     /// Each shows the state it is in rather than the state it would move to, which makes it an
-    /// indicator you can also press - and puts the burden of saying so on the tooltip. That tooltip
+    /// indicator that can also be pressed - and puts the burden of saying so on the tooltip. That tooltip
     /// is read through <see cref="ImGuiHoveredFlags.AllowWhenDisabled"/> so a greyed-out button can
     /// still explain why it is greyed out, which an icon cannot do on its own.
     /// </remarks>

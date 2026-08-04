@@ -7,7 +7,7 @@ namespace DungeonDrip.Game;
 public static unsafe class ArmoireReader
 {
     /// <summary>
-    /// Reads which Armoire-eligible items you have stored.
+    /// Reads which Armoire-eligible items are stored.
     /// </summary>
     /// <returns><c>null</c> when the armoire has not been loaded from the server yet.</returns>
     /// <remarks>

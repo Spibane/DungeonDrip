@@ -12,16 +12,16 @@ using FFXIVClientStructs.FFXIV.Component.GUI;
 namespace DungeonDrip.Windows;
 
 /// <summary>
-/// A panel that rides alongside a game window, listing gear and where you already have each piece.
+/// A panel that rides alongside a game window, listing gear and where each piece is already held.
 /// </summary>
 /// <remarks>
 /// A panel rather than markers on the game's own rows. These lists are long and virtualised - the
-/// game recycles a handful of row widgets as you scroll - so an inline glyph has to stay pinned to
+/// game recycles a handful of row widgets while scrolling - so an inline glyph has to stay pinned to
 /// a moving target, and a marker that slips onto the wrong item is worse than no feature at all. A
 /// panel cannot misalign, because it never claims to point at a row.
 ///
 /// What is here is the part that has nothing to do with any particular game window: finding the
-/// addon, sizing to it, telling a resize we asked for from one the user dragged, remembering the
+/// addon, sizing to it, telling a resize the panel asked for from one the user dragged, remembering the
 /// latter, the shared filter buttons, the collapsible headings, and the marker rows. That resize
 /// latch is subtle enough that it has been got wrong before, and writing it out a third time by
 /// hand is how it would be got wrong again.
@@ -60,7 +60,7 @@ public abstract unsafe class AddonPanelWindow : Window
     private float contentWidth = FallbackWidth;
     private IReadOnlyList<GearRow>? measuredFrom;
 
-    /// <summary>The size PreDraw wants, so a size we chose is not mistaken for a drag.</summary>
+    /// <summary>The size PreDraw wants, so a size the panel chose is not mistaken for a drag.</summary>
     private Vector2 appliedSize;
 
     /// <summary>The size the window actually had last frame.</summary>
@@ -68,7 +68,7 @@ public abstract unsafe class AddonPanelWindow : Window
 
     private bool resizing;
 
-    /// <summary>Frames left for a resize we asked for to land, during which drags are not read.</summary>
+    /// <summary>Frames left for a requested resize to land, during which drags are not read.</summary>
     private int applying;
 
     protected AddonPanelWindow(Plugin plugin, string title, string collapsePrefix, string toolbarId)
@@ -104,7 +104,7 @@ public abstract unsafe class AddonPanelWindow : Window
     /// The list to draw, or null when it could not be read.
     /// </summary>
     /// <remarks>
-    /// Null and empty must stay distinguishable at the source: "we could not read this" and "there
+    /// Null and empty must stay distinguishable at the source: "this could not be read" and "there
     /// is nothing here" both end up drawing no panel, but only one of them is worth a log line, and
     /// conflating them is how an unreadable window quietly starts looking like an empty one.
     /// </remarks>
@@ -175,18 +175,18 @@ public abstract unsafe class AddonPanelWindow : Window
             : new Vector2(contentWidth, unit->GetScaledHeight(true));
 
         // Against the constraints as ImGui will enforce them, not as they were written: a floor the
-        // window then overrides is a size we asked for and did not get, which reads as a drag below.
+        // window then overrides is a size asked for and not got, which reads as a drag below.
         desired.X = Clamp(desired.X, MinWidth * scale, display.X);
         desired.Y = Clamp(desired.Y, MinHeight * scale, display.Y);
 
         // Appearing only lands while a window is coming up, so on its own a reset would sit there
-        // until the panel next reappeared. Insist whenever the size we want is not the size on
+        // until the panel next reappeared. Insist whenever the wanted size is not the size on
         // screen - except mid-drag, where the user's size is not saved yet and insisting would snap
         // the window out from under them on every frame of the gesture.
         var moved = lastSize != Vector2.Zero && Vector2.Distance(desired, lastSize) > 1f;
         var theirs = resizing || ImGui.IsMouseDown(ImGuiMouseButton.Left);
 
-        // Size is the one value on this path Dalamud scales for us, so it is handed over divided.
+        // Size is the one value on this path Dalamud scales itself, so it is handed over divided.
         // Everything else here - the addon's height, the measured width, a size read back off the
         // window - is already in screen pixels, and appliedSize has to stay in those to be
         // comparable with what the window actually ends up.
@@ -229,7 +229,7 @@ public abstract unsafe class AddonPanelWindow : Window
         var ownership = Plugin.Ownership;
         var stale = ownership.IsDresserStale;
 
-        // Unlike a loot roll, these are decisions you can come back to, so this says how much to
+        // Unlike a loot roll, these are decisions that can be come back to, so this says how much to
         // trust itself and shows the list anyway rather than refusing.
         if (!ownership.HasDresserData)
         {
@@ -286,7 +286,7 @@ public abstract unsafe class AddonPanelWindow : Window
     {
         var uncertain = CollectionMarkers.IsUncertain(row.Marker, stale);
 
-        // The glyph carries the state; the name only says whether you need the thing. Hence the
+        // The glyph carries the state; the name only says whether the thing is needed. Hence the
         // untinted name - any colour on it would compete with the glyph for meaning.
         var glyphColour = row.Marker switch
         {
@@ -352,7 +352,7 @@ public abstract unsafe class AddonPanelWindow : Window
     /// <remarks>
     /// Saved on release, not per frame: a drag changes the size on every one of them.
     ///
-    /// Telling our resizes from theirs needs the latch, not just a comparison. On the frame a resize
+    /// Telling the panel's own resizes from the user's needs the latch, not just a comparison. On the frame a resize
     /// is requested the window has not moved yet, so a comparison reads as a drag - and since this
     /// runs before the toolbar, a stray size written here is read back by the same frame's toolbar.
     /// </remarks>
@@ -393,9 +393,9 @@ public abstract unsafe class AddonPanelWindow : Window
     /// The list filters, as buttons rather than a trip to Settings.
     /// </summary>
     /// <remarks>
-    /// They write the shared settings rather than per-panel copies: standing at a vendor is when you
-    /// find out you wanted "everything" instead of "my job". Each button shows the state it is in,
-    /// not the state it would move to, so it reads as an indicator you can also press.
+    /// They write the shared settings rather than per-panel copies: standing at a vendor is where the
+    /// wrong filter gets noticed. Each button shows the state it is in, not the state it would move to,
+    /// so it reads as an indicator that can also be pressed.
     /// </remarks>
     private bool DrawToolbar()
     {
@@ -545,7 +545,7 @@ public abstract unsafe class AddonPanelWindow : Window
 
     /// <remarks>
     /// The star marks a finished outfit and nothing else. A star is a reward everywhere else in the
-    /// game, so it must never land on the pieces you are missing.
+    /// game, so it must never land on the pieces still missing.
     /// </remarks>
     protected static FontAwesomeIcon Glyph(CollectionMarker marker) => marker switch
     {
@@ -558,6 +558,12 @@ public abstract unsafe class AddonPanelWindow : Window
         CollectionMarker.OutfitPartial => FontAwesomeIcon.Adjust,
         CollectionMarker.Armoire => FontAwesomeIcon.Archive,
         CollectionMarker.Inventory => FontAwesomeIcon.Briefcase,
+
+        // Not a second case. A retainer is somewhere to be travelled to, and the figure says so.
+        CollectionMarker.Retainer => FontAwesomeIcon.UserTag,
+
+        // The dressed figure, because this one is not in any bag: the retainer has it on.
+        CollectionMarker.RetainerEquipped => FontAwesomeIcon.UserTie,
         CollectionMarker.NotCollected => FontAwesomeIcon.Times,
         _ => FontAwesomeIcon.Question,
     };

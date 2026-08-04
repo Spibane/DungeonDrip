@@ -12,7 +12,7 @@ namespace DungeonDrip.Core;
 /// would occupy.
 /// </param>
 /// <param name="HoldingOutfitItem">
-/// Whether the outfit item this needs is in your inventory. When it is, the advice is actionable;
+/// Whether the outfit item this needs is in the inventory. When it is, the advice is actionable;
 /// when it is not, it is a conditional.
 /// </param>
 public sealed record CollapsibleSet(
@@ -69,7 +69,7 @@ public static class DresserPressure
         var collapsible = new List<CollapsibleSet>();
 
         // Only sets reachable from what is actually in the box. Walking every set in the game to
-        // find the handful you hold pieces of would be thousands of lookups for the same answer.
+        // find the handful with pieces held would be thousands of lookups for the same answer.
         var candidates = view.DresserDirect.SelectMany(outfits.SetsContaining).Distinct();
 
         foreach (var setId in candidates)
@@ -90,7 +90,7 @@ public static class DresserPressure
                 view.Inventory?.Contains(setId) == true));
         }
 
-        // The ones you can act on today first.
+        // The ones that can be acted on today first.
         var ordered = collapsible
             .OrderByDescending(entry => entry.HoldingOutfitItem)
             .ThenByDescending(entry => entry.SlotsReclaimed)
