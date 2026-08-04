@@ -415,6 +415,12 @@ drop table per boss and per coffer. Those headings are read alongside the items 
 [by-boss grouping](#grouping) groups on; a page laid out some other way contributes its items as usual
 and simply attributes nothing.
 
+A duty does not always own its own title. "Ala Mhigo" is the city, "Alzadaal's Legacy" and "the Fell
+Court of Troia" are disambiguation pages, and all three duties sit at `<name> (Duty)` with a full set of
+tables on them. A page that turns out to carry no drop table at all is followed there once — which is
+the difference between those three having nothing from the wiki and having all of it. The handful of
+duties that really do drop no gear, the Praetorium among them, pay one request that finds no page.
+
 To add drops by hand, put a `loot-overrides.json` in the config folder
 (**Settings → Open config folder**), keyed by territory id:
 
@@ -578,8 +584,10 @@ game install is needed, and uploads the packaged plugin.
 - The retainer market. Gear listed for sale can sell while nobody is there, so a snapshot of it would
   go wrong in the one direction that matters — calling off the hunt for a piece that is no longer
   owned. The seven bag pages and whatever the retainer is wearing are read.
-- Per-boss attribution for duties the wiki has no page for, or lays out without a table per boss.
-  The downloaded dataset gives one flat list per duty and there is nothing to infer it from.
+- Per-boss attribution for a piece the wiki's tables do not list. Every dungeon and alliance raid that
+  drops gear has a page laying it out per boss, so a duty is attributed as soon as it has been looked
+  up — but a piece only the downloaded dataset knows about was never in a table to be read out of one,
+  and is left unattributed rather than guessed into the nearest fight.
 - Nothing else currently planned.
 
 ## Licence
