@@ -41,3 +41,34 @@ public record GearRow(
     public bool IsOwned =>
         !CollectionMarkers.IsMissing(Marker) && Marker != CollectionMarker.Unknown;
 }
+
+/// <summary>
+/// A held piece one of the two boxes has not got, and how much trouble the copy is to get at.
+/// </summary>
+/// <remarks>
+/// The row both "what should go in" panels draw - the Glamour Dresser's and the Armoire's. Those ask
+/// the same question of different boxes, so this is one record rather than two that would drift apart
+/// a field at a time.
+///
+/// <see cref="GearRow.Marker"/> says nothing on either panel: a row there is one the box does not have,
+/// by construction. The column it would have taken goes to <see cref="Location"/> instead, which is
+/// the part that decides what has to happen before the piece can go in.
+/// </remarks>
+/// <param name="Blocked">
+/// Why the box would turn this down today, or null when nothing readable from outside it says it
+/// would. Null is not a promise of acceptance - both boxes have refusals that cannot be seen from
+/// here - which is why a row without one reads "not in the box" rather than "this can be added".
+/// </param>
+public record HeldGearRow(
+    uint ItemId,
+    string Name,
+    ushort IconId,
+    int SlotOrder,
+    string SlotName,
+    CollectionMarker Marker,
+    bool JobEquippable,
+    EquipLock Locks,
+    CarryLocation Location,
+    int Quantity,
+    string? Blocked)
+    : GearRow(ItemId, Name, IconId, SlotOrder, SlotName, Marker, JobEquippable, Locks);

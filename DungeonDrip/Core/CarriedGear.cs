@@ -51,6 +51,12 @@ public enum CarryLocation
 /// Which retainer is holding it, empty for anything on the character. What is worth doing about a
 /// spare copy depends on which trip it is on the other end of.
 /// </param>
+/// <param name="InArmoire">
+/// Whether the Armoire has one, asked of the Armoire directly rather than read off
+/// <paramref name="StoredIn"/>. That one takes the first answer that holds and the Dresser is ahead
+/// of the Armoire in it, so a piece in both boxes reports as the Dresser's - which is the right
+/// answer to "where is it" and the wrong one to "does the Armoire have it".
+/// </param>
 public sealed record CarriedPiece(
     uint ItemId,
     string Name,
@@ -61,11 +67,11 @@ public sealed record CarriedPiece(
     int Quantity,
     OwnershipSource StoredIn,
     StorageKind Storable,
+    bool InArmoire,
     string Holder = "")
 {
     /// <summary>The Armoire would take this and it is not in there yet - a dresser slot saved.</summary>
-    public bool ArmoireWouldTake =>
-        Storable.HasFlag(StorageKind.Armoire) && StoredIn != OwnershipSource.Armoire;
+    public bool ArmoireWouldTake => Storable.HasFlag(StorageKind.Armoire) && !InArmoire;
 }
 
 /// <summary>
@@ -83,10 +89,23 @@ public sealed record CarriedPiece(
 /// Held and nowhere in the collection. One row per piece, offered from the easiest place to reach
 /// it from.
 /// </param>
+/// <param name="ArmoireCandidates">
+/// Held pieces the Armoire accepts and does not already have. Not derivable from the three lists
+/// above, which is why it is its own: two of them leave out anything equipped, and a piece sitting in
+/// the Dresser is in one of them while still being something the Armoire has never seen. One row per
+/// piece, from the easiest copy to reach, as <paramref name="NotStored"/> is.
+/// </param>
+/// <param name="ArmoireDuplicates">
+/// How many held, Armoire-eligible pieces the Armoire already has - which is the count the game's own
+/// "store an item" screen will not give: it lists what the Armoire can take without saying which of
+/// those it is already holding, and refuses only on the attempt.
+/// </param>
 public sealed record CarriedGearReport(
     IReadOnlyList<CarriedPiece> AlreadyStored,
     IReadOnlyList<CarriedPiece> OnlyInsideAnOutfit,
     IReadOnlyList<CarriedPiece> NotStored,
+    IReadOnlyList<CarriedPiece> ArmoireCandidates,
+    int ArmoireDuplicates,
     bool SaddlebagReadable);
 
 /// <summary>
@@ -124,6 +143,10 @@ public static class CarriedGear
         var alreadyStored = new List<CarriedPiece>();
         var insideOutfit = new List<CarriedPiece>();
         var notStored = new Dictionary<uint, CarriedPiece>();
+        var armoireCandidates = new Dictionary<uint, CarriedPiece>();
+
+        // Per piece rather than per stack, so two of a thing in two bags is one duplicate and not two.
+        var armoireDuplicates = new HashSet<uint>();
 
         foreach (var group in Collapse(carried, retainers))
         {
@@ -153,7 +176,16 @@ public static class CarriedGear
                 group.Quantity,
                 source,
                 storable,
+                stored.Armoire.Contains(group.ItemId),
                 group.Holder);
+
+            // Answered off to one side of the switch below, because it is a different question and
+            // cuts across every one of its cases: the Armoire either has the piece or it does not,
+            // whatever the Dresser is doing about it and whether or not it is being worn.
+            if (piece.ArmoireWouldTake)
+                Offer(armoireCandidates, piece);
+            else if (piece.InArmoire)
+                armoireDuplicates.Add(piece.ItemId);
 
             switch (source)
             {
@@ -178,6 +210,8 @@ public static class CarriedGear
             Sorted(alreadyStored),
             Sorted(insideOutfit),
             Sorted(notStored.Values),
+            Sorted(armoireCandidates.Values),
+            armoireDuplicates.Count,
             InventoryReader.SaddlebagLoaded());
     }
 

@@ -33,6 +33,16 @@ public class ConfigWindow : Window
     /// </remarks>
     private string? armedReset;
 
+    /// <summary>The marker legend the two store panels share, which is a location rather than a state.</summary>
+    private const string StorePanelNote =
+        "Markers give the location, not ownership:\n" +
+        "    case: bags        box: armoury chest\n" +
+        "    figure: worn        horse: saddlebag\n" +
+        "Amber: something is required first.";
+
+    /// <summary>Said on both copies of a setting that has one value.</summary>
+    private const string StorePanelShared = "Applies to the Glamour Dresser and Armoire panels alike.";
+
     public ConfigWindow(Plugin plugin)
         : base("Dungeon Drip Settings###DungeonDripConfig", ImGuiWindowFlags.AlwaysAutoResize)
     {
@@ -460,10 +470,14 @@ public class ConfigWindow : Window
         changed |= DrawPanelSection(
             "Glamour Dresser", "dresser", configuration.DresserPanel,
             "Carried gear that is not in the dresser or Armoire.",
-            "Markers give the location, not ownership:\n" +
-            "    case: bags        box: armoury chest\n" +
-            "    figure: worn        horse: saddlebag\n" +
-            "Amber: something is required first.");
+            StorePanelNote);
+
+        changed |= DrawPanelSection(
+            "Armoire", "armoire", configuration.ArmoirePanel,
+            "Held gear the Armoire has not got. The game's own \"store an item\" list shows\n" +
+            "what the Armoire accepts rather than what it is missing, so a piece already in\n" +
+            "there is listed the same as one that is not and is refused on the attempt.",
+            StorePanelNote);
 
         DrawSharedSettingsNote();
         return changed;
@@ -519,19 +533,22 @@ public class ConfigWindow : Window
             changed = true;
         }
 
-        if (id == "dresser")
+        // Both store panels, off the same two settings rather than a pair each: gear a gearset is
+        // using is using it whichever box is being stood at. Shown under both sections and said so,
+        // because a switch that moves in two places is only confusing when one of them is silent.
+        if (id is "dresser" or "armoire")
         {
             var armoury = configuration.DresserPanelIncludesArmoury;
-            if (UiParts.Toggle("Include armoury chest gear##dresser", ref armoury,
-                    "Armoury gear may belong to a gearset."))
+            if (UiParts.Toggle($"Include armoury chest gear##{id}", ref armoury,
+                    "Armoury gear may belong to a gearset.\n" + StorePanelShared))
             {
                 configuration.DresserPanelIncludesArmoury = armoury;
                 changed = true;
             }
 
             var equipped = configuration.DresserPanelIncludesEquipped;
-            if (UiParts.Toggle("Include gear you are wearing##dresser", ref equipped,
-                    "Has to come off before it can be stored."))
+            if (UiParts.Toggle($"Include gear you are wearing##{id}", ref equipped,
+                    "Has to come off before it can be stored.\n" + StorePanelShared))
             {
                 configuration.DresserPanelIncludesEquipped = equipped;
                 changed = true;

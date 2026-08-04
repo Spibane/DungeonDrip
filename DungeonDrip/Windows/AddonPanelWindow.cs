@@ -128,6 +128,17 @@ public abstract unsafe class AddonPanelWindow : Window
     /// <summary>What to add to a row's tooltip when the snapshot cannot be trusted about it.</summary>
     protected virtual string? UncertainNote => null;
 
+    /// <summary>
+    /// Whether how old the dresser snapshot is is a caveat on this panel's list.
+    /// </summary>
+    /// <remarks>
+    /// True everywhere the list is answered against the dresser, which is everywhere but the Armoire
+    /// panel: that one is built from cabinet flags the game has loaded in front of the player and
+    /// never asks the dresser anything. Warning there would be a caveat about data the list does not
+    /// use, which is how a warning gets learnt as noise before it appears on a panel that means it.
+    /// </remarks>
+    protected virtual bool DependsOnDresserSnapshot => true;
+
     protected virtual string EmptyMessage => "Nothing new here.";
 
     protected virtual string FilteredEmptyMessage => "Nothing left after your filters.";
@@ -255,23 +266,15 @@ public abstract unsafe class AddonPanelWindow : Window
         }
 
         var ownership = Plugin.Ownership;
-        var stale = ownership.IsDresserStale;
+
+        // False on a panel the snapshot has nothing to do with, where it would also be handed to every
+        // row as a reason to distrust one.
+        var stale = DependsOnDresserSnapshot && ownership.IsDresserStale;
 
         // Unlike a loot roll, these are decisions that can be come back to, so this says how much to
         // trust itself and shows the list anyway rather than refusing.
-        if (!ownership.HasDresserData)
-        {
-            ImGui.TextColored(Palette.Warning, "No dresser data yet.");
-            ImGui.TextColored(Palette.Warning, "Open your Glamour Dresser.");
-            ImGui.Separator();
-        }
-        else if (stale)
-        {
-            var age = Format.Age(ownership.DresserUpdatedUtc!.Value);
-            ImGui.TextColored(Palette.Warning, $"Dresser last read {age} ago.");
-            ImGui.TextColored(Palette.Warning, "Open one to be sure.");
-            ImGui.Separator();
-        }
+        if (DependsOnDresserSnapshot)
+            DrawSnapshotWarning(ownership, stale);
 
         // The same filters the duty window uses, so each means one thing across the plugin.
         var options = new ViewOptions(
@@ -301,6 +304,26 @@ public abstract unsafe class AddonPanelWindow : Window
 
         foreach (var group in groups)
             DrawGroup(group, options.GroupBySlot, stale);
+    }
+
+    /// <summary>How much to trust the list, said above it rather than instead of it.</summary>
+    private static void DrawSnapshotWarning(Game.OwnershipTracker ownership, bool stale)
+    {
+        if (!ownership.HasDresserData)
+        {
+            ImGui.TextColored(Palette.Warning, "No dresser data yet.");
+            ImGui.TextColored(Palette.Warning, "Open your Glamour Dresser.");
+            ImGui.Separator();
+            return;
+        }
+
+        if (!stale)
+            return;
+
+        var age = Format.Age(ownership.DresserUpdatedUtc!.Value);
+        ImGui.TextColored(Palette.Warning, $"Dresser last read {age} ago.");
+        ImGui.TextColored(Palette.Warning, "Open one to be sure.");
+        ImGui.Separator();
     }
 
     /// <summary>

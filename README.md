@@ -67,10 +67,10 @@ were used, so treat this as temporary — it goes away once the official submiss
                    ┌───────────────┴───────────────┐        └────────────┐
                    ▼                               ▼                     ▼
               main window                  companion window beside   panel beside vendor
-    (by slot, role or boss)                   the Need/Greed roll    stock, panel beside
-                   │                                                 the dresser, and the
-                   ▼                                                 game's own menus
-            collection view
+    (by slot, role or boss)                   the Need/Greed roll    stock, panels beside
+                   │                                                 the dresser and the
+                   ▼                                                 Armoire, and the
+            collection view                                          game's own menus
      (sets in progress, dresser
       pressure, carried gear)
 ```
@@ -180,6 +180,30 @@ readable from outside it, so a few pieces the game turns down will still appear.
 The panel waits for the box's contents to arrive rather than the window: a list built against an
 unloaded dresser would claim every piece owned is unstored, at exactly the moment it would be acted
 on.
+
+## At the Armoire
+
+The same panel, beside the Armoire, listing held gear the Armoire **has not got**. The game's own
+**Store an item** screen cannot answer that: it lists what the Armoire *accepts*, which is a fact about
+the item rather than about the character, so a piece already deposited sits in that list looking exactly
+like one that is not — and the only way to find out is to pick it and be told no, one piece at a time.
+The header says how many of the pieces on the character the Armoire already has, which is the number
+that screen will not give.
+
+Both Armoire screens get the panel — the store list and the Armoire's own window — since they are one
+place and the answer is the same at both. Markers, the amber rows and the two toolbar buttons work as
+they do at the dresser, and those two buttons are the same setting on both panels: gear a gearset is
+using is using it whichever box is being stood at.
+
+There is **no header about how full it is and no snapshot warning**, and neither is an omission. The
+Armoire has no capacity — what it holds is decided by the game's own Cabinet sheet, so which pieces to
+put in is never a choice between them — and its contents are read live in front of the player, so the
+age of the dresser snapshot says nothing about this list.
+
+Like the dresser panel, it waits for the Armoire's flags to have been read rather than for the window,
+and a row means "the Armoire has not got this" rather than "the Armoire will take it from here".
+Whether it reaches into the armoury chest is not something readable from outside it, so no row claims
+either way.
 
 ## Roulettes
 
@@ -321,6 +345,9 @@ what is specific to that surface.
 | Panel beside vendor windows | Panels | on |
 | Panel beside the market board | Panels | on |
 | Panel beside the Glamour Dresser | Panels | on |
+| Panel beside the Armoire | Panels | on |
+| Include armoury-chest gear on both store panels | Panels | on |
+| Include worn gear on both store panels | Panels | on |
 | Group each panel by slot | Panels | on |
 | Gear options on the game's right-click menus | In-game UI | on |
 | Marker on the game's item tooltips | In-game UI | off |
@@ -511,6 +538,7 @@ DungeonDrip/
 │   ├── ShopWatcher.cs           which vendor is open and what it is selling
 │   ├── MarketBoardWatcher.cs    what the board's browse list is showing
 │   ├── DresserAddWatcher.cs     carried gear the dresser has not got
+│   ├── ArmoireAddWatcher.cs     the same of the Armoire, whose own screen will not say
 │   ├── OwnershipTracker.cs      per-character snapshot and staleness
 │   └── LootObserver.cs          records gear seen dropping
 ├── Core/
@@ -536,7 +564,9 @@ DungeonDrip/
     ├── CollectionView.cs        the window's other mode: sets, dresser, carried gear
     ├── AddonPanelWindow.cs      anchoring, sizing and the drag latch every panel shares
     ├── VendorPanelWindow.cs     what is vendor-specific about the vendor panel
+    ├── StorePanelWindow.cs      what the two "what should go in" panels share
     ├── DresserPanelWindow.cs    the add list beside the Glamour Dresser
+    ├── ArmoirePanelWindow.cs    the same beside the Armoire
     ├── MarketBoardPanelWindow.cs what is board-specific about the board panel
     ├── PanelGrouping.cs         slot headings and the filter counts
     ├── LootCompanionWindow.cs   read-only list beside the Need/Greed window

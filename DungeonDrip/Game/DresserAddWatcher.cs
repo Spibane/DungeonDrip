@@ -8,7 +8,11 @@ using FFXIVClientStructs.FFXIV.Component.GUI;
 
 namespace DungeonDrip.Game;
 
-/// <summary>A carried piece the collection has not got, and how to get at it.</summary>
+/// <summary>A carried piece the Glamour Dresser has not got, and how to get at it.</summary>
+/// <param name="ArmoireWouldTake">
+/// The one thing this panel knows that the Armoire's does not: the piece has a home that costs no
+/// dresser slot, which is worth saying while somebody is deciding what to spend a slot on.
+/// </param>
 public sealed record DresserAddRow(
     uint ItemId,
     string Name,
@@ -20,9 +24,11 @@ public sealed record DresserAddRow(
     EquipLock Locks,
     CarryLocation Location,
     int Quantity,
-    bool ArmoireWouldTake,
-    string? Blocked)
-    : GearRow(ItemId, Name, IconId, SlotOrder, SlotName, Marker, JobEquippable, Locks);
+    string? Blocked,
+    bool ArmoireWouldTake)
+    : HeldGearRow(
+        ItemId, Name, IconId, SlotOrder, SlotName, Marker, JobEquippable, Locks,
+        Location, Quantity, Blocked);
 
 /// <summary>
 /// Watches the Glamour Dresser and works out which carried pieces are not in it.
@@ -172,8 +178,8 @@ public sealed unsafe class DresserAddWatcher : IDisposable
                 row.Locks,
                 piece.Location,
                 piece.Quantity,
-                piece.ArmoireWouldTake,
-                BlockedReason(piece)));
+                BlockedReason(piece),
+                piece.ArmoireWouldTake));
         }
 
         Plugin.Log.Debug($"Dresser panel: {built.Count} carried pieces are not stored.");
