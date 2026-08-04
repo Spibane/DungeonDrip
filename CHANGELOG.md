@@ -1,6 +1,6 @@
 # Changelog
 
-### Unreleased
+### v0.15.1 - 2026-08-04
 - Fixed the panel beside the Glamour Dresser leaving out a piece the strict outfit rule says is not owned. With "owned only if every outfit with that piece is stored" on, a piece held inside one of its two sets is not collected - every other surface marks it so, and the panel beside the Armoire listed it - but the add list was asking a flatter question, whether the thing is physically in a box at all, and one stored set answered yes. The two settings look alike and are not: the storage scope narrows which box is being asked about, and this question is about every box, while the outfit mode is a rule about what counts as having a piece and the add list is the list that rule exists to change
 - Rows put there by that rule say so, because they are the ones that read as a bug: the dresser is visibly holding the piece inside a set, through the window that is open. The hover names how many of the sets using it are stored and that storing the loose copy on its own settles it
 - Under the strict rule such a piece also leaves the Collection view's **Already in your collection** list, which is the other half of the same fix - it was offering a spare copy for disposal while the rest of the plugin called the piece missing
