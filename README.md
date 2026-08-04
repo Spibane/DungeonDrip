@@ -4,7 +4,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-0.13.0-121212)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.14.0-121212)](./CHANGELOG.md)
 [![Status](https://img.shields.io/badge/status-Beta-yellow)](./CHANGELOG.md)
 [![Changelog](https://img.shields.io/badge/changelog-blue)](./CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-AGPL--3.0--or--later-663366)](./LICENSE)
@@ -559,7 +559,7 @@ switched off under **Settings → In-game UI**.
 Pushing a tag does everything:
 
 ```bash
-git tag v0.13.0 && git push origin v0.13.0
+git tag v0.14.0 && git push origin v0.14.0
 ```
 
 `.github/workflows/release.yml` then builds on `windows-latest`, attaches `DungeonDrip.zip`
