@@ -207,10 +207,22 @@ public class Configuration : IPluginConfiguration
     /// <summary>The panel beside the market board's browse list.</summary>
     public PanelSettings MarketBoardPanel { get; set; } = new();
 
-    /// <summary>List armoury-chest gear on the Glamour Dresser panel.</summary>
+    /// <summary>The panel beside the Armoire, listing held gear the Armoire has not got.</summary>
+    public PanelSettings ArmoirePanel { get; set; } = new();
+
+    /// <summary>
+    /// List armoury-chest gear on both store panels.
+    /// </summary>
+    /// <remarks>
+    /// Shared by the Glamour Dresser panel and the Armoire one, and named for the dresser only because
+    /// that panel existed first and renaming the property would silently reset it. Gear a gearset is
+    /// depending on is depending on it whichever box is being stood at, so a second copy of this per
+    /// panel would be two switches for one idea.
+    /// </remarks>
     public bool DresserPanelIncludesArmoury { get; set; } = true;
 
-    /// <summary>List equipped gear on the Glamour Dresser panel.</summary>
+    /// <summary>List equipped gear on both store panels.</summary>
+    /// <inheritdoc cref="DresserPanelIncludesArmoury" path="/remarks"/>
     public bool DresserPanelIncludesEquipped { get; set; } = true;
 
     // The vendor panel's settings used to be five flat properties. They are nullable so that

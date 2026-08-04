@@ -95,6 +95,9 @@ public sealed class Plugin : IDalamudPlugin
     /// <summary>Carried gear the Glamour Dresser has not got.</summary>
     public DresserAddWatcher Dresser { get; }
 
+    /// <summary>The same question asked of the Armoire, whose own screen will not answer it.</summary>
+    public ArmoireAddWatcher Armoire { get; }
+
     /// <summary>The gear the market board is currently browsing.</summary>
     public MarketBoardWatcher Market { get; }
 
@@ -149,6 +152,7 @@ public sealed class Plugin : IDalamudPlugin
         Rows = new GearRowFactory(this);
         Shop = new ShopWatcher(this);
         Dresser = new DresserAddWatcher(this);
+        Armoire = new ArmoireAddWatcher(this);
         Market = new MarketBoardWatcher(this);
         gameContextMenu = new GameContextMenu(this);
         tooltipLine = new ItemTooltipLine(this, SigScanner, GameInterop);
@@ -167,6 +171,7 @@ public sealed class Plugin : IDalamudPlugin
         windowSystem.AddWindow(new LootCompanionWindow(this) { IsOpen = true });
         windowSystem.AddWindow(new VendorPanelWindow(this) { IsOpen = true });
         windowSystem.AddWindow(new DresserPanelWindow(this) { IsOpen = true });
+        windowSystem.AddWindow(new ArmoirePanelWindow(this) { IsOpen = true });
         windowSystem.AddWindow(new MarketBoardPanelWindow(this) { IsOpen = true });
 
         currentTerritory = ClientState.TerritoryType;
@@ -194,6 +199,7 @@ public sealed class Plugin : IDalamudPlugin
         tooltipLine.Dispose();
         Shop.Dispose();
         Dresser.Dispose();
+        Armoire.Dispose();
         Market.Dispose();
         LootData.Dispose();
         Wiki.Dispose();
