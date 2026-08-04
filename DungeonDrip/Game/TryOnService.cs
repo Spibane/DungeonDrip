@@ -71,11 +71,11 @@ public sealed unsafe class TryOnService
     /// </summary>
     /// <remarks>
     /// A refusal is logged and the queue keeps draining rather than being dropped. The game says no
-    /// while you are in combat, a cutscene or GPose, and each piece is asked separately anyway, so
+    /// during combat, a cutscene or GPose, and each piece is asked separately anyway, so
     /// letting the rest through costs a handful of no-ops in the case where nothing was going to work
     /// - against losing the other ten pieces of an outfit to one unreadable return value.
-    /// Nothing is ever retried: a queue that waited out a cutscene would spring an outfit on you
-    /// minutes after you asked for it.
+    /// Nothing is ever retried: a queue that waited out a cutscene would spring an outfit on the
+    /// fitting room minutes after it was asked for.
     /// </remarks>
     public void Tick()
     {

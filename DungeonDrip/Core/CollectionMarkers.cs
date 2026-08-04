@@ -1,6 +1,6 @@
 namespace DungeonDrip.Core;
 
-/// <summary>What a panel says about one piece of gear the game is showing you.</summary>
+/// <summary>What a panel says about one piece of gear the game is showing.</summary>
 /// <remarks>
 /// Not <see cref="OwnershipSource"/>, which folds "not collected" and "never read the dresser" into
 /// one value. The duty report can afford that because it refuses to draw without a snapshot; a
@@ -35,6 +35,27 @@ public enum CollectionMarker
     Armoire,
     Inventory,
 
+    /// <summary>
+    /// In a retainer's bags, as of the last time they were open.
+    /// </summary>
+    /// <remarks>
+    /// Its own value rather than folded into <see cref="Inventory"/>, which it resembles - both mean
+    /// "owned, in no glamour box". The difference is reach: a piece in the bags can be put away on the
+    /// spot, and one with a retainer needs a trip to a bell before it is anything at all. That is worth
+    /// a marker of its own on a list being read at a vendor.
+    /// </remarks>
+    Retainer,
+
+    /// <summary>
+    /// Worn by a retainer, which is not somewhere it can be looked for.
+    /// </summary>
+    /// <remarks>
+    /// Split off from <see cref="Retainer"/> after the two together cost somebody five minutes of
+    /// searching a retainer's bags for a coat the retainer had on. Every marker in this vocabulary is
+    /// read as "here is where to find it", so one that names the wrong place is worse than none.
+    /// </remarks>
+    RetainerEquipped,
+
     /// <summary>No dresser snapshot exists, so no claim can honestly be made either way.</summary>
     Unknown,
 }
@@ -58,14 +79,16 @@ public static class CollectionMarkers
         bool outfitCompleted = false,
         bool outfitShortfall = false)
     {
-        // Positive evidence needs no dresser snapshot behind it: inventory is re-read every tick,
-        // and an armoire result is only recorded when the game had the cabinet loaded.
+        // Positive evidence needs no dresser snapshot behind it: inventory is re-read every tick, and
+        // an armoire or retainer result is only recorded when the game had that store loaded.
         var marker = source switch
         {
             OwnershipSource.Dresser => CollectionMarker.Dresser,
             OwnershipSource.Outfit => outfitCompleted ? CollectionMarker.OutfitComplete : CollectionMarker.Outfit,
             OwnershipSource.Armoire => CollectionMarker.Armoire,
             OwnershipSource.Inventory => CollectionMarker.Inventory,
+            OwnershipSource.Retainer => CollectionMarker.Retainer,
+            OwnershipSource.RetainerEquipped => CollectionMarker.RetainerEquipped,
             _ => CollectionMarker.NotCollected,
         };
 
@@ -98,7 +121,7 @@ public static class CollectionMarkers
     /// Whether this marker should be drawn in the warning colour rather than its own.
     /// </summary>
     /// <remarks>
-    /// Staleness marks "not collected", not "owned", which reads backwards until you see why:
+    /// Staleness marks "not collected", not "owned", which reads backwards until the reason is clear:
     /// dresser contents are near-monotonic, so an old snapshot's positives still hold while its
     /// negatives are exactly what rots. Do not invert this.
     /// </remarks>
@@ -118,6 +141,8 @@ public static class CollectionMarkers
         CollectionMarker.OutfitComplete => "Outfit completed",
         CollectionMarker.Armoire => "In your Armoire",
         CollectionMarker.Inventory => "Carried or equipped",
+        CollectionMarker.Retainer => "In a retainer's bags",
+        CollectionMarker.RetainerEquipped => "Worn by one of your retainers",
         CollectionMarker.NotCollected => "Not collected",
 
         CollectionMarker.OutfitPartial => outfitsTotal > 1

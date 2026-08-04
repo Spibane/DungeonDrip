@@ -11,7 +11,7 @@ using FFXIVClientStructs.FFXIV.Component.GUI;
 namespace DungeonDrip.Game;
 
 /// <summary>
-/// Adds one line to the game's own item tooltip saying whether the piece is in your collection.
+/// Adds one line to the game's own item tooltip saying whether the piece is in the collection.
 /// </summary>
 /// <remarks>
 /// The only place the plugin modifies a game window's contents rather than riding beside it, and the
@@ -64,13 +64,13 @@ public sealed unsafe class ItemTooltipLine : IDisposable
     /// The state, as one of the game's own tooltip icons.
     /// </summary>
     /// <remarks>
-    /// Four icons for six states, because the word beside it already says which of the six it is.
+    /// Four icons for eight states, because the word beside it already says which of the eight it is.
     /// The stars are a scale of how well collected a piece is - gold for put away, silver for a set
     /// that still has gaps - and the no-entry sign is the absence of it.
     ///
     /// Carried gets a diamond rather than a third grade of star, because it is not a worse kind of
-    /// stored, it is a different thing entirely: the piece is on you and in no box at all, and one
-    /// trip to a vendor from being gone. A different shape says that where a dimmer star would
+    /// stored, it is a different thing entirely: the piece is on the character and in no box at all,
+    /// one trip to a vendor from being gone. A different shape says that where a dimmer star would
     /// imply it is nearly there.
     ///
     /// The green dot the first attempt used for the dresser is gone and should stay gone. It is the
@@ -86,7 +86,7 @@ public sealed unsafe class ItemTooltipLine : IDisposable
         CollectionMarker.Armoire => BitmapFontIcon.GoldStar,
         CollectionMarker.OutfitComplete => BitmapFontIcon.GoldStar,
 
-        // Yours, but the set it is in still has gaps.
+        // Owned, but the set it is in still has gaps.
         CollectionMarker.Outfit => BitmapFontIcon.SilverStar,
 
         // In a stored outfit, but the strict rule wants the others too. Third grade of star, because
@@ -94,23 +94,27 @@ public sealed unsafe class ItemTooltipLine : IDisposable
         // no-entry sign and not as far as the silver, and the count beside it says by how much.
         CollectionMarker.OutfitPartial => BitmapFontIcon.BlueStar,
 
-        // On you rather than in anything.
+        // On the character, in a retainer's bags, or on a retainer's back: owned, and in no box at all.
+        // One shape for all three, because the word beside it is what distinguishes them and more
+        // diamonds would not add anything.
         CollectionMarker.Inventory => BitmapFontIcon.OrangeDiamond,
+        CollectionMarker.Retainer => BitmapFontIcon.OrangeDiamond,
+        CollectionMarker.RetainerEquipped => BitmapFontIcon.OrangeDiamond,
 
         _ => BitmapFontIcon.NoCircle,
     };
 
     /// <summary>
-    /// Where it is, in one word. The icon has already said whether you have it.
+    /// Where it is, in one word. The icon has already said whether it is collected.
     /// </summary>
     /// <remarks>
     /// Short because this shares a row with the item's category and that row is not wide. The full
-    /// sentences the panels use do not fit and do not need to: there are seven states and the icon
+    /// sentences the panels use do not fit and do not need to: there are eight states and the icon
     /// carries most of the meaning.
     ///
     /// The outfit count is the one thing here that is not a fixed string, and it is the exception
-    /// worth making: without it the strict ownership rule tells you a piece sitting in your dresser
-    /// is not owned, which is indistinguishable from the plugin being broken. Two small numbers are
+    /// worth making: without it the strict ownership rule calls a piece sitting in the dresser not
+    /// owned, which is indistinguishable from the plugin being broken. Two small numbers are
     /// still bounded - a piece belongs to a handful of sets at most - so the row cannot outgrow its
     /// space.
     /// </remarks>
@@ -121,6 +125,11 @@ public sealed unsafe class ItemTooltipLine : IDisposable
         CollectionMarker.Outfit => "Outfit",
         CollectionMarker.OutfitComplete => "Outfit",
         CollectionMarker.Inventory => "Carried",
+        CollectionMarker.Retainer => "Retainer",
+
+        // Spelled out rather than shortened to "Retainer" like the bags are. This is the state that
+        // sends people searching the wrong place, and the row has space for two more words.
+        CollectionMarker.RetainerEquipped => "Retainer, worn",
 
         // Not a word, on purpose. "Not owned" here would be the bug report; the fraction is the
         // whole message, and the panels have room to explain it.
@@ -131,7 +140,7 @@ public sealed unsafe class ItemTooltipLine : IDisposable
         _ => stale ? "Not owned?" : "Not owned",
     };
 
-    /// <summary>Ours, so the line can recognise itself and never double up.</summary>
+    /// <summary>This plugin's own, so the line can recognise itself and never double up.</summary>
     private const uint MarkerCommandId = 0x44445F31;
 
     private delegate void* GenerateItemTooltipDelegate(
@@ -211,7 +220,7 @@ public sealed unsafe class ItemTooltipLine : IDisposable
             return;
 
         // The same content rule as every other surface, so the absence of a line keeps meaning
-        // "not glamour gear" rather than "you have it".
+        // "not glamour gear" rather than "it is collected".
         if (!plugin.Storage.CanBeStored(itemId))
             return;
 
@@ -228,7 +237,7 @@ public sealed unsafe class ItemTooltipLine : IDisposable
         // Missing this is what made a finished outfit and a half-finished one look identical.
         var completed = source == OwnershipSource.Outfit && plugin.Outfits.IsInCompletedSet(itemId, view);
 
-        // Missing this is what made a piece the strict rule holds back look like one you never had.
+        // Missing this is what made a piece the strict rule holds back look like one never collected.
         var (stored, total) = MissingItems.Shortfall(
             itemId, view, sets, source, plugin.Configuration.OutfitOwnership, plugin.Configuration.Scope);
 
@@ -245,15 +254,19 @@ public sealed unsafe class ItemTooltipLine : IDisposable
         {
             CollectionMarker.NotCollected => stale ? (ushort)26 : (ushort)14,
 
-            // Not the red the missing pieces get. You have one of these; what you do not have is
-            // every copy your own setting asks for.
+            // Not the red the missing pieces get. One of these is stored; what is not is every copy
+            // the chosen setting asks for.
             CollectionMarker.OutfitPartial => (ushort)26,
             CollectionMarker.Inventory => (ushort)26,
+
+            // The same as carried, for the same reason: one is owned, it is just not put away.
+            CollectionMarker.Retainer => (ushort)26,
+            CollectionMarker.RetainerEquipped => (ushort)26,
             _ => (ushort)45,
         };
 
         // Appended, never replaced: whatever is already there - including a line another plugin
-        // added in an earlier hook - is re-emitted first and ours lands after it.
+        // added in an earlier hook - is re-emitted first and this one lands after it.
         var built = new SeStringBuilder();
         foreach (var payload in existing.Payloads)
             built.Add(payload);
@@ -272,14 +285,14 @@ public sealed unsafe class ItemTooltipLine : IDisposable
     }
 
     /// <summary>
-    /// The line as the game wrote it, with anything we added last time removed.
+    /// The line as the game wrote it, with anything this hook added last time removed.
     /// </summary>
     /// <remarks>
-    /// Truncating at our own marker rather than checking for its presence and giving up. That check
+    /// Truncating at this plugin's own marker rather than checking for its presence and giving up. That check
     /// was the first attempt and it deadlocked the feature: it was reading a field that goes stale,
     /// so after one write every later item looked already done. Rebuilding from the game's own text
     /// each time is idempotent whether the field is fresh or not, which is the property actually
-    /// wanted. A line another plugin added survives, since it lands before our marker.
+    /// wanted. A line another plugin added survives, since it lands before this one's marker.
     /// </remarks>
     private static SeString Read(StringArrayData* strings, int field)
     {

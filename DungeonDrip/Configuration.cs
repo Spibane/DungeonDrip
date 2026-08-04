@@ -38,10 +38,10 @@ public enum CollectionScope
 /// <summary>Which of the main window's two jobs it is currently doing.</summary>
 public enum MainWindowMode
 {
-    /// <summary>Loot for one duty, or the roulette advice when you are not standing in one.</summary>
+    /// <summary>Loot for one duty, or the roulette advice outside one.</summary>
     Duty,
 
-    /// <summary>Your collection as a whole, which no duty is involved in.</summary>
+    /// <summary>The collection as a whole, which no duty is involved in.</summary>
     Collection,
 }
 
@@ -53,23 +53,57 @@ public enum MissingGrouping
 
     /// <summary>By the role allowed to roll Need, for claiming during a run.</summary>
     Role,
+
+    /// <summary>
+    /// By the boss or coffer inside the duty that drops it.
+    /// </summary>
+    /// <remarks>
+    /// Only as complete as the wiki lookup for that duty, which is why this is not the default: a duty
+    /// covered by the downloaded dataset alone has nothing to group by and lands in one heading.
+    /// </remarks>
+    Source,
 }
 
 public class Configuration : IPluginConfiguration
 {
     public int Version { get; set; } = 1;
 
-    /// <summary>Pop the window open when you zone into a duty we have loot data for.</summary>
+    /// <summary>Pop the window open on zoning into a duty that has loot data.</summary>
     public bool AutoOpenOnDutyEnter { get; set; } = true;
 
-    /// <summary>Suppress the automatic pop-up when you already have everything.</summary>
+    /// <summary>Suppress the automatic pop-up when nothing is missing.</summary>
     public bool HideWhenNothingMissing { get; set; } = true;
 
-    /// <summary>Close the window again when you leave the duty.</summary>
+    /// <summary>Close the window again on leaving the duty.</summary>
     public bool CloseWhenLeavingDuty { get; set; } = true;
 
     /// <summary>Also treat bags, armoury, equipped gear and saddlebags as owning a piece.</summary>
     public bool CountInventoryAndEquipped { get; set; }
+
+    /// <summary>
+    /// Also treat gear left with a retainer as owning a piece.
+    /// </summary>
+    /// <remarks>
+    /// Off, like the bags it sits beside, and for the same reason: a retainer is somewhere a piece is
+    /// held, not somewhere it is put away. Nothing outside the Glamour Dresser and the Armoire can be
+    /// worn as a glamour, so counting a retainer copy answers "do I own one" rather than "can I wear
+    /// it", and which of those the lists should mean is the user's call.
+    /// </remarks>
+    public bool CountRetainers { get; set; }
+
+    /// <summary>
+    /// Whether <see cref="CountRetainers"/> also covers gear the retainer is wearing.
+    /// </summary>
+    /// <remarks>
+    /// Off, and a narrowing of the setting above rather than a place of its own - counting what a
+    /// retainer wears while not counting what a retainer holds is a combination nobody means.
+    ///
+    /// Excluded by default because a retainer's own gear is the worst kind of owned. It is not in their
+    /// bags, so "with a retainer" sends the player through seven pages after a piece that was never
+    /// going to be there; and it is doing a job where it is, since a retainer's item level decides what
+    /// their ventures bring back. Both halves of that argue for leaving it out unless it is asked for.
+    /// </remarks>
+    public bool CountRetainerEquipped { get; set; }
 
     public OutfitOwnershipMode OutfitOwnership { get; set; } = OutfitOwnershipMode.AnyOutfit;
 
@@ -88,7 +122,7 @@ public class Configuration : IPluginConfiguration
     /// </summary>
     /// <remarks>
     /// Separate from the job filter although it reads like a second helping of it. That one is about
-    /// what you have equipped this minute and flips several times an evening; this is a standing fact
+    /// what is equipped this minute and flips several times an evening; this is a standing fact
     /// about the character, and the two are wanted independently - "everything I could ever wear" is
     /// the common case and needs this on and that off.
     ///
@@ -124,7 +158,7 @@ public class Configuration : IPluginConfiguration
     /// <summary>Which storage is compared against.</summary>
     public CollectionScope Scope { get; set; } = CollectionScope.Both;
 
-    /// <summary>Group the missing list by slot, or by who can roll Need on it.</summary>
+    /// <summary>Group the missing list by slot, by who can roll Need, or by the boss that drops it.</summary>
     public MissingGrouping Grouping { get; set; } = MissingGrouping.Slot;
 
     /// <summary>
@@ -136,7 +170,7 @@ public class Configuration : IPluginConfiguration
     /// <summary>Headings the user has collapsed, remembered between sessions.</summary>
     public List<string> CollapsedGroups { get; set; } = [];
 
-    /// <summary>Age at which the cached Glamour Dresser snapshot starts warning you.</summary>
+    /// <summary>Age at which the cached Glamour Dresser snapshot starts warning.</summary>
     public int StaleAfterDays { get; set; } = 7;
 
     /// <summary>Record gear seen dropping in a duty, to fill gaps the upstream dataset has.</summary>
@@ -145,16 +179,16 @@ public class Configuration : IPluginConfiguration
     /// <summary>Look duties up on the FFXIV Console Games Wiki, which covers new content far better.</summary>
     public bool UseWikiSource { get; set; } = true;
 
-    /// <summary>Show a companion window beside the loot roll window listing what you still need.</summary>
+    /// <summary>Show a companion window beside the loot roll window listing what is missing.</summary>
     public bool ShowLootCompanion { get; set; } = true;
 
     /// <summary>Which side of the loot window the companion sits on. Auto flips if space is tight.</summary>
     public PanelSide LootCompanionSide { get; set; } = PanelSide.Auto;
 
-    /// <summary>The panel beside vendor windows, marking which of their stock you already have.</summary>
+    /// <summary>The panel beside vendor windows, marking which of their stock is collected.</summary>
     public PanelSettings VendorPanel { get; set; } = new();
 
-    /// <summary>The panel beside the Glamour Dresser, listing what you carry that is not stored.</summary>
+    /// <summary>The panel beside the Glamour Dresser, listing carried gear that is not stored.</summary>
     public PanelSettings DresserPanel { get; set; } = new();
 
     /// <summary>The panel beside the market board's browse list.</summary>
@@ -163,7 +197,7 @@ public class Configuration : IPluginConfiguration
     /// <summary>List armoury-chest gear on the Glamour Dresser panel.</summary>
     public bool DresserPanelIncludesArmoury { get; set; } = true;
 
-    /// <summary>List gear you are wearing on the Glamour Dresser panel.</summary>
+    /// <summary>List equipped gear on the Glamour Dresser panel.</summary>
     public bool DresserPanelIncludesEquipped { get; set; } = true;
 
     // The vendor panel's settings used to be five flat properties. They are nullable so that
@@ -219,7 +253,7 @@ public class Configuration : IPluginConfiguration
     public bool ShowGameContextMenu { get; set; } = true;
 
     /// <summary>
-    /// Append a line to the game's own item tooltip saying where the piece is in your collection.
+    /// Append a line to the game's own item tooltip saying where the piece is in the collection.
     /// </summary>
     /// <remarks>
     /// Off by default, unlike the right-click menu. This is the one thing that modifies a game

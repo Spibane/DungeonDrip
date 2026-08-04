@@ -17,7 +17,7 @@ namespace DungeonDrip.Game;
 /// <remarks>
 /// Chat is used rather than the Need/Greed addon because loot chat carries an item link, so the
 /// item id comes straight out of the payload with no text parsing and no localisation problem - and
-/// it covers rolls won by other party members, not just your own.
+/// it covers rolls won by other party members, not just the player's own.
 /// </remarks>
 public sealed class LootObserver : IDisposable
 {

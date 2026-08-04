@@ -5,11 +5,11 @@ using Lumina.Excel.Sheets;
 
 namespace DungeonDrip.Core;
 
-/// <summary>A duty a roulette can drop you into, with the level it wants you at.</summary>
+/// <summary>A duty a roulette can send a player to, with the level it asks for.</summary>
 public readonly record struct RouletteDuty(uint TerritoryId, byte Level);
 
-/// <summary>A duty roulette and everything it can send you to.</summary>
-/// <param name="RequiredLevel">The level the roulette itself will not queue you below.</param>
+/// <summary>A duty roulette and everything it can send a player to.</summary>
+/// <param name="RequiredLevel">The level the roulette itself will not queue below.</param>
 public sealed record RoulettePool(string Name, byte RequiredLevel, IReadOnlyList<RouletteDuty> Duties);
 
 /// <summary>
@@ -17,7 +17,7 @@ public sealed record RoulettePool(string Name, byte RequiredLevel, IReadOnlyList
 /// one this plugin covers.
 /// </summary>
 /// <remarks>
-/// Separate from <see cref="DutyCatalog"/> because that only covers duties we have loot for, and is
+/// Separate from <see cref="DutyCatalog"/> because that only covers duties with loot data, and is
 /// rebuilt whenever the dataset changes. This covers every duty in the game and never changes.
 /// </remarks>
 public sealed class ContentFinderIndex
@@ -38,7 +38,7 @@ public sealed class ContentFinderIndex
     private const uint RaidContentType = 5;
 
     /// <summary>
-    /// The roulettes we advise on, each paired with the flag that marks a duty as belonging to it.
+    /// The roulettes advised on, each paired with the flag that marks a duty as belonging to it.
     /// </summary>
     /// <remarks>
     /// Every duty carries one boolean per roulette, so membership is read off the game's own data

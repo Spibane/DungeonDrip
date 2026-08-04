@@ -9,17 +9,17 @@ namespace DungeonDrip.Core;
 
 /// <summary>How one role would fare in one roulette.</summary>
 /// <param name="Total">Pieces in the pool this role could roll Need on, collected or not.</param>
-/// <param name="Missing">How many of those you have not collected.</param>
+/// <param name="Missing">How many of those are not collected.</param>
 public sealed record RoleOdds(string Label, int Order, int Missing, int Total)
 {
-    /// <summary>The share of what this role can roll on that would be new to you.</summary>
+    /// <summary>The share of what this role can roll on that would be new.</summary>
     public float Share => Total == 0 ? 0f : (float)Missing / Total;
 }
 
-/// <param name="DutyCount">Duties in the pool we hold loot for.</param>
+/// <param name="DutyCount">Duties in the pool with loot data.</param>
 /// <param name="PoolCount">Duties in the pool altogether.</param>
 /// <param name="Roles">
-/// Every role eligible to queue this, best first. Empty when nothing of yours clears the level bar.
+/// Every role eligible to queue this, best first. Empty when no job clears the level bar.
 /// </param>
 public sealed record RouletteAdvice(
     string Name,
@@ -30,23 +30,22 @@ public sealed record RouletteAdvice(
 
 /// <summary>
 /// Answers "what should I queue this roulette as" by counting uncollected gear across everything
-/// the roulette can send you to.
+/// the roulette can send a player to.
 /// </summary>
 /// <remarks>
 /// Counted by role heading rather than by job, which is both shorter to read and the same division
 /// the missing list already draws. Melee stays split by gear type there, so "Melee DPS (NIN VPR)"
 /// still names what to queue as rather than lumping pools that share nothing.
 ///
-/// Ranked by share rather than by raw count. The question is how likely the next piece you can roll
-/// on is to be one you do not have, and a raw count would simply crown whichever role the game
-/// happens to hand the most gear - a role whose pool is small is not thereby a worse bet. Both
-/// numbers are reported, because they disagree occasionally and the count is what you are actually
-/// collecting.
+/// Ranked by share rather than by raw count. The question is how likely the next rollable piece is to
+/// be an uncollected one, and a raw count would simply crown whichever role the game happens to hand
+/// the most gear - a role whose pool is small is not thereby a worse bet. Both numbers are reported,
+/// because they disagree occasionally and the count is what actually gets collected.
 ///
-/// Two things it cannot see. It does not know which duties you have unlocked, so a pool is assumed
-/// open once your level clears it - a returning player's odds will be off in the direction of
-/// optimism. And it counts what a role may roll on, not what will drop: a duty gives out a handful
-/// of pieces per run, so these are the odds per roll, not per run.
+/// Two things it cannot see. Duty unlocks are not readable, so a pool is assumed open once the
+/// character's level clears it - a returning player's odds will be off in the direction of optimism.
+/// And it counts what a role may roll on, not what will drop: a duty gives out a handful of pieces per
+/// run, so these are the odds per roll, not per run.
 /// </remarks>
 public sealed class RouletteAdviceBuilder(
     DungeonLootData loot,
@@ -77,8 +76,8 @@ public sealed class RouletteAdviceBuilder(
 
                 covered++;
 
-                // A roulette will not send you anywhere your job is too low for, so the whole duty
-                // drops out for a role you have nothing levelled enough in.
+                // A roulette sends nobody anywhere their job is too low for, so the whole duty drops
+                // out for a role with nothing levelled enough in it.
                 var needed = Math.Max(pool.RequiredLevel, duty.Level);
 
                 foreach (var itemId in itemIds)
@@ -89,7 +88,7 @@ public sealed class RouletteAdviceBuilder(
                     // The same filters the missing list uses, so the two views cannot disagree about
                     // what counts as a piece worth having. The job filter is deliberately not among
                     // them - the whole question here is which job to queue as, so a pool cannot be
-                    // judged by the one you happen to be standing in.
+                    // judged by whichever job happens to be equipped.
                     if (!storage.MatchesScope(storage.Of(item), configuration.Scope))
                         continue;
 
@@ -135,7 +134,7 @@ public sealed class RouletteAdviceBuilder(
 
         return advice;
 
-        // The best you have in the role, since queueing as it only needs one job high enough.
+        // The highest job in the role, since queueing as it only needs one job high enough.
         // Memoised: levelling is slow enough that reading it once per rebuild is plenty, and this
         // would otherwise run once per item per heading.
         int LevelOf(RoleGroup group)

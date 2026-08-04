@@ -115,7 +115,7 @@ public sealed class OutfitCatalog
     /// Whether every slot of a stored set is filled.
     /// </summary>
     /// <remarks>
-    /// "Complete as stored" is narrower than "do you own these pieces" - a piece can be in your
+    /// "Complete as stored" is narrower than "are these pieces owned" - a piece can be in the
     /// Armoire, or in a different set, and still leave this slot empty. The broader reading obeys
     /// the storage scope and outfit mode, so it lives with the ownership decision rather than here.
     /// </remarks>

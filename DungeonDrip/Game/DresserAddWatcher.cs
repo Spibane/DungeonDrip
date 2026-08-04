@@ -8,7 +8,7 @@ using FFXIVClientStructs.FFXIV.Component.GUI;
 
 namespace DungeonDrip.Game;
 
-/// <summary>A piece you are carrying that the collection has not got, and how to get at it.</summary>
+/// <summary>A carried piece the collection has not got, and how to get at it.</summary>
 public sealed record DresserAddRow(
     uint ItemId,
     string Name,
@@ -25,10 +25,10 @@ public sealed record DresserAddRow(
     : GearRow(ItemId, Name, IconId, SlotOrder, SlotName, Marker, JobEquippable, Locks);
 
 /// <summary>
-/// Watches the Glamour Dresser and works out what you are carrying that is not in it.
+/// Watches the Glamour Dresser and works out which carried pieces are not in it.
 /// </summary>
 /// <remarks>
-/// The dresser is the one surface where you can actually act on what the plugin knows, and it was
+/// The dresser is the one surface where the plugin's answer can be acted on where it is read, and it was
 /// only ever a data source. This is the other half: not "what am I missing" but "what have I got on
 /// me that should go in".
 ///
@@ -71,7 +71,7 @@ public sealed unsafe class DresserAddWatcher : IDisposable
         (plugin.Ownership.DresserSlotsUsed, plugin.Ownership.DresserSlotCapacity);
 
     /// <summary>
-    /// What you are carrying that is not stored, or null when there is nothing to draw against.
+    /// Carried gear that is not stored, or null when there is nothing to draw against.
     /// Call once per frame.
     /// </summary>
     public IReadOnlyList<DresserAddRow>? Resolve()
@@ -87,7 +87,7 @@ public sealed unsafe class DresserAddWatcher : IDisposable
             return Forget();
 
         // The single most important guard here. The addon comes up before its contents arrive, and
-        // a list built against an unloaded box would confidently claim every piece you own is
+        // a list built against an unloaded box would confidently claim every piece owned is
         // unstored - which is exactly the moment someone would act on it.
         var mirage = MirageManager.Instance();
         if (mirage == null || !mirage->PrismBoxLoaded)
@@ -116,7 +116,7 @@ public sealed unsafe class DresserAddWatcher : IDisposable
     /// </summary>
     /// <remarks>
     /// Both of these are gear that is spoken for. Armoury pieces are usually a gearset's, and one
-    /// you are wearing has to come off before it can go anywhere - so a list of things to store is
+    /// equipped gear has to come off before it can go anywhere - so a list of things to store is
     /// often better without them, and both are switchable rather than assumed either way.
     /// </remarks>
     private (bool Armoury, bool Equipped) Filters() => (
@@ -138,8 +138,10 @@ public sealed unsafe class DresserAddWatcher : IDisposable
 
     private List<DresserAddRow> Build()
     {
+        // No retainers. This panel's subject is what can go into the box being stood at, and a piece
+        // two zones away with a retainer is not on that list however definitely it is owned.
         var report = CarriedGear.Build(
-            InventoryReader.ReadDetailed(), plugin.Ownership.Current, plugin.Outfits, plugin.Storage);
+            InventoryReader.ReadDetailed(), [], plugin.Ownership.Current, plugin.Outfits, plugin.Storage);
 
         var built = new List<DresserAddRow>(report.NotStored.Count);
 
@@ -183,10 +185,10 @@ public sealed unsafe class DresserAddWatcher : IDisposable
     /// </summary>
     /// <remarks>
     /// Only the two reasons that are both legible from here and not already explained by the game.
-    /// Damaged gear is refused too, but the dresser says so itself when you try, and spiritbond is
+    /// Damaged gear is refused too, but the dresser says so itself on the attempt, and spiritbond is
     /// not a reason at all - storing a piece resets it rather than requiring it.
     ///
-    /// A row without a note therefore reads "not stored" rather than "you can add this", and a few
+    /// A row without a note therefore reads "not stored" rather than "this can be added", and a few
     /// pieces the game turns down will still be listed.
     /// </remarks>
     private static string? BlockedReason(CarriedPiece piece) => piece.Location switch

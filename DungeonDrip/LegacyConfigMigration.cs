@@ -52,7 +52,7 @@ public static class LegacyConfigMigration
         if (!legacy.Exists)
             return;
 
-        // The new directory may already have been created for us, so move file by file rather than
+        // The new directory may already exist, so move file by file rather than
         // renaming the folder wholesale.
         Directory.CreateDirectory(current.FullName);
 

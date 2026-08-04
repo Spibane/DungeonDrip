@@ -14,7 +14,7 @@ public sealed record DutyEntry(
     int ItemCount);
 
 /// <summary>
-/// Every duty we have loot for, named and sorted for the picker so a dungeon can be looked up
+/// Every duty with loot data, named and sorted for the picker so a dungeon can be looked up
 /// without setting foot in it.
 /// </summary>
 public sealed class DutyCatalog

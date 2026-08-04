@@ -8,12 +8,12 @@ using DungeonDrip.Game;
 namespace DungeonDrip.Windows;
 
 /// <summary>
-/// A panel beside the Glamour Dresser listing what you are carrying that is not in it.
+/// A panel beside the Glamour Dresser listing carried gear that is not in it.
 /// </summary>
 /// <remarks>
-/// The mirror of every other panel. Those ask "do I need this" about gear the game is offering you;
+/// The mirror of every other panel. Those ask "is this needed" about gear the game is offering;
 /// standing at the dresser, the useful question is the other one - what have I got on me that
-/// should go in. It is also the only surface where the answer is something you can act on without
+/// should go in. It is also the only surface where the answer can be acted on without
 /// going anywhere.
 /// </remarks>
 public sealed class DresserPanelWindow(Plugin plugin)
@@ -28,7 +28,7 @@ public sealed class DresserPanelWindow(Plugin plugin)
     /// <summary>Every row here is unstored by construction, so the filter has nothing to act on.</summary>
     protected override bool HasOwnedRows => false;
 
-    /// <summary>An empty list here means you are done, which is worth saying in the good colour.</summary>
+    /// <summary>An empty list here means nothing is left to store, worth saying in the good colour.</summary>
     protected override string EmptyMessage => "Nothing on you that is not already stored.";
 
     protected override bool EmptyIsGood => true;
@@ -90,7 +90,7 @@ public sealed class DresserPanelWindow(Plugin plugin)
     /// <summary>
     /// Every row here is uncollected by construction, so the ownership glyph would say the same
     /// thing on all of them. The column goes to where the piece is instead, which is the part that
-    /// changes what you have to do about it.
+    /// changes what has to be done about it.
     /// </summary>
     protected override void DrawRow(GearRow row, bool stale)
     {

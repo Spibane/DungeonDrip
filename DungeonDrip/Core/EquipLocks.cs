@@ -25,16 +25,16 @@ public enum EquipLock
 }
 
 /// <summary>
-/// Whether the character you are on can wear a given piece at all - the part of wearability that has
-/// nothing to do with what you are doing today.
+/// Whether the current character can wear a given piece at all - the part of wearability that has
+/// nothing to do with what is being done today.
 /// </summary>
 /// <remarks>
 /// A sibling of <see cref="JobFilter"/> and deliberately not folded into it. That one answers a
-/// question whose answer changes every time you switch job, and it is a view filter in the ordinary
-/// sense: the piece is yours to collect, you just cannot wear it right now. These are facts about
-/// your character - a locked piece is one your Glamour Dresser will accept and your character will
-/// never wear - which is why they are worth dropping without also dropping everything the current job
-/// cannot use.
+/// question whose answer changes on every job switch, and it is a view filter in the ordinary sense:
+/// the piece is still collectable, merely not wearable this minute. These are facts about the
+/// character - a locked piece is one the Glamour Dresser will accept and the character will never wear
+/// - which is why they are worth dropping without also dropping everything the current job cannot
+/// use.
 ///
 /// Both locks come off one row, so they are read together and cached together: the item's
 /// <c>EquipRestriction</c> is a row in <c>EquipRaceCategory</c>, which carries a column per race and

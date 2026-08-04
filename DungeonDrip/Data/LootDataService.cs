@@ -16,7 +16,7 @@ namespace DungeonDrip.Data;
 /// <remarks>
 /// The game ships no loot tables, so this comes from FFXIV Teamcraft's public data (which mirrors
 /// Garland Tools). The two upstream files are item -> instances and instance metadata; inverting
-/// and joining them is what produces our per-duty lists.
+/// and joining them is what produces the per-duty lists.
 /// </remarks>
 public sealed class LootDataService : IDisposable
 {
@@ -94,7 +94,7 @@ public sealed class LootDataService : IDisposable
     public void Update()
     {
         // A newly observed drop or wiki lookup changes the merged result without changing the
-        // download, so rebuild from the cache we already hold.
+        // download, so rebuild from the cache already held.
         var supplementsChanged = learned.Revision != seenLearnedRevision || wiki.Revision != seenWikiRevision;
 
         LootCacheFile? incoming;
@@ -123,6 +123,33 @@ public sealed class LootDataService : IDisposable
             Plugin.Log.Error(ex, "Could not build the loot dataset");
             StatusMessage = $"Loot data could not be processed: {ex.Message}";
         }
+    }
+
+    /// <summary>
+    /// Deletes the downloaded copy and fetches it again from scratch.
+    /// </summary>
+    /// <remarks>
+    /// The ETags go with the file, which is the difference between this and the update check: that one
+    /// asks "changed?" and is told no, so a dataset that is on disk wrongly - truncated, or written by
+    /// a version that read it differently - can never be dislodged by it.
+    ///
+    /// What is already built stays live until the replacement lands. Emptying it would leave the duty
+    /// list and the picker built from a dataset the service says it does not have, and a download that
+    /// then failed would have cost the user their offline copy for nothing.
+    /// </remarks>
+    public void Forget()
+    {
+        lock (sync)
+        {
+            cache = null;
+            pending = null;
+        }
+
+        JsonStore.Delete(CachePath);
+        Plugin.Log.Information("Deleted the downloaded loot data; fetching it again");
+
+        StatusMessage = "Downloaded loot data discarded; fetching it again...";
+        CheckForUpdates(force: true);
     }
 
     /// <remarks>
@@ -165,7 +192,7 @@ public sealed class LootDataService : IDisposable
                 return;
             }
 
-            // Only one of the two changed: we still need the other's body to rebuild the join.
+            // Only one of the two changed: the other's body is still needed to rebuild the join.
             var sourcesJson = sources.Body ?? (await Fetch(SourcesUrl, null, token)).Body;
             var instancesJson = instances.Body ?? (await Fetch(InstancesUrl, null, token)).Body;
 

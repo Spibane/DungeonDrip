@@ -14,6 +14,11 @@ namespace DungeonDrip.Windows;
 
 public class MissingItemsWindow : Window
 {
+    /// <summary>Heading for pieces no source is known for, and the order that puts it last.</summary>
+    private const string UnattributedLabel = "Not attributed to a boss or coffer";
+
+    private const int UnattributedOrder = int.MaxValue;
+
     private readonly Plugin plugin;
     private readonly CollectionView collection;
 
@@ -148,7 +153,7 @@ public class MissingItemsWindow : Window
         if (plugin.IsPinned)
         {
             // One button, showing where it lands rather than what it does. Unpinning goes back to
-            // tracking wherever you are, and standing anywhere without a drop list of its own - a
+            // tracking the current location, and anywhere without a drop list of its own - a
             // city, most of the time - that is the roulette advice.
             var toRoulettes = plugin.Duties?.TryGet(plugin.CurrentTerritory, out _) != true;
 
@@ -172,15 +177,29 @@ public class MissingItemsWindow : Window
 
         ImGui.SameLine();
 
-        var byRole = plugin.Configuration.Grouping == MissingGrouping.Role;
-        if (UiParts.ToolButton(
-                "##grouping",
-                byRole ? FontAwesomeIcon.PeopleGroup : FontAwesomeIcon.Vest,
-                byRole
-                    ? "Grouped by who can roll Need. Click to group by equipment slot."
-                    : "Grouped by equipment slot. Click to group by who can roll Need."))
+        // One button through three states rather than three buttons: it is one choice, and each
+        // click's destination is named in the tooltip so the cycle is not something to discover.
+        var grouping = plugin.Configuration.Grouping;
+        var (groupingIcon, groupingTooltip) = grouping switch
         {
-            plugin.Configuration.Grouping = byRole ? MissingGrouping.Slot : MissingGrouping.Role;
+            MissingGrouping.Role => (FontAwesomeIcon.PeopleGroup,
+                "Grouped by who can roll Need. Click to group by the boss that drops each piece."),
+            MissingGrouping.Source => (FontAwesomeIcon.Skull,
+                "Grouped by boss and coffer, as far as the wiki lookup for this duty knows. " +
+                "Click to group by equipment slot."),
+            _ => (FontAwesomeIcon.Vest,
+                "Grouped by equipment slot. Click to group by who can roll Need."),
+        };
+
+        if (UiParts.ToolButton("##grouping", groupingIcon, groupingTooltip))
+        {
+            plugin.Configuration.Grouping = grouping switch
+            {
+                MissingGrouping.Slot => MissingGrouping.Role,
+                MissingGrouping.Role => MissingGrouping.Source,
+                _ => MissingGrouping.Slot,
+            };
+
             plugin.Configuration.Save();
             plugin.InvalidateReport();
         }
@@ -251,11 +270,11 @@ public class MissingItemsWindow : Window
     }
 
     /// <summary>
-    /// What to queue as, shown while you are not standing in a duty we have loot for.
+    /// What to queue as, shown while outside any duty with loot data.
     /// </summary>
     /// <remarks>
     /// This is the window's whole content in a city, where the missing list has nothing to say -
-    /// so it answers the question you would otherwise have to open the window in a dungeon to ask.
+    /// so it answers the question that would otherwise need the window opened in a dungeon to ask.
     /// Suppressed without a dresser snapshot, where every piece would read as uncollected and the
     /// table would confidently recommend nonsense.
     /// </remarks>
@@ -391,15 +410,15 @@ public class MissingItemsWindow : Window
     /// </summary>
     /// <remarks>
     /// Always counts by role, even when the list is grouped by slot - "what should I chase here" is
-    /// a different question from how you want the list arranged. Ties are reported as ties rather
-    /// than silently picking one, which is the common case on a duty you have barely run.
+    /// a different question from how the list is arranged. Ties are reported as ties rather than
+    /// silently picking one, which is the common case on a barely-run duty.
     /// </remarks>
     private void DrawRoleFocus(DutyReport report)
     {
         if (!plugin.Configuration.ShowRoleSummary || report.MissingCount == 0)
             return;
 
-        var byRole = BuildGroups([.. report.Items.Where(item => !item.IsOwned)], true)
+        var byRole = BuildGroups([.. report.Items.Where(item => !item.IsOwned)], MissingGrouping.Role)
             .Select(bucket => (bucket.Group.Label, bucket.Group.Order, Count: bucket.MissingCount))
             .Where(entry => entry.Count > 0)
             .OrderByDescending(entry => entry.Count)
@@ -445,9 +464,14 @@ public class MissingItemsWindow : Window
     /// Broader headings are only folded into narrower ones that some item already created in this
     /// duty. A blind subset rule would conjure a "Melee DPS (DRG)" heading out of a legacy sheet row
     /// and fill it with nothing but shared accessories.
+    ///
+    /// Source view duplicates for its own reason: a piece in two coffers is genuinely in both, and the
+    /// question being asked - what comes out of this - wants it under each. Pieces nothing attributes
+    /// share one heading at the end, which on a duty with no wiki lookup is the whole list.
     /// </remarks>
-    private static List<Bucket> BuildGroups(IReadOnlyList<ReportItem> items, bool byRole)
+    private static List<Bucket> BuildGroups(IReadOnlyList<ReportItem> items, MissingGrouping grouping)
     {
+        var byRole = grouping == MissingGrouping.Role;
         var buckets = new Dictionary<string, Bucket>();
 
         Bucket Ensure(RoleGroup group)
@@ -460,14 +484,27 @@ public class MissingItemsWindow : Window
 
         foreach (var item in items)
         {
-            if (byRole)
+            switch (grouping)
             {
-                foreach (var group in item.RoleGroups)
-                    Ensure(group).Add(item);
-            }
-            else
-            {
-                Ensure(new RoleGroup(item.SlotOrder, item.SlotName, string.Empty)).Add(item);
+                case MissingGrouping.Role:
+                    foreach (var group in item.RoleGroups)
+                        Ensure(group).Add(item);
+
+                    break;
+
+                case MissingGrouping.Source when item.Origins.Count > 0:
+                    foreach (var origin in item.Origins)
+                        Ensure(new RoleGroup(origin.Order, origin.Label, string.Empty)).Add(item);
+
+                    break;
+
+                case MissingGrouping.Source:
+                    Ensure(new RoleGroup(UnattributedOrder, UnattributedLabel, string.Empty)).Add(item);
+                    break;
+
+                default:
+                    Ensure(new RoleGroup(item.SlotOrder, item.SlotName, string.Empty)).Add(item);
+                    break;
             }
         }
 
@@ -511,14 +548,27 @@ public class MissingItemsWindow : Window
     {
         var configuration = plugin.Configuration;
         var showOwned = configuration.ShowOwnedItems;
-        var byRole = configuration.Grouping == MissingGrouping.Role;
 
         using var child = ImRaii.Child("itemList", Vector2.Zero, false);
         if (!child.Success)
             return;
 
+        // Said once above the list rather than on the one heading it would otherwise appear as. A duty
+        // the downloaded dataset covers alone has no per-boss tables behind it, and a list that simply
+        // says "not attributed" reads as the grouping being broken.
+        if (configuration.Grouping == MissingGrouping.Source && !report.HasOrigins)
+        {
+            ImGui.TextColored(Palette.Warning,
+                "Nothing here is attributed to a boss or coffer yet.");
+            ImGui.TextColored(Palette.Muted,
+                configuration.UseWikiSource
+                    ? "Only the wiki says where inside a duty a piece drops, and this duty has no lookup yet."
+                    : "Only the wiki says where inside a duty a piece drops, and it is switched off under Data.");
+            ImGui.Spacing();
+        }
+
         var visible = report.Items.Where(item => showOwned || !item.IsOwned).ToList();
-        var groups = BuildGroups(visible, byRole);
+        var groups = BuildGroups(visible, configuration.Grouping);
 
         if (groups.Count == 0)
         {
@@ -583,6 +633,7 @@ public class MissingItemsWindow : Window
         ImGui.Text(MissingItems.Describe(item.Source));
         ImGui.TextColored(Palette.Muted, ProvenanceDescription(item.Provenance));
 
+        DrawOrigins(item);
         DrawOutfitMembership(item.ItemId);
 
         ImGui.Spacing();
@@ -590,12 +641,30 @@ public class MissingItemsWindow : Window
     }
 
     /// <summary>
+    /// Where inside the duty the piece comes from, when anything knows.
+    /// </summary>
+    /// <remarks>
+    /// Silent when nothing does, which is most of the time. "Drops from: unknown" would be a line
+    /// spent on the absence of a line, and worse, it reads as a claim that the piece drops from no
+    /// boss - whereas all it means is that the wiki was never asked about this duty.
+    /// </remarks>
+    private static void DrawOrigins(ReportItem item)
+    {
+        if (item.Origins.Count == 0)
+            return;
+
+        ImGui.TextColored(Palette.Focus, item.Origins.Count == 1
+            ? $"Drops from: {item.Origins[0].Label}"
+            : $"Drops from: {string.Join(", ", item.Origins.Select(origin => origin.Label))}");
+    }
+
+    /// <summary>
     /// Lists the outfit sets a piece belongs to and where each one stands.
     /// </summary>
     /// <remarks>
-    /// Three states, not two. A set can be sitting in your dresser with this particular slot empty,
-    /// which reads as "not stored" if you only check whether the piece is accounted for - but the
-    /// fix is different: you top up the set you already have rather than hunting the whole outfit.
+    /// Three states, not two. A set can be sitting in the dresser with this particular slot empty,
+    /// which reads as "not stored" to a check that only asks whether the piece is accounted for - but
+    /// the fix is different: top up the set already held rather than hunt the whole outfit.
     /// </remarks>
     private void DrawOutfitMembership(uint itemId)
     {

@@ -9,7 +9,7 @@ using DungeonDrip.Core;
 namespace DungeonDrip.Windows;
 
 /// <summary>
-/// The main window's other half: your collection as a whole, with no duty involved.
+/// The main window's other half: the collection as a whole, with no duty involved.
 /// </summary>
 /// <remarks>
 /// Composed into <see cref="MissingItemsWindow"/> rather than being a window of its own. That one is
@@ -81,7 +81,7 @@ public sealed class CollectionView(Plugin plugin)
         var ownershipMoved = plugin.Ownership.Revision != seenOwnershipRevision || inputs != seenInputs;
 
         // One pass over the containers, no allocation, and the only thing that notices a piece
-        // leaving your bags when the tracker has no reason to look.
+        // leaving the bags when the tracker has no reason to look.
         var inventory = Game.InventoryReader.Fingerprint();
         var inventoryMoved = inventory != seenInventory;
 
@@ -94,9 +94,13 @@ public sealed class CollectionView(Plugin plugin)
 
         var ownership = plugin.Ownership.Current;
 
-        // Carried gear is the collection compared against the bags, so either side moving rebuilds it.
+        // Held gear is the collection compared against everywhere something is merely held, so
+        // either side moving rebuilds it. The retainers go in regardless of whether they are being
+        // counted as owning a piece, for the same reason the bags do: that setting decides what makes
+        // a piece collected, and this section is about the holdings themselves either way.
         carried = CarriedGear.Build(
-            Game.InventoryReader.ReadDetailed(), ownership, plugin.Outfits, plugin.Storage);
+            Game.InventoryReader.ReadDetailed(), plugin.Ownership.Retainers,
+            ownership, plugin.Outfits, plugin.Storage);
 
         if (!ownershipMoved)
             return;
@@ -116,6 +120,8 @@ public sealed class CollectionView(Plugin plugin)
             configuration.Scope,
             configuration.OutfitOwnership,
             configuration.CountInventoryAndEquipped,
+            configuration.CountRetainers,
+            configuration.CountRetainerEquipped,
             configuration.HideWeapons,
             configuration.OnlyCurrentJobEquippable,
             configuration.OnlyCurrentGenderEquippable,
@@ -123,7 +129,7 @@ public sealed class CollectionView(Plugin plugin)
     }
 
     /// <summary>
-    /// Outfit sets you are part way through, closest to done first.
+    /// Outfit sets part way through, closest to done first.
     /// </summary>
     /// <remarks>
     /// One count per row. Reporting the dresser copy's filled slots beside it was tried and read as
@@ -228,10 +234,10 @@ public sealed class CollectionView(Plugin plugin)
     /// The capacity read off the client is the box's structural size, which is not the same as how
     /// many slots a given character has actually unlocked, and the client offers no way to tell. So
     /// a bare count is the claim that can always be stood behind; the "of N" is worded as the most
-    /// the box can hold rather than as the room you have.
+    /// the box can hold rather than as the room left.
     ///
-    /// A stale snapshot only ever undercounts, because you add to a dresser far more often than you
-    /// take from it, so the number is prefixed rather than suppressed.
+    /// A stale snapshot only ever undercounts, because a dresser is added to far more often than it is
+    /// taken from, so the number is prefixed rather than suppressed.
     /// </remarks>
     private void DrawOccupancy(DresserPressureReport report)
     {
@@ -269,7 +275,7 @@ public sealed class CollectionView(Plugin plugin)
         foreach (var set in report.Collapsible)
         {
             // Conditional on purpose. Storing a set needs the outfit item - a tradeable attire box -
-            // and owning all eleven pieces does not give you one; plenty of sets have no such item
+            // and owning all eleven pieces does not produce one; plenty of sets have no such item
             // at all. Telling someone to do something they may have no way to do is worse than
             // telling them what it would be worth if they could.
             var line = set.HoldingOutfitItem
@@ -343,13 +349,17 @@ public sealed class CollectionView(Plugin plugin)
     }
 
     /// <summary>
-    /// Gear you are carrying that the collection already holds.
+    /// Merely held gear that the collection already holds.
     /// </summary>
     /// <remarks>
     /// The heading is "already in your collection" rather than "safe to discard", and that is the
     /// whole design of the section. It reports a fact the plugin can stand behind - this piece is
     /// also in a box - and leaves the conclusion to the reader, because the conclusion is
     /// irreversible and is being drawn from a snapshot that may be days old.
+    ///
+    /// Retainers are one of the places looked at, not one of the boxes compared against. A piece with
+    /// a retainer is no more wearable as a glamour than one in a bag, so it belongs on the left of
+    /// this question rather than the right.
     /// </remarks>
     private void DrawAlreadyStored()
     {
@@ -365,38 +375,120 @@ public sealed class CollectionView(Plugin plugin)
 
         var stale = plugin.Ownership.IsDresserStale;
 
-        // Where the list comes from, which is not guessable from its contents and changes what an
-        // empty one means. Trimmed away with the rest of this section's text and put straight back:
-        // it was the one line that was saying something rather than explaining something.
-        ImGui.TextColored(Palette.Muted, "From your bags, armoury chest and saddlebag.");
+        // The premise, then where it reads from. Both are worth the two lines: the premise is what a
+        // row is reporting and was being left for the reader to infer from a location heading and a
+        // trailing clause, and where it reads from is not guessable from the contents and changes what
+        // an empty list means.
+        ImGui.TextColored(Palette.Muted, "Every row is two copies of one piece:");
+
+        ImGui.TextColored(Palette.Muted, plugin.Ownership.Retainers.Count > 0
+            ? "one in your bags, armoury chest, saddlebag or with a retainer, and one the collection has."
+            : "one in your bags, armoury chest or saddlebag, and one the collection has.");
 
         if (carried.AlreadyStored.Count == 0 && carried.OnlyInsideAnOutfit.Count == 0)
         {
-            ImGui.TextColored(Palette.Good, "Nothing there is already stored.");
+            ImGui.TextColored(Palette.Good, "Nothing held has a second copy in the collection.");
             DrawCaveats(stale);
             return;
         }
 
-        DrawCarriedGroup(
-            "In your bags", carried.AlreadyStored.Where(piece => piece.Location == CarryLocation.Bags),
-            null, stale);
+        DrawCarriedGroup("In your bags", HeldIn(CarryLocation.Bags), null, stale);
 
         DrawCarriedGroup(
-            "In your armoury chest",
-            carried.AlreadyStored.Where(piece => piece.Location == CarryLocation.Armoury),
+            "In your armoury chest", HeldIn(CarryLocation.Armoury),
             "A gearset may be using these.", stale);
 
-        DrawCarriedGroup(
-            "In your saddlebag",
-            carried.AlreadyStored.Where(piece => piece.Location == CarryLocation.Saddlebag),
-            null, stale);
+        DrawCarriedGroup("In your saddlebag", HeldIn(CarryLocation.Saddlebag), null, stale);
 
-        DrawCarriedGroup(
-            "Only inside a stored outfit", carried.OnlyInsideAnOutfit,
-            "Removing the set empties the slot.", stale);
+        DrawRetainerGroups(stale);
 
         DrawCaveats(stale);
     }
+
+    /// <summary>
+    /// Everything held in one place that the collection accounts for, however it accounts for it.
+    /// </summary>
+    /// <remarks>
+    /// The two halves of the report are merged here rather than drawn as two tiers, which is how this
+    /// section used to work and was the one confusing thing in it. Every heading answers "where is
+    /// this" - bags, armoury chest, saddlebag, one per retainer - except that the outfit tier answered
+    /// "how is this accounted for" instead, so a piece in the armoury chest held only inside a stored
+    /// outfit appeared under a heading that never said armoury, below the other headings, reading like
+    /// one more place to look.
+    ///
+    /// One axis, then: the heading is the place, and how the collection accounts for a piece is said on
+    /// the row. Nothing is lost, because the row already carried that sentence - it is now the only
+    /// thing saying it, and the outfit case is coloured because its second copy is a conditional one.
+    /// </remarks>
+    private IEnumerable<CarriedPiece> HeldIn(CarryLocation location) =>
+        carried!.AlreadyStored
+            .Concat(carried.OnlyInsideAnOutfit)
+            .Where(piece => piece.Location == location)
+            .OrderBy(piece => piece.SlotOrder)
+            .ThenBy(piece => piece.Name, System.StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// A heading per retainer holding something the collection accounts for.
+    /// </summary>
+    /// <remarks>
+    /// Named rather than lumped into one retainer heading, because the whole difficulty with a spare
+    /// copy at a retainer is which retainer, and a list that will not say leaves all of them to check.
+    /// Ordered by name here rather than by how stale the snapshot is, which is what the Data tab sorts
+    /// by: this is a list to find a name in.
+    /// </remarks>
+    private void DrawRetainerGroups(bool stale)
+    {
+        foreach (var group in ByRetainer(CarryLocation.Retainer))
+        {
+            DrawCarriedGroup(
+                $"In {Possessive(group.Key)} bags", group,
+                "Only reachable at a bell, and only as fresh as your last visit.", stale);
+        }
+
+        // Separate headings, and this is the whole point of the split. "With Ysayle" for a coat Ysayle
+        // is wearing is a true sentence that leads to seven pages of her bags being searched for it.
+        foreach (var group in ByRetainer(CarryLocation.RetainerEquipped))
+        {
+            DrawCarriedGroup(
+                $"Worn by {Name(group.Key)}", group,
+                "On the retainer, not in their bags - and their gear decides what ventures bring back.",
+                stale);
+        }
+    }
+
+    private IEnumerable<IGrouping<string, CarriedPiece>> ByRetainer(CarryLocation location) =>
+        HeldIn(location)
+            .GroupBy(piece => piece.Holder)
+            .OrderBy(group => group.Key, System.StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// A retainer's name, with somewhere to fall back to.
+    /// </summary>
+    /// <remarks>
+    /// The name comes from the client and is never blank in practice, but a heading reading "Worn by"
+    /// would be a puzzle rather than a row.
+    /// </remarks>
+    private static string Name(string holder) => holder.Length > 0 ? holder : "a retainer";
+
+    /// <summary>The same as a possessive, since "In Ysayle's bags" is the heading that reads.</summary>
+    private static string Possessive(string holder) =>
+        holder.Length == 0 ? "a retainer's" : holder.EndsWith('s') ? $"{holder}'" : $"{holder}'s";
+
+    /// <summary>
+    /// Where the collection's copy is, as the other half of a sentence about two of them.
+    /// </summary>
+    /// <remarks>
+    /// Not <see cref="MissingItems.Describe"/>, which is written for a surface asking "do I have this"
+    /// and answers in one place. Here both copies are being named at once, so each needs to say the
+    /// Glamour Dresser out loud - "part of a stored outfit set" on its own never mentions the box the
+    /// set is sitting in, which is the thing a reader is trying to place.
+    /// </remarks>
+    private static string SecondCopy(OwnershipSource source) => source switch
+    {
+        OwnershipSource.Armoire => "There is a second in your Armoire.",
+        OwnershipSource.Outfit => "There is a second in your Glamour Dresser, inside a stored outfit set.",
+        _ => "There is a second in your Glamour Dresser.",
+    };
 
     private void DrawCarriedGroup(
         string label, IEnumerable<CarriedPiece> pieces, string? note, bool stale)
@@ -421,15 +513,36 @@ public sealed class CollectionView(Plugin plugin)
             var hovered = ImGui.IsItemHovered();
             UiParts.ItemContextMenu(plugin, piece.ItemId, piece.Name);
 
+            // "also", because that word is the whole row. Every piece here exists twice - the one being
+            // held, under the heading that says where, and a second the collection has - and without it
+            // the row reads as a claim about where this copy is, which the heading has already answered.
+            var insideOutfit = piece.StoredIn == OwnershipSource.Outfit;
+
             ImGui.SameLine();
-            ImGui.TextColored(Palette.Muted, $"- {MissingItems.Describe(piece.StoredIn).ToLowerInvariant()}");
+            ImGui.TextColored(
+                insideOutfit ? Palette.Warning : Palette.Muted,
+                $"- also {MissingItems.Describe(piece.StoredIn).ToLowerInvariant()}");
 
             if (!hovered)
                 continue;
 
             using var tooltip = ImRaii.Tooltip();
             ImGui.Text(piece.Name);
-            ImGui.TextColored(Palette.Muted, MissingItems.Describe(piece.StoredIn));
+
+            // Both places, in the hover, even though the heading has one of them. A tooltip that
+            // repeated only the collection half never said what the row is actually reporting - two
+            // copies, and here is each one.
+            ImGui.TextColored(Palette.Muted, $"{label}.");
+            ImGui.TextColored(Palette.Muted, SecondCopy(piece.StoredIn));
+
+            if (insideOutfit)
+            {
+                // Why this one is amber rather than grey. The dresser's copy is not a piece sitting in
+                // the box, it is a slot of a whole set sitting in the box, so it is only there for as
+                // long as the set is - which the two flat statements above cannot say on their own.
+                ImGui.TextColored(Palette.Warning,
+                    "That second copy belongs to the set, so taking the set out takes it too.");
+            }
 
             if (piece.ArmoireWouldTake)
                 ImGui.TextColored(Palette.Muted, "The Armoire would take this too.");
@@ -455,9 +568,22 @@ public sealed class CollectionView(Plugin plugin)
                 $"Dresser snapshot {Format.Age(plugin.Ownership.DresserUpdatedUtc!.Value)} old.");
         }
 
-        ImGui.TextColored(Palette.Muted, carried!.SaddlebagReadable
-            ? "Retainers not counted."
-            : "Retainers not counted. Saddlebag unreadable away from a bell.");
+        // What the amber rows mean, said only when there are some. The row itself says which pieces
+        // they are and the hover says what to do about it; this is here so the colour is not a thing
+        // to work out.
+        if (carried!.OnlyInsideAnOutfit.Count > 0)
+        {
+            ImGui.TextColored(Palette.Muted,
+                "Amber: the second copy is a slot of a stored outfit set rather than a piece of its own.");
+        }
+
+        if (!carried.SaddlebagReadable)
+            ImGui.TextColored(Palette.Muted, "Saddlebag unreadable away from a bell.");
+
+        // Which retainers this could not look at, since an unvisited one is indistinguishable from an
+        // empty one on the list itself.
+        if (plugin.Ownership.Retainers.Count == 0)
+            ImGui.TextColored(Palette.Muted, "No retainer has been read - open one at a bell to include it.");
     }
 
     /// <summary>A collapsible heading whose state survives a restart, as the duty list's do.</summary>
@@ -492,6 +618,8 @@ public sealed class CollectionView(Plugin plugin)
         CollectionScope Scope,
         OutfitOwnershipMode Outfits,
         bool CountInventory,
+        bool CountRetainers,
+        bool CountRetainerEquipped,
         bool HideWeapons,
         bool JobOnly,
         bool GenderOnly,

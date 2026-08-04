@@ -11,7 +11,7 @@ namespace DungeonDrip.Windows;
 
 /// <summary>
 /// A small window that rides alongside the Need/Greed roll window, marking which of the items up
-/// for roll you do not own yet.
+/// for roll are not collected yet.
 /// </summary>
 /// <remarks>
 /// Deliberately a separate window rather than recolouring the loot addon's own nodes. Several
@@ -26,8 +26,8 @@ public sealed unsafe class LootCompanionWindow : Window
     private readonly Plugin plugin;
 
     /// <summary>
-    /// Our own width, measured at the end of the last frame. PreDraw runs before this window's
-    /// Begin, so ImGui's current-window queries are not ours to ask there.
+    /// This window's own width, measured at the end of the last frame. PreDraw runs before its
+    /// Begin, so ImGui's current-window queries cannot be asked there.
     /// </summary>
     private float lastWidth = 220f;
 
@@ -110,7 +110,7 @@ public sealed unsafe class LootCompanionWindow : Window
             if (itemId == 0 || kind == ItemKind.EventItem || !items.TryGetRow(itemId, out var item))
                 continue;
 
-            // Only what the chosen store can hold; the rest of the roll list is not our business.
+            // Only what the chosen store can hold; the rest of the roll list is not this plugin's business.
             var storage = plugin.Storage;
             if (!storage.MatchesScope(storage.Of(item), plugin.Configuration.Scope))
                 continue;

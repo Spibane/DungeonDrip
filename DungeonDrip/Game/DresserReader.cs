@@ -16,7 +16,7 @@ public sealed class DresserSnapshot
 
     /// <summary>
     /// Every outfit set sitting in the box, whether or not its slots are filled. Lets the UI say
-    /// "you have that outfit but this piece is missing from it" rather than just "not stored".
+    /// "that outfit is stored but this piece is missing from it" rather than just "not stored".
     /// </summary>
     public HashSet<uint> StoredOutfits { get; init; } = [];
 
@@ -36,8 +36,8 @@ public sealed class DresserSnapshot
     /// Hash of the raw box this was read from, for telling "read again" from "changed".
     /// </summary>
     /// <remarks>
-    /// The box stays loaded until you zone, so it is re-read every second from the moment you open a
-    /// dresser. Without something to compare, each of those reads looked like news and rewrote the
+    /// The box stays loaded until the next zone change, so it is re-read every second from the moment a
+    /// dresser is opened. Without something to compare, each of those reads looked like news and rewrote the
     /// cache file. Taken over the raw ids rather than the derived sets because it is the input: equal
     /// input, equal output, and it costs one multiply-add per slot on a read that was happening
     /// anyway. Zero for a snapshot restored from disk, which is what makes the first live read save.
@@ -63,8 +63,8 @@ public static unsafe class DresserReader
     /// </summary>
     /// <returns><c>null</c> when the client has no dresser data loaded right now.</returns>
     /// <remarks>
-    /// MirageManager clears this data on every zone change and only repopulates it after you
-    /// interact with a dresser, which is why the caller caches the result to disk.
+    /// MirageManager clears this data on every zone change and only repopulates it once a dresser has
+    /// been interacted with, which is why the caller caches the result to disk.
     /// </remarks>
     public static DresserSnapshot? TryRead()
     {

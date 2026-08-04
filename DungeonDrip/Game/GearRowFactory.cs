@@ -61,7 +61,7 @@ public sealed class GearRowFactory(Plugin plugin)
         var kind = storage.Of(item);
 
         // Absence of a row must mean exactly one thing: "not glamour gear". If a dye ever appears
-        // here, absence starts reading as "you already have it" instead.
+        // here, absence starts reading as "already collected" instead.
         if (kind == StorageKind.None || !storage.MatchesScope(kind, plugin.Configuration.Scope))
             return null;
 
@@ -103,6 +103,8 @@ public sealed class GearRowFactory(Plugin plugin)
         plugin.Configuration.Scope,
         plugin.Configuration.OutfitOwnership,
         plugin.Configuration.CountInventoryAndEquipped,
+        plugin.Configuration.CountRetainers,
+        plugin.Configuration.CountRetainerEquipped,
         Plugin.PlayerState.IsLoaded ? Plugin.PlayerState.ClassJob.RowId : 0,
         Plugin.PlayerState.IsLoaded ? Plugin.PlayerState.Sex : null,
         Plugin.PlayerState.IsLoaded ? Plugin.PlayerState.Race.RowId : 0);
@@ -115,7 +117,7 @@ public sealed class GearRowFactory(Plugin plugin)
     /// Staleness is absent on purpose: it changes how a marker is drawn, not which marker it is, so
     /// an ageing snapshot never rebuilds the cache. The job, the gender and the race are here because
     /// wearability is baked into the row - the last two because a Fantasia mid-session would
-    /// otherwise leave every cached row answering for who you used to be.
+    /// otherwise leave every cached row answering for the previous appearance.
     ///
     /// Neither of the filter toggles belongs here: they decide whether a row is drawn, not what it
     /// says, so flipping one must not cost a rebuild.
@@ -126,6 +128,8 @@ public sealed class GearRowFactory(Plugin plugin)
         CollectionScope Scope,
         OutfitOwnershipMode OutfitMode,
         bool CountInventory,
+        bool CountRetainers,
+        bool CountRetainerEquipped,
         uint ClassJob,
         Sex? Sex,
         uint Race);
