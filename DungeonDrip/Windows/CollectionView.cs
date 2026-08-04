@@ -108,7 +108,7 @@ public sealed class CollectionView(Plugin plugin)
         // a piece collected, and this section is about the holdings themselves either way.
         carried = CarriedGear.Build(
             Game.InventoryReader.ReadDetailed(), plugin.Ownership.Retainers,
-            ownership, plugin.Outfits, plugin.Storage);
+            ownership, plugin.Outfits, plugin.Storage, plugin.Configuration.OutfitOwnership);
 
         if (!ownershipMoved)
             return;

@@ -159,7 +159,8 @@ public sealed unsafe class ArmoireAddWatcher : IDisposable
         // No retainers, for the reason the dresser panel has none: the subject is what can go into the
         // box being stood at, and a piece at a bell two zones away is not on that list.
         var report = CarriedGear.Build(
-            InventoryReader.ReadDetailed(), [], plugin.Ownership.Current, plugin.Outfits, plugin.Storage);
+            InventoryReader.ReadDetailed(), [], plugin.Ownership.Current, plugin.Outfits, plugin.Storage,
+            plugin.Configuration.OutfitOwnership);
 
         Duplicates = report.ArmoireDuplicates;
 

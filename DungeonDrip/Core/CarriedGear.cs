@@ -127,12 +127,16 @@ public static class CarriedGear
     /// The retainers whose bags have been read, which is allowed to be empty - and is, for the panel
     /// beside the dresser, whose subject is what can be acted on without going anywhere.
     /// </param>
+    /// <param name="outfitMode">
+    /// The user's rule for a piece a stored outfit set is holding.
+    /// </param>
     public static CarriedGearReport Build(
         IReadOnlyList<CarriedStack> carried,
         IReadOnlyList<RetainerHolding> retainers,
         OwnershipView ownership,
         OutfitCatalog outfits,
-        StorageEligibility storage)
+        StorageEligibility storage,
+        OutfitOwnershipMode outfitMode)
     {
         // The single most important line here. Every piece being considered is by definition somewhere
         // in the inventory or with a retainer, so leaving any of those in scope makes each of them own
@@ -157,13 +161,17 @@ public static class CarriedGear
             if (storable == StorageKind.None)
                 continue;
 
-            // Deliberately not the user's Scope or outfit mode. Those settings say what should count
-            // as collected when deciding whether to chase a piece; the question here is the flatter
-            // one of whether the thing is physically in a box somewhere, and the answer to that does
-            // not change because someone narrowed their duty list to the Armoire.
+            // The outfit mode is the user's, and the scope deliberately is not. Both look like the
+            // same kind of setting and are not: the scope narrows which box is being asked about, and
+            // this question is about every box - a piece in the Dresser is in a box however narrowly
+            // the duty list is looking. The outfit mode is a rule about what counts as having a piece
+            // at all, and the add list is the list that rule exists to change. Under "owned only if
+            // every outfit with that piece is stored", a piece one of its two sets is holding is one
+            // the user has said they do not have, so it belongs on the list of things to put in - and
+            // it is the same piece every other surface is already marking as not collected.
             var source = MissingItems.Resolve(
                 group.ItemId, stored, outfits.SetsContaining(group.ItemId),
-                OutfitOwnershipMode.AnyOutfit, CollectionScope.Both);
+                outfitMode, CollectionScope.Both);
 
             var (slotOrder, slotName) = EquipSlots.Describe(item.EquipSlotCategory.Value);
             var piece = new CarriedPiece(

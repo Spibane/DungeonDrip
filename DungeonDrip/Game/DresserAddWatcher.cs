@@ -25,10 +25,12 @@ public sealed record DresserAddRow(
     CarryLocation Location,
     int Quantity,
     string? Blocked,
-    bool ArmoireWouldTake)
+    bool ArmoireWouldTake,
+    int OutfitsStored = 0,
+    int OutfitsTotal = 0)
     : HeldGearRow(
         ItemId, Name, IconId, SlotOrder, SlotName, Marker, JobEquippable, Locks,
-        Location, Quantity, Blocked);
+        Location, Quantity, Blocked, OutfitsStored, OutfitsTotal);
 
 /// <summary>
 /// Watches the Glamour Dresser and works out which carried pieces are not in it.
@@ -147,7 +149,8 @@ public sealed unsafe class DresserAddWatcher : IDisposable
         // No retainers. This panel's subject is what can go into the box being stood at, and a piece
         // two zones away with a retainer is not on that list however definitely it is owned.
         var report = CarriedGear.Build(
-            InventoryReader.ReadDetailed(), [], plugin.Ownership.Current, plugin.Outfits, plugin.Storage);
+            InventoryReader.ReadDetailed(), [], plugin.Ownership.Current, plugin.Outfits, plugin.Storage,
+            plugin.Configuration.OutfitOwnership);
 
         var built = new List<DresserAddRow>(report.NotStored.Count);
 
@@ -161,6 +164,8 @@ public sealed unsafe class DresserAddWatcher : IDisposable
             var row = plugin.Rows.Row(piece.ItemId);
             if (row == null)
                 continue;
+
+            var (outfitsStored, outfitsTotal) = Shortfall(piece);
 
             built.Add(new DresserAddRow(
                 row.ItemId,
@@ -179,12 +184,35 @@ public sealed unsafe class DresserAddWatcher : IDisposable
                 piece.Location,
                 piece.Quantity,
                 BlockedReason(piece),
-                piece.ArmoireWouldTake));
+                piece.ArmoireWouldTake,
+                outfitsStored,
+                outfitsTotal));
         }
 
         Plugin.Log.Debug($"Dresser panel: {built.Count} carried pieces are not stored.");
         return built;
     }
+
+    /// <summary>
+    /// How many of the outfit sets using this piece are stored holding it, when that is the reason it
+    /// is on the list at all. Zeroes otherwise.
+    /// </summary>
+    /// <remarks>
+    /// Asked here rather than taken off the factory's row, which zeroes it for anyone counting their
+    /// bags as owning a piece: there a carried piece resolves to the bags, and a shortfall is only
+    /// reported against a piece nothing owns at all. The verdict handed in is the one this panel is
+    /// built on - no box has this - so the numbers survive that setting.
+    ///
+    /// The user's scope and outfit mode go in unchanged, so the numbers appear exactly when the rule
+    /// they describe is the one in force.
+    /// </remarks>
+    private (int Stored, int Total) Shortfall(CarriedPiece piece) => MissingItems.Shortfall(
+        piece.ItemId,
+        plugin.Ownership.Current,
+        plugin.Outfits.SetsContaining(piece.ItemId),
+        piece.StoredIn,
+        plugin.Configuration.OutfitOwnership,
+        plugin.Configuration.Scope);
 
     /// <summary>
     /// Why the box would refuse this piece today, if it would.
