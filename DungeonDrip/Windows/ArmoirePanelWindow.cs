@@ -13,6 +13,10 @@ namespace DungeonDrip.Windows;
 /// not, and the only way to find out is to try it and be told no. This is the missing column - held
 /// gear the Armoire genuinely has not got.
 ///
+/// The store screen only. The Armoire's own window is a list of what is in there already, which is a
+/// question it answers on its own, so a panel beside it would be answering something nobody standing
+/// at it asked.
+///
 /// No staleness warning, and that is not an oversight: see
 /// <see cref="AddonPanelWindow.DependsOnDresserSnapshot"/>. Nor a slot header, because the Armoire has
 /// no capacity - what it holds is decided by the game's Cabinet sheet, so nothing here is a choice
@@ -23,7 +27,7 @@ public sealed class ArmoirePanelWindow(Plugin plugin)
 {
     protected override PanelSettings Settings => Plugin.Configuration.ArmoirePanel;
 
-    protected override string? AnchorAddonName => Plugin.Armoire.AnchorAddon;
+    protected override string AnchorAddonName => Game.ArmoireAddWatcher.AddonName;
 
     protected override IReadOnlyList<GearRow>? ResolveRows() => Plugin.Armoire.Resolve();
 

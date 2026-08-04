@@ -190,10 +190,12 @@ like one that is not — and the only way to find out is to pick it and be told 
 The header says how many of the pieces on the character the Armoire already has, which is the number
 that screen will not give.
 
-Both Armoire screens get the panel — the store list and the Armoire's own window — since they are one
-place and the answer is the same at both. Markers, the amber rows and the two toolbar buttons work as
-they do at the dresser, and those two buttons are the same setting on both panels: gear a gearset is
-using is using it whichever box is being stood at.
+**The Store an item screen only.** The Armoire's own window lists what is in there already, which is a
+question it answers by itself.
+
+Markers, the amber rows and the two toolbar buttons work as they do at the dresser, and those two
+buttons are the same setting on both panels: gear a gearset is using is using it whichever box is being
+stood at.
 
 There is **no header about how full it is and no snapshot warning**, and neither is an omission. The
 Armoire has no capacity — what it holds is decided by the game's own Cabinet sheet, so which pieces to
