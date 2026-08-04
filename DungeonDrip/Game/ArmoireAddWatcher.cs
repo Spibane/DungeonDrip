@@ -12,8 +12,8 @@ namespace DungeonDrip.Game;
 /// Watches the Armoire and works out which held pieces it has not got.
 /// </summary>
 /// <remarks>
-/// The gap this fills is in the game's own screen rather than in the plugin's knowledge. The store
-/// list shows what the Armoire <em>can</em> take, which is a fact about the item and not about the
+/// The gap this fills is in the game's own "store an item" screen rather than in the plugin's
+/// knowledge. That list shows what the Armoire <em>can</em> take, which is a fact about the item and not about the
 /// character: a piece already deposited is listed exactly as one that is not, and the refusal comes
 /// only on the attempt, one piece at a time. So the question "what is left to put in" cannot be
 /// answered by reading the screen, however carefully.
@@ -33,66 +33,38 @@ public sealed unsafe class ArmoireAddWatcher : IDisposable
     /// The "store an item" screen - a category dropdown over a grid of what the Armoire accepts.
     /// </summary>
     /// <remarks>
-    /// This is the screen the panel exists for, and the one whose list cannot be trusted to mean
-    /// anything about this character.
+    /// Only this screen, not the Armoire's own window beside it. That one is a list of what is already
+    /// in there, which is a question it answers perfectly well on its own; the panel exists for the
+    /// screen whose list cannot be trusted to mean anything about this character.
     /// </remarks>
-    public const string StoreAddonName = "Cabinet";
-
-    /// <summary>The Armoire's own window, with a radio button per category and the search box.</summary>
-    /// <remarks>
-    /// Anchored to as well, because the two screens are one place and the answer is the same at both:
-    /// somebody reading what is in the Armoire is the same person deciding what still has to go in.
-    /// The store screen wins when both are up, since that is where the list is being acted on.
-    /// </remarks>
-    public const string WithdrawAddonName = "CabinetWithdraw";
+    public const string AddonName = "Cabinet";
 
     private readonly Plugin plugin;
 
     private List<HeldGearRow>? rows;
     private int seenRowRevision = -1;
     private ulong seenInventory;
-    private bool storeOpen;
-    private bool withdrawOpen;
     private (bool Armoury, bool Equipped) seenFilters = (true, true);
 
     /// <summary>
-    /// When the Armoire was opened, as the earliest a read of it can be trusted to describe now.
+    /// When the store screen was opened, as the earliest a read of the Armoire can describe now.
+    /// Null while it is closed.
     /// </summary>
-    /// <remarks>
-    /// Set on the first of the two windows to come up and kept across the other opening and closing,
-    /// so stepping between the store screen and the list does not start the wait again. Null while
-    /// neither is open.
-    /// </remarks>
     private DateTime? openedUtc;
 
     public ArmoireAddWatcher(Plugin plugin)
     {
         this.plugin = plugin;
 
-        foreach (var addon in Addons)
-        {
-            Plugin.AddonLifecycle.RegisterListener(AddonEvent.PostSetup, addon, OnOpened);
-            Plugin.AddonLifecycle.RegisterListener(AddonEvent.PreFinalize, addon, OnClosed);
-        }
+        Plugin.AddonLifecycle.RegisterListener(AddonEvent.PostSetup, AddonName, OnOpened);
+        Plugin.AddonLifecycle.RegisterListener(AddonEvent.PreFinalize, AddonName, OnClosed);
     }
 
     public void Dispose()
     {
-        foreach (var addon in Addons)
-        {
-            Plugin.AddonLifecycle.UnregisterListener(AddonEvent.PostSetup, addon, OnOpened);
-            Plugin.AddonLifecycle.UnregisterListener(AddonEvent.PreFinalize, addon, OnClosed);
-        }
+        Plugin.AddonLifecycle.UnregisterListener(AddonEvent.PostSetup, AddonName, OnOpened);
+        Plugin.AddonLifecycle.UnregisterListener(AddonEvent.PreFinalize, AddonName, OnClosed);
     }
-
-    private static string[] Addons => [StoreAddonName, WithdrawAddonName];
-
-    /// <summary>Which Armoire window the panel should sit beside, or null while there is none.</summary>
-    /// <remarks>
-    /// Written by <see cref="Resolve"/> rather than worked out on demand, so the panel is anchored to
-    /// the same window the rows were checked against in the same frame.
-    /// </remarks>
-    public string? AnchorAddon { get; private set; }
 
     /// <summary>
     /// How many held pieces the Armoire already has - the ones its own list will offer and refuse.
@@ -113,8 +85,11 @@ public sealed unsafe class ArmoireAddWatcher : IDisposable
         if (!plugin.Configuration.ArmoirePanel.Enabled || Plugin.GameGui.GameUiHidden)
             return null;
 
-        var addon = VisibleAddon();
-        if (addon == null)
+        if (openedUtc == null)
+            return Forget();
+
+        var unit = Plugin.GameGui.GetAddonByName<AtkUnitBase>(AddonName);
+        if (unit == null || !unit->IsVisible)
             return Forget();
 
         // The counterpart of the dresser watcher's PrismBoxLoaded guard, and just as load-bearing. The
@@ -132,14 +107,8 @@ public sealed unsafe class ArmoireAddWatcher : IDisposable
         //
         // Spelt out rather than compared as nullables: "never read" would come out false on either
         // side of a < and let an unread armoire through as though it were an empty one.
-        if (openedUtc == null ||
-            plugin.Ownership.ArmoireUpdatedUtc is not { } read ||
-            read < openedUtc)
-        {
+        if (plugin.Ownership.ArmoireUpdatedUtc is not { } read || read < openedUtc)
             return Forget();
-        }
-
-        AnchorAddon = addon;
 
         plugin.Rows.Revalidate();
 
@@ -157,21 +126,6 @@ public sealed unsafe class ArmoireAddWatcher : IDisposable
         seenInventory = inventory;
         rows = Build();
         return rows;
-    }
-
-    /// <summary>Whichever Armoire window is actually on screen, the store screen first.</summary>
-    private string? VisibleAddon()
-    {
-        if (storeOpen && IsVisible(StoreAddonName))
-            return StoreAddonName;
-
-        return withdrawOpen && IsVisible(WithdrawAddonName) ? WithdrawAddonName : null;
-    }
-
-    private static bool IsVisible(string addon)
-    {
-        var unit = Plugin.GameGui.GetAddonByName<AtkUnitBase>(addon);
-        return unit != null && unit->IsVisible;
     }
 
     /// <summary>
@@ -196,7 +150,6 @@ public sealed unsafe class ArmoireAddWatcher : IDisposable
     private List<HeldGearRow>? Forget()
     {
         rows = null;
-        AnchorAddon = null;
         Duplicates = 0;
         return null;
     }
@@ -266,23 +219,11 @@ public sealed unsafe class ArmoireAddWatcher : IDisposable
 
     private void OnOpened(AddonEvent type, AddonArgs args)
     {
-        Track(args.AddonName, true);
+        openedUtc = DateTime.UtcNow;
 
         // Standing at the Armoire is the one moment its flags are loaded and can be snapshotted.
         plugin.Ownership.RequestRefresh();
     }
 
-    private void OnClosed(AddonEvent type, AddonArgs args) => Track(args.AddonName, false);
-
-    private void Track(string addon, bool open)
-    {
-        if (addon == StoreAddonName)
-            storeOpen = open;
-        else if (addon == WithdrawAddonName)
-            withdrawOpen = open;
-
-        openedUtc = storeOpen || withdrawOpen
-            ? openedUtc ?? DateTime.UtcNow
-            : null;
-    }
+    private void OnClosed(AddonEvent type, AddonArgs args) => openedUtc = null;
 }
