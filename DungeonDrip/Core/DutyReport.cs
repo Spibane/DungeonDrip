@@ -52,6 +52,15 @@ public sealed class DutyReportBuilder(
     JobFilter jobFilter,
     EquipLockFilter equipLocks)
 {
+    /// <summary>
+    /// Builds one duty's list, or null when there is no loot data for that territory at all.
+    /// </summary>
+    /// <remarks>
+    /// Each filter counts what it drops separately rather than into one total, because the window
+    /// says why the list is short and the reasons want different words - a piece the current job
+    /// cannot wear, one this character never can, and a weapon the user asked not to see are three
+    /// different bits of news.
+    /// </remarks>
     public DutyReport? Build(uint territoryId, OwnershipView ownership, Configuration configuration)
     {
         if (!loot.TryGetItems(territoryId, out var itemIds))

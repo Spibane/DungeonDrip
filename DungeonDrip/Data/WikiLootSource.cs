@@ -12,8 +12,13 @@ namespace DungeonDrip.Data;
 /// <summary>What the wiki had to say about one duty, and when it was last asked.</summary>
 public sealed class WikiEntry
 {
+    /// <summary>The page actually read, after redirects. The next lookup starts from this.</summary>
     public string? Title { get; set; }
+
+    /// <summary>The page revision this was parsed from, so an unchanged page can skip the parse.</summary>
     public long RevisionId { get; set; }
+
+    /// <summary>When the wiki was last asked, whatever it said. Drives the TTLs above.</summary>
     public DateTime CheckedUtc { get; set; }
 
     /// <summary>No page could be matched. Cached so a miss is not retried on every window open.</summary>
@@ -182,6 +187,18 @@ public sealed class WikiLootSource : IDisposable
         return entry.NotFound || entry.Error != null ? age > MissTtl : age > SuccessTtl;
     }
 
+    /// <summary>
+    /// The whole lookup for one duty, on a worker thread: find the page, read it, parse it, publish.
+    /// </summary>
+    /// <remarks>
+    /// Written so that every exit produces an entry to cache, including the failures. A miss and an
+    /// error are both recorded with their own shorter lifetime, which is what stops a duty with no
+    /// page being re-fetched on every window open; only cancellation records nothing, because that is
+    /// the plugin unloading rather than an answer.
+    ///
+    /// The revision check before the parse is the reason a fortnightly refresh is cheap: an unchanged
+    /// page costs one request and keeps the parsed result.
+    /// </remarks>
     private async Task LookupAsync(
         uint territoryId,
         string dutyName,

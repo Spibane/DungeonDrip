@@ -6,6 +6,18 @@ using Dalamud.Interface.Windowing;
 
 namespace DungeonDrip.Windows;
 
+/// <summary>
+/// The settings window: every preference, plus the data resets and what the plugin knows.
+/// </summary>
+/// <remarks>
+/// Tabbed rather than one column, because the settings divide by where they are noticed - the duty
+/// window, the panels beside game windows, the entries added to game UI - and a flat list of thirty
+/// checkboxes gives no clue which of them a given surface reads.
+///
+/// Every write saves immediately rather than on a button, so there is no state to be lost by closing
+/// the window, and the tabs report back whether anything moved rather than saving themselves - one
+/// save per frame however many toggles were hit.
+/// </remarks>
 public class ConfigWindow : Window
 {
     private readonly Plugin plugin;
@@ -29,6 +41,14 @@ public class ConfigWindow : Window
     }
 
 
+    /// <summary>
+    /// Draws the tabs and saves once at the end if any of them reported a change.
+    /// </summary>
+    /// <remarks>
+    /// The report is invalidated alongside the save, unconditionally: nearly every setting here
+    /// changes what the duty list should contain, and working out which ones do not would be a
+    /// second copy of that knowledge to keep in step for no gain - a rebuild is one frame's work.
+    /// </remarks>
     public override void Draw()
     {
         var changed = false;

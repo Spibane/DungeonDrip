@@ -135,6 +135,13 @@ public abstract unsafe class AddonPanelWindow : Window
     /// <summary>Whether an empty list is a good outcome rather than a neutral one.</summary>
     protected virtual bool EmptyIsGood => false;
 
+    /// <summary>
+    /// Resolves the list and decides whether the panel appears at all, measuring it while it is here.
+    /// </summary>
+    /// <remarks>
+    /// The measurement has to happen here rather than in Draw, because PreDraw consumes the width and
+    /// runs first - measuring later would size each window's panel to the previous one's longest name.
+    /// </remarks>
     public sealed override bool DrawConditions()
     {
         rows = ResolveRows();
@@ -155,6 +162,17 @@ public abstract unsafe class AddonPanelWindow : Window
         return true;
     }
 
+    /// <summary>
+    /// Sizes the panel and parks it beside the addon, insisting only when the size on screen is not
+    /// the one wanted.
+    /// </summary>
+    /// <remarks>
+    /// The subtle half is telling the panel's own resizes from the user's. Asking for a size takes a
+    /// few frames to land, during which the window is the wrong size and a naive comparison reads
+    /// that as a drag - hence the latch that <see cref="RememberUserResize"/> waits on. Mid-drag,
+    /// nothing is insisted on at all, because insisting every frame would snap the window out from
+    /// under the gesture.
+    /// </remarks>
     public sealed override void PreDraw()
     {
         var name = AnchorAddonName;
@@ -209,6 +227,16 @@ public abstract unsafe class AddonPanelWindow : Window
         PositionCondition = ImGuiCond.Always;
     }
 
+    /// <summary>
+    /// The panel body: the subclass's header, the shared toolbar, how much to trust the snapshot,
+    /// and the grouped rows.
+    /// </summary>
+    /// <remarks>
+    /// Sealed, and the extension points are the small virtuals above it. Every panel here shows the
+    /// same thing in the same order, and the parts that genuinely differ - what to say when the list
+    /// is empty, which extra buttons there are, what a stale snapshot means at this window - are
+    /// small enough to name individually rather than let a subclass rewrite the body.
+    /// </remarks>
     public sealed override void Draw()
     {
         RememberUserResize();

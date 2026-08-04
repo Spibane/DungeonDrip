@@ -12,6 +12,21 @@ using DungeonDrip.Data;
 
 namespace DungeonDrip.Windows;
 
+/// <summary>
+/// The plugin's main window: what is missing from the duty in view, or the collection as a whole.
+/// </summary>
+/// <remarks>
+/// Two views behind one window rather than two windows, because they are read one after the other -
+/// a duty answers "what should I run for", the collection answers "what have I got" - and a second
+/// thing to open and position is a cost paid every session for a switch that is one button.
+///
+/// The spine here is duty-shaped all the way through: the title comes from the report, the window
+/// pins a territory, and it opens itself on zoning into one. The collection view is composed in
+/// rather than sharing any of that, which is what keeps it from having to pretend to be about a duty.
+///
+/// Nothing is computed here. The report is built on the framework tick and the collection view keeps
+/// its own cache, so a draw is a draw.
+/// </remarks>
 public class MissingItemsWindow : Window
 {
     /// <summary>Heading for pieces no source is known for, and the order that puts it last.</summary>
@@ -46,6 +61,10 @@ public class MissingItemsWindow : Window
         IsOpen = true;
     }
 
+    /// <summary>
+    /// Retitles the window to whatever it is about, keeping the id suffix so ImGui still recognises
+    /// it as the same window and remembers where it was put.
+    /// </summary>
     public override void PreDraw()
     {
         var report = plugin.Report;
@@ -56,6 +75,15 @@ public class MissingItemsWindow : Window
         WindowName = $"{title}###DungeonDripMain";
     }
 
+    /// <summary>
+    /// Picks which of the window's states to draw: the collection, a plea for loot data, the
+    /// roulette advice, or a duty's list.
+    /// </summary>
+    /// <remarks>
+    /// Four outcomes rather than two, because "no report" splits: outside a duty there is nothing to
+    /// report on and the roulette advice is the useful answer, whereas with no dataset at all
+    /// nothing can be said and the window has to explain why rather than look broken.
+    /// </remarks>
     public override void Draw()
     {
         DrawToolbar();
@@ -523,6 +551,14 @@ public class MissingItemsWindow : Window
         return [.. buckets.Values.OrderBy(b => b.Group.Order).ThenBy(b => b.Group.Label, StringComparer.OrdinalIgnoreCase)];
     }
 
+    /// <summary>
+    /// One role heading's rows, counting its own missing pieces and refusing duplicates.
+    /// </summary>
+    /// <remarks>
+    /// The seen set is what makes the covering pass safe: a piece can reach a heading both as its own
+    /// role and by way of a broader heading that covers it, and a heading claiming the same piece
+    /// twice would double its count as well as list it twice.
+    /// </remarks>
     private sealed class Bucket(RoleGroup group)
     {
         private readonly HashSet<uint> seen = [];

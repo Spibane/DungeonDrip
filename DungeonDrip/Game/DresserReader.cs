@@ -20,6 +20,7 @@ public sealed class DresserSnapshot
     /// </summary>
     public HashSet<uint> StoredOutfits { get; init; } = [];
 
+    /// <summary>Slots holding anything, whether a single piece or a whole set.</summary>
     public int SlotsUsed { get; init; }
 
     /// <summary>How many slots the box has room for at all.</summary>
@@ -45,6 +46,19 @@ public sealed class DresserSnapshot
     public ulong Fingerprint { get; init; }
 }
 
+/// <summary>
+/// Reads the Glamour Dresser out of the client, when the client happens to have it.
+/// </summary>
+/// <remarks>
+/// The box is a flat array of ids, and a slot can hold either a single piece or a whole outfit set -
+/// so reading it is really two jobs, and the second is the awkward one: a stored set's slots can be
+/// individually empty, so which pieces it actually accounts for has to be asked of the client rather
+/// than taken from the sheet.
+///
+/// MirageManager drops all of this on every zone change and only repopulates it once a dresser has
+/// been interacted with, which is why the caller snapshots the result to disk and why null here means
+/// "nothing loaded" rather than "empty box".
+/// </remarks>
 public static unsafe class DresserReader
 {
     /// <summary>

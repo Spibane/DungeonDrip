@@ -260,6 +260,7 @@ public static class CarriedGear
             .ThenBy(piece => piece.Name, StringComparer.OrdinalIgnoreCase),
     ];
 
+    /// <summary>One piece in one place, with however many of it are there summed.</summary>
     private readonly record struct Collapsed(
         uint ItemId, CarryLocation Location, int Quantity, string Holder);
 }

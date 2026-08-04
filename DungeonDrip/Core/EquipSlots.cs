@@ -2,6 +2,18 @@ using Lumina.Excel.Sheets;
 
 namespace DungeonDrip.Core;
 
+/// <summary>
+/// Names a piece's equipment slot and gives it a sort order.
+/// </summary>
+/// <remarks>
+/// One place, because every gear list in the plugin sorts and groups by slot and they have to agree.
+/// The order is the character sheet's - weapon down to ring - rather than the sheet's own column
+/// order, which the outfit catalogue uses and which has no waist column at all.
+///
+/// The category row carries one column per slot rather than a slot id, so the answer is a chain of
+/// tests rather than a lookup. Two-slot rings collapse into one heading: which hand a ring is on is
+/// not something a collection cares about.
+/// </remarks>
 public static class EquipSlots
 {
     private const int MainHandOrder = 0;

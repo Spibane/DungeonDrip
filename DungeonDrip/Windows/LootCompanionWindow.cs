@@ -55,6 +55,7 @@ public sealed unsafe class LootCompanionWindow : Window
         return addon != null && addon->AtkUnitBase.IsVisible && addon->NumItems > 0;
     }
 
+    /// <summary>Parks the window against whichever side of the roll window has room for it.</summary>
     public override void PreDraw()
     {
         var addon = GetLootAddon();
@@ -70,6 +71,18 @@ public sealed unsafe class LootCompanionWindow : Window
         PositionCondition = ImGuiCond.Always;
     }
 
+    /// <summary>
+    /// Lists what is up for roll and which of it is not collected, reading the addon's items afresh
+    /// each frame.
+    /// </summary>
+    /// <remarks>
+    /// No cache and no grouping, unlike the panels. The list is at most a handful of rows, it is
+    /// only on screen for the length of a roll, and anything that reorders or resizes itself mid-roll
+    /// is hostile when the reader is about to click.
+    ///
+    /// The one place in the plugin that refuses to draw its list without a dresser snapshot rather
+    /// than showing it with a warning: a roll cannot be undone and cannot be checked in the moment.
+    /// </remarks>
     public override void Draw()
     {
         lastWidth = ImGui.GetWindowWidth();

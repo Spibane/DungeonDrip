@@ -167,6 +167,15 @@ public sealed class OutfitCatalog
         return new OutfitCatalog(byPiece, bySet);
     }
 
+    /// <summary>
+    /// A set's piece in one slot, zero when the set has none there.
+    /// </summary>
+    /// <remarks>
+    /// The sheet has a named column per slot rather than an array, so an index has to be turned back
+    /// into a column. The order is the sheet's own and must stay that way: it is the bit order
+    /// <c>MirageManager.IsSetSlotUnlocked</c> and <c>RestorePrismBoxSetItem</c> use, so reordering it
+    /// would silently ask the client about the wrong slot. Note there is no waist column.
+    /// </remarks>
     public static uint GetSlotItemId(MirageStoreSetItem row, int slot) => slot switch
     {
         0 => row.MainHand.RowId,

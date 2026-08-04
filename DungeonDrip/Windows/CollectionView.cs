@@ -47,6 +47,14 @@ public sealed class CollectionView(Plugin plugin)
     /// </summary>
     private bool showAllSets;
 
+    /// <summary>
+    /// Rebuilds anything stale, then draws the three sections inside one scrolling region.
+    /// </summary>
+    /// <remarks>
+    /// The order is what the sections cost to act on: an outfit part way done is a duty to run, the
+    /// dresser section is housekeeping, and a spare copy of something already collected is the one
+    /// that ends in throwing something away.
+    /// </remarks>
     public void Draw()
     {
         Recompute();
