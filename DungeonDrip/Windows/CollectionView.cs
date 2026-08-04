@@ -22,7 +22,7 @@ namespace DungeonDrip.Windows;
 public sealed class CollectionView(Plugin plugin)
 {
     /// <summary>
-    /// Prefix on the remembered heading state, so a section can never collide with a slot or role
+    /// Prefix on the remembered heading state, so nothing here can collide with a slot or role
     /// heading from the duty list, which share the same store.
     /// </summary>
     private const string CollapsePrefix = "collection:";
@@ -506,7 +506,20 @@ public sealed class CollectionView(Plugin plugin)
             return;
 
         ImGui.Spacing();
-        ImGui.TextColored(stale ? Palette.Warning : Palette.Focus, $"{label} ({listed.Count})");
+
+        // Collapsible per place, because the places are separate errands and a full armoury chest is
+        // dozens of rows - enough to push the retainer headings below it off the bottom of the window,
+        // where somebody looking for which retainer has a spare copy will not find them. Remembered,
+        // since the chest is the one nobody wants to see again tomorrow either.
+        //
+        // The count is in the label and not in the key, so collecting something does not lose the
+        // state of the heading it is under.
+        if (!RememberedHeader(
+                $"{label} ({listed.Count})", CollapsePrefix + label,
+                stale ? Palette.Warning : Palette.Focus))
+        {
+            return;
+        }
 
         if (note != null)
             ImGui.TextColored(Palette.Muted, $"   {note}");
@@ -594,15 +607,38 @@ public sealed class CollectionView(Plugin plugin)
             ImGui.TextColored(Palette.Muted, "No retainer has been read - open one at a bell to include it.");
     }
 
-    /// <summary>A collapsible heading whose state survives a restart, as the duty list's do.</summary>
+    /// <summary>One of the three top-level sections, drawn only when it is open.</summary>
     private void Section(string label, System.Action body)
     {
-        var key = CollapsePrefix + label;
+        if (!RememberedHeader(label, CollapsePrefix + label))
+            return;
+
+        body();
+        ImGui.Spacing();
+    }
+
+    /// <summary>
+    /// A collapsing header whose state survives a restart, as the duty list's headings do.
+    /// </summary>
+    /// <remarks>
+    /// The remembered state is applied on <see cref="ImGuiCond.Appearing"/> only, so a click wins for
+    /// the rest of the session rather than being overruled on the next frame, and whatever it settles
+    /// on is written back.
+    ///
+    /// <paramref name="key"/> is separate from <paramref name="label"/> because a label carrying a
+    /// count changes as gear moves, and the state has to outlive that.
+    /// </remarks>
+    /// <returns>Whether the section's contents should be drawn.</returns>
+    private bool RememberedHeader(string label, string key, Vector4? colour = null)
+    {
         var configuration = plugin.Configuration;
         var collapsed = configuration.CollapsedGroups.Contains(key);
 
         ImGui.SetNextItemOpen(!collapsed, ImGuiCond.Appearing);
-        var open = ImGui.CollapsingHeader($"{label}###{key}");
+
+        bool open;
+        using (ImRaii.PushColor(ImGuiCol.Text, colour ?? default, colour != null))
+            open = ImGui.CollapsingHeader($"{label}###{key}");
 
         if (open == collapsed)
         {
@@ -614,11 +650,7 @@ public sealed class CollectionView(Plugin plugin)
             configuration.Save();
         }
 
-        if (!open)
-            return;
-
-        body();
-        ImGui.Spacing();
+        return open;
     }
 
     /// <summary>The settings any section reads, folded into one value so a change is one compare.</summary>
