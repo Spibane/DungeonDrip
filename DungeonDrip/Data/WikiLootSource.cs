@@ -229,6 +229,18 @@ public sealed class WikiLootSource : IDisposable
             entry.Title = page.Value.Title;
 
             var (items, unmatched, attributions) = WikiDropTables.Parse(page.Value.Text, names);
+
+            var elsewhere = await FollowToDutyPageAsync(entry.Title, items, unmatched, names, token);
+            if (elsewhere != null)
+            {
+                entry.Title = elsewhere.Value.Title;
+                (items, unmatched, attributions) = elsewhere.Value.Parsed;
+
+                // The revision belongs to whichever page was read, and the next lookup starts from
+                // the title stored here - so it has to be the article's, not the signpost's.
+                revisionId = await GetRevisionIdAsync(entry.Title, token);
+            }
+
             entry.RevisionId = revisionId;
             entry.Items = items;
             entry.UnmatchedNames = unmatched;
@@ -339,6 +351,52 @@ public sealed class WikiLootSource : IDisposable
         }
 
         return null;
+    }
+
+    /// <summary>The wiki's suffix for a duty whose plain name is taken by something else.</summary>
+    private const string DutySuffix = " (Duty)";
+
+    /// <summary>
+    /// Second look at "<c>&lt;name&gt; (Duty)</c>" when the page landed on carries no drop table.
+    /// </summary>
+    /// <remarks>
+    /// A duty named after the place it happens in does not own its own title. "Ala Mhigo" is the
+    /// city, "Alzadaal's Legacy" and "the Fell Court of Troia" are disambiguation pages, and all
+    /// three duties sit at the suffixed title with a full set of per-boss tables on them. Nothing
+    /// distinguishes those pages from a duty page cheaply - one is a hatnote, the others a template -
+    /// so the trigger is the outcome rather than the shape: a page that yielded no drop table at all
+    /// is not the page being looked for, whatever it is.
+    ///
+    /// <para>Unmatched names count as a drop table. A real duty page whose item names have drifted
+    /// out of the game's spelling is a parsing problem to be seen in the count, not a reason to go
+    /// looking for a different article.</para>
+    ///
+    /// <para>One hop, and only when there is nothing to lose by it. Three duties in the game need
+    /// this and a handful more - the Praetorium, Castrum Meridianum - genuinely drop no gear, so they
+    /// pay one request that finds no page each time their fortnight is up. That is the whole cost of
+    /// being wrong here.</para>
+    /// </remarks>
+    private async Task<(string Title, (uint[] Items, int Unmatched, LootAttribution[] Attributions) Parsed)?>
+        FollowToDutyPageAsync(
+            string title,
+            uint[] items,
+            int unmatched,
+            IReadOnlyDictionary<string, uint> names,
+            CancellationToken token)
+    {
+        if (items.Length > 0 || unmatched > 0 || title.EndsWith(DutySuffix, StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        var page = await GetWikitextAsync(title + DutySuffix, token);
+        if (page == null)
+            return null;
+
+        var parsed = WikiDropTables.Parse(page.Value.Text, names);
+        if (parsed.Items.Length == 0)
+            return null;
+
+        Plugin.Log.Information($"Wiki: \"{title}\" carries no drop table; read \"{page.Value.Title}\" instead");
+        return (page.Value.Title, parsed);
     }
 
     private static string Normalise(string value) =>
