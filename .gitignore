@@ -48,3 +48,4 @@ $RECYCLE.BIN/
 # ======= Logs and local scratch =======
 *.log
 .claude/
+CLAUDE.md
