@@ -94,14 +94,53 @@ public class ConfigWindow : Window
         }
     }
 
+    /// <summary>
+    /// A muted heading and the lines qualifying it, for the block that opens a tab.
+    /// </summary>
+    /// <remarks>
+    /// No rule above it, unlike <see cref="SectionHeading"/>: the tab bar draws its own line, and a
+    /// second one under it separates nothing from the tab strip.
+    /// </remarks>
+    private static void TabHeading(string label, params string[] notes)
+    {
+        ImGui.Spacing();
+        ImGui.TextColored(Palette.Muted, label);
+
+        foreach (var note in notes)
+            ImGui.TextColored(Palette.Muted, note);
+
+        ImGui.Spacing();
+    }
+
+    /// <summary>
+    /// The same heading with a rule above it, for every block after the first.
+    /// </summary>
+    /// <remarks>
+    /// The rule is what makes a tab read as a handful of subjects rather than one run of checkboxes.
+    /// A blank line was doing this job and could not: the notes under a heading are muted text the
+    /// same as the heading itself, so where one block ended and the next began was a matter of
+    /// counting gaps.
+    /// </remarks>
+    private static void SectionHeading(string label, params string[] notes)
+    {
+        Rule();
+        TabHeading(label, notes);
+    }
+
+    /// <summary>A rule with room around it, for the two places that divide without a heading.</summary>
+    private static void Rule()
+    {
+        ImGui.Spacing();
+        ImGui.Separator();
+    }
+
     private bool DrawGeneralTab()
     {
         var changed = false;
 
-        ImGui.Spacing();
-        ImGui.TextColored(Palette.Muted, "What to list");
-        ImGui.TextColored(Palette.Muted, "Applies everywhere: the duty window, the loot roll list and vendors.");
-        ImGui.Spacing();
+        TabHeading(
+            "What to list",
+            "Applies everywhere: the duty window, the loot roll list and vendors.");
 
         var showOwned = configuration.ShowOwnedItems;
         if (UiParts.Toggle("List pieces I already have, greyed out", ref showOwned))
@@ -154,10 +193,9 @@ public class ConfigWindow : Window
             changed = true;
         }
 
-        ImGui.Spacing();
-        ImGui.TextColored(Palette.Muted, "Trying on");
-        ImGui.TextColored(Palette.Muted, "Right-click any piece in any of the three lists.");
-        ImGui.Spacing();
+        SectionHeading(
+            "Trying on",
+            "Right-click any piece in any of the three lists.");
 
         var clearFittingRoom = configuration.ClearFittingRoomForOutfits;
         if (UiParts.Toggle("Empty the fitting room before trying on an outfit", ref clearFittingRoom,
@@ -169,10 +207,9 @@ public class ConfigWindow : Window
             changed = true;
         }
 
-        ImGui.Spacing();
-        ImGui.TextColored(Palette.Muted, "What counts as owned");
-        ImGui.TextColored(Palette.Muted, "Also applies everywhere.");
-        ImGui.Spacing();
+        SectionHeading(
+            "What counts as owned",
+            "Also applies everywhere.");
 
         var scope = configuration.Scope;
         ImGui.SetNextItemWidth(200 * ImGuiHelpers.GlobalScale);
@@ -267,8 +304,8 @@ public class ConfigWindow : Window
                 "A piece can belong to several sets. Strict requires all of them stored.");
         }
 
+        Rule();
         ImGui.Spacing();
-        ImGui.Separator();
 
         // Worth showing: a short alias is skipped when another plugin already owns it, and silently
         // missing commands would otherwise look like a bug here.
@@ -282,8 +319,7 @@ public class ConfigWindow : Window
     {
         var changed = false;
 
-        ImGui.Spacing();
-        ImGui.TextColored(Palette.Muted, "Duty window");
+        TabHeading("Duty window");
 
         var autoOpen = configuration.AutoOpenOnDutyEnter;
         if (UiParts.Toggle("Open automatically when I enter a duty", ref autoOpen))
@@ -343,8 +379,7 @@ public class ConfigWindow : Window
                 "Headings can be collapsed and stay that way.");
         }
 
-        ImGui.Spacing();
-        ImGui.TextColored(Palette.Muted, "Loot roll window");
+        SectionHeading("Loot roll window");
 
         var companion = configuration.ShowLootCompanion;
         if (UiParts.Toggle("Show a companion list beside the Need/Greed window", ref companion,
@@ -391,8 +426,7 @@ public class ConfigWindow : Window
     {
         var changed = false;
 
-        ImGui.Spacing();
-        ImGui.TextColored(Palette.Muted, "Markers");
+        TabHeading("Markers");
         ImGui.BulletText("x - not collected");
         ImGui.BulletText("amber x - not collected, dresser data is old");
         ImGui.BulletText("tick - Glamour Dresser");
@@ -405,6 +439,9 @@ public class ConfigWindow : Window
         ImGui.BulletText("figure in a tie - worn by a retainer, not in their bags");
         ImGui.BulletText("? - no dresser data");
 
+        // A rule and no heading: the three panel sections are collapsing headers of their own, so
+        // naming the block above them would only repeat the tab.
+        Rule();
         ImGui.Spacing();
 
         changed |= DrawPanelSection(
@@ -517,7 +554,7 @@ public class ConfigWindow : Window
     {
         var changed = false;
 
-        ImGui.Spacing();
+        TabHeading("Right-click menus");
 
         var contextMenu = configuration.ShowGameContextMenu;
         if (UiParts.Toggle("Add gear options to the game's right-click menus", ref contextMenu,
@@ -527,11 +564,12 @@ public class ConfigWindow : Window
             changed = true;
         }
 
+        SectionHeading("Item tooltips");
+
         if (!plugin.TooltipLineAvailable)
         {
             // The one thing here worth the space: a toggle that cannot work should not be offered
             // as though it can.
-            ImGui.Spacing();
             ImGui.TextColored(Palette.Warning, "Item tooltip marking is unavailable on this game version.");
             ImGui.Spacing();
             return changed;
@@ -572,8 +610,7 @@ public class ConfigWindow : Window
     {
         var changed = false;
 
-        ImGui.Spacing();
-        ImGui.TextColored(Palette.Muted, "Collection snapshot");
+        TabHeading("Collection snapshot");
 
         var staleDays = configuration.StaleAfterDays;
         ImGui.SetNextItemWidth(200 * ImGuiHelpers.GlobalScale);
@@ -625,9 +662,7 @@ public class ConfigWindow : Window
             ownership.Forget();
         }
 
-        ImGui.Spacing();
-        ImGui.Separator();
-        ImGui.TextColored(Palette.Muted, "Dungeon loot data");
+        SectionHeading("Dungeon loot data");
 
         ImGui.TextWrapped(plugin.LootData.StatusMessage);
 
@@ -655,9 +690,7 @@ public class ConfigWindow : Window
             plugin.LootData.Forget();
         }
 
-        ImGui.Spacing();
-        ImGui.Separator();
-        ImGui.TextColored(Palette.Muted, "Console Games Wiki");
+        SectionHeading("Console Games Wiki");
 
         var useWiki = configuration.UseWikiSource;
         if (UiParts.Toggle("Fill gaps from the wiki", ref useWiki,
@@ -709,9 +742,7 @@ public class ConfigWindow : Window
             }
         }
 
-        ImGui.Spacing();
-        ImGui.Separator();
-        ImGui.TextColored(Palette.Muted, "Learning from what you see drop");
+        SectionHeading("Learning from what you see drop");
 
         var learn = configuration.LearnDropsFromLoot;
         if (UiParts.Toggle("Record gear that drops in duties", ref learn,
@@ -747,9 +778,7 @@ public class ConfigWindow : Window
             "Learned drops are written to learned-loot.json in the same format as loot-overrides.json, " +
             "so you can promote them by hand or contribute them upstream.");
 
-        ImGui.Spacing();
-        ImGui.Separator();
-        ImGui.TextColored(Palette.Muted, "Files");
+        SectionHeading("Files");
 
         ImGui.TextWrapped(
             "Missing drops for a very recent dungeon? Add them to loot-overrides.json in the config " +
@@ -767,9 +796,7 @@ public class ConfigWindow : Window
         if (ImGui.Button("Copy path"))
             ImGui.SetClipboardText(configPath);
 
-        ImGui.Spacing();
-        ImGui.Separator();
-        ImGui.TextColored(Palette.Muted, "Start again");
+        SectionHeading("Start again");
 
         ImGui.TextWrapped(
             "Everything above in one go: the collection snapshot for this character, the downloaded " +

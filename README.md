@@ -225,8 +225,9 @@ leaves the decision alone, because that decision is irreversible and is being re
 may be days old. Split by where the held copy is — bags, armoury, saddlebag, then one heading per
 retainer, with **In Ysayle's bags** and **Worn by Ysayle** kept apart — since what is safe to do differs
 and a second copy is no use without knowing which retainer has it, let alone whether it is in a bag at
-all; nothing equipped is ever listed. The section says how old the snapshot behind it is, and says so
-when no retainer has been read.
+all; nothing equipped is ever listed. Each heading collapses with a click, keeps its count while it is
+shut and stays collapsed between sessions. The section says how old the snapshot behind it is, and says
+so when no retainer has been read.
 
 The heading says where the held copy is; the row says where the second one is — *also in your glamour
 dresser*, *also in your Armoire*, or amber for *also part of a stored outfit set*. Hovering names both
