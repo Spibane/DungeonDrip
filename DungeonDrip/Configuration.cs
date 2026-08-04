@@ -64,8 +64,20 @@ public enum MissingGrouping
     Source,
 }
 
+/// <summary>
+/// Everything the user has chosen, as one object serialised to the plugin's config file.
+/// </summary>
+/// <remarks>
+/// Read by nearly every surface, which is why it is passed around rather than consulted through a
+/// static: the ownership decision and the report builder take it as an argument so they stay
+/// testable without a live plugin behind them.
+///
+/// Property names are the JSON keys, so renaming one silently resets that setting for every existing
+/// user. <see cref="Version"/> plus <see cref="MigrateIfNeeded"/> is the way to reshape anything.
+/// </remarks>
 public class Configuration : IPluginConfiguration
 {
+    /// <summary>Config-file shape, bumped when a migration reshapes it. See <see cref="MigrateIfNeeded"/>.</summary>
     public int Version { get; set; } = 1;
 
     /// <summary>Pop the window open on zoning into a duty that has loot data.</summary>
@@ -105,6 +117,7 @@ public class Configuration : IPluginConfiguration
     /// </remarks>
     public bool CountRetainerEquipped { get; set; }
 
+    /// <summary>How a piece present only inside stored outfit sets is judged.</summary>
     public OutfitOwnershipMode OutfitOwnership { get; set; } = OutfitOwnershipMode.AnyOutfit;
 
     /// <summary>Show owned pieces greyed out alongside the missing ones, in every gear list.</summary>

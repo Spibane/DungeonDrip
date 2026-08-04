@@ -4,6 +4,18 @@ using CabinetSheet = Lumina.Excel.Sheets.Cabinet;
 
 namespace DungeonDrip.Game;
 
+/// <summary>
+/// Reads the Armoire out of the client, when the client happens to have it.
+/// </summary>
+/// <remarks>
+/// The Armoire is not a container the client can enumerate. It is a set of flags on UIState keyed by
+/// Cabinet row, so the whole sheet is walked and each row asked about - a few thousand cheap
+/// questions rather than one read, which is why this runs on the poll rather than per frame.
+///
+/// Rarely loaded: opening it at an inn, and some glamour operations. Everything else answers from
+/// the snapshot <see cref="OwnershipTracker"/> keeps, which is why null here has to mean "nothing to
+/// say" rather than "empty".
+/// </remarks>
 public static unsafe class ArmoireReader
 {
     /// <summary>

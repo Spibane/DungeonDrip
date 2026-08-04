@@ -14,6 +14,20 @@ using DungeonDrip.Windows;
 
 namespace DungeonDrip;
 
+/// <summary>
+/// The plugin's entry point: builds everything once, owns it, and drives it from the framework tick.
+/// </summary>
+/// <remarks>
+/// Also the composition root. Nothing here constructs itself on demand, because the order matters -
+/// the legacy migration has to run before anything reads a settings file or a cache, and the loot
+/// dataset has to exist before the catalogue, the drop index and the report builder derived from it
+/// can. Keeping that order in one constructor is what makes it checkable.
+///
+/// Everything derived from the loot dataset or from the ownership snapshot is rebuilt here rather
+/// than by whoever draws it, in <see cref="OnFrameworkUpdate"/>. Both change rarely and are read by
+/// every surface, so rebuilding on a revision bump costs one comparison a frame and guarantees the
+/// windows cannot disagree about what is collected.
+/// </remarks>
 public sealed class Plugin : IDalamudPlugin
 {
     [PluginService] internal static IDalamudPluginInterface PluginInterface { get; private set; } = null!;
@@ -251,6 +265,10 @@ public sealed class Plugin : IDalamudPlugin
 
     public void ToggleMainUi() => mainWindow.Toggle();
 
+    /// <summary>
+    /// Follows the character between zones: stales the report and decides whether the window should
+    /// open or close on its own.
+    /// </summary>
     private void OnTerritoryChanged(uint territoryId)
     {
         var leftSupportedDuty = contentFinder.IsSupportedDuty(currentTerritory) &&
@@ -274,6 +292,16 @@ public sealed class Plugin : IDalamudPlugin
             : null;
     }
 
+    /// <summary>
+    /// The per-frame spine: pumps the background services, then rebuilds the report if anything it
+    /// is derived from has moved.
+    /// </summary>
+    /// <remarks>
+    /// Rebuilding is gated on revision counters and cheap comparisons rather than done every tick,
+    /// because a report sweeps a duty's whole loot list. The counters cover the two sources that
+    /// change on their own - the dataset and the collection - and the compares cover the character
+    /// facts a filter reads, which no revision would notice moving.
+    /// </remarks>
     private void OnFrameworkUpdate(IFramework framework)
     {
         Wiki.Update();
@@ -370,6 +398,14 @@ public sealed class Plugin : IDalamudPlugin
             Wiki.RequestIfStale(selected, condition.Name.ExtractText(), force: true);
     }
 
+    /// <summary>
+    /// Dispatches a chat command: the fixed sub-commands first, then a duty name, then a gear name.
+    /// </summary>
+    /// <remarks>
+    /// The order is the whole design. Duty names keep absolute priority so nothing that worked
+    /// before behaves differently, and a query matching no duty falls through to gear rather than
+    /// erroring - which is what lets one command answer both questions without a keyword.
+    /// </remarks>
     private void OnCommand(string command, string arguments)
     {
         var args = arguments.Trim();
@@ -496,6 +532,10 @@ public sealed class Plugin : IDalamudPlugin
         DescribeGear(itemId);
     }
 
+    /// <summary>
+    /// Lists the pieces a query could have meant, as item links so one can be hovered rather than
+    /// retyped. Above <see cref="MaxGearMatches"/> it asks for a longer query instead of filling chat.
+    /// </summary>
     private void DescribeAmbiguity(string query, IReadOnlyList<(uint ItemId, string Name)> matches)
     {
         if (matches.Count > MaxGearMatches)
@@ -517,6 +557,7 @@ public sealed class Plugin : IDalamudPlugin
         ChatGui.Print(line.Build());
     }
 
+    /// <summary>Prints one piece's answer: the link, whether it is collected, and where it drops.</summary>
     private void DescribeGear(uint itemId)
     {
         ChatGui.Print(new SeStringBuilder()

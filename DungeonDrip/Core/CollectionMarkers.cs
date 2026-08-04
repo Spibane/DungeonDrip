@@ -66,6 +66,17 @@ public enum CollectionMarker
 /// </summary>
 public static class CollectionMarkers
 {
+    /// <summary>
+    /// The marker for one piece, given what the ownership decision said and whether anything was
+    /// actually read.
+    /// </summary>
+    /// <remarks>
+    /// The order of the three steps is the point. A positive answer is taken at face value first,
+    /// because it needs no snapshot behind it; then the outfit shortfall, which is itself read off a
+    /// snapshot and so cannot be the no-data case; and only then is a bare negative downgraded to
+    /// <see cref="CollectionMarker.Unknown"/>. Reordering any of that makes a marker claim something
+    /// nothing looked at.
+    /// </remarks>
     /// <param name="outfitCompleted">
     /// Only consulted for a piece held in an outfit set: whether any set holding it is finished.
     /// </param>

@@ -33,6 +33,15 @@ internal static class Palette
     public static readonly Vector4 Focus = new(0.55f, 0.80f, 1.00f, 1f);
 }
 
+/// <summary>
+/// The widgets more than one window draws, so they cannot come to look or behave differently.
+/// </summary>
+/// <remarks>
+/// Small pieces on purpose - a checkbox, a toolbar button, an icon, a right-click menu. Anything
+/// larger is a window's own business; what is here is the furniture that would otherwise be
+/// copy-pasted, and the right-click menu especially, since a second hand-written copy is how an
+/// action ends up on one surface and not the others.
+/// </remarks>
 internal static class UiParts
 {
     /// <summary>

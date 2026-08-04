@@ -19,6 +19,10 @@ namespace DungeonDrip.Data;
 /// </remarks>
 public sealed class HttpFetcher : IDisposable
 {
+    /// <summary>
+    /// One response. <see cref="Body"/> is null exactly when <see cref="NotModified"/> - there is
+    /// nothing to read on a 304, and the ETag comes back unchanged so the caller can re-store it.
+    /// </summary>
     public readonly record struct Response(bool NotModified, string? Body, string? ETag);
 
     private readonly HttpClient http;
@@ -36,6 +40,14 @@ public sealed class HttpFetcher : IDisposable
             $"DungeonDrip/{version} (Dalamud plugin; https://github.com/Spibane/DungeonDrip)");
     }
 
+    /// <summary>
+    /// Fetches one URL, revalidating with an ETag and refusing to buffer more than it was told to.
+    /// </summary>
+    /// <remarks>
+    /// The timeout is a linked token rather than the client's, so one slow host cannot hold up
+    /// another's request, and headers are read before the body so an over-large response can be
+    /// refused on its Content-Length before a byte of it is buffered.
+    /// </remarks>
     /// <param name="etag">Sent as If-None-Match; a 304 comes back as <see cref="Response.NotModified"/>.</param>
     /// <param name="maxBytes">Hard ceiling on the body; anything larger is an error, not a truncation.</param>
     public async Task<Response> GetAsync(

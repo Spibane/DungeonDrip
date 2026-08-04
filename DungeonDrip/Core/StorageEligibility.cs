@@ -54,11 +54,20 @@ public sealed class StorageEligibility
         return new StorageEligibility(armoire);
     }
 
+    /// <summary>The same, for a caller holding only an id. An unknown row can be kept nowhere.</summary>
     public StorageKind Of(uint itemId) =>
         Plugin.DataManager.GetExcelSheet<Item>().TryGetRow(itemId, out var item)
             ? Of(item)
             : StorageKind.None;
 
+    /// <summary>
+    /// Where this piece can be kept, which is the plugin's whole test for "is this worth listing".
+    /// </summary>
+    /// <remarks>
+    /// Wearability is the gate: an item with no equip slot is a potion or a material, and a soul
+    /// crystal has a slot without being anything a glamour applies to. Everything that survives both
+    /// goes in the Dresser, and the Cabinet sheet decides which of those the Armoire will also take.
+    /// </remarks>
     public StorageKind Of(Item item)
     {
         if (item.EquipSlotCategory.RowId == 0 || !item.EquipSlotCategory.IsValid)

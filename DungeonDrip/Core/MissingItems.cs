@@ -4,6 +4,15 @@ using DungeonDrip.Game;
 
 namespace DungeonDrip.Core;
 
+/// <summary>
+/// Where a piece was found, or <see cref="None"/> when it was not.
+/// </summary>
+/// <remarks>
+/// The order is the precedence <see cref="MissingItems.Resolve"/> answers in, which runs from the
+/// stores a glamour can actually be worn out of to the places a piece is merely held. Nothing here
+/// distinguishes "not collected" from "the dresser was never read" - the surfaces that need that
+/// distinction use <see cref="CollectionMarker"/>, which is this plus the refusal to say.
+/// </remarks>
 public enum OwnershipSource
 {
     None,
@@ -31,6 +40,19 @@ public enum OwnershipSource
 /// </summary>
 public static class MissingItems
 {
+    /// <summary>
+    /// Where a piece is, taking the first answer that holds.
+    /// </summary>
+    /// <remarks>
+    /// The order is not arbitrary and is the single thing every surface in the plugin depends on
+    /// agreeing about. The two glamour stores come first because a piece in one can actually be
+    /// worn; the held places follow in order of how much trouble the copy is to get at, so the
+    /// answer doubles as advice on where to go for it.
+    ///
+    /// A null holding means "not counted" rather than "empty", which is how the storage scope and
+    /// the count-inventory and count-retainer settings switch a place off without the caller having
+    /// to know they exist.
+    /// </remarks>
     /// <param name="setsContainingItem">
     /// Every outfit set in the game that lists this piece - only consulted in
     /// <see cref="OutfitOwnershipMode.AllOutfits"/>.
@@ -128,6 +150,7 @@ public static class MissingItems
         return stored > 0 && stored < total ? (stored, total) : (0, 0);
     }
 
+    /// <summary>The answer as a sentence, for chat and for anything with room for one.</summary>
     public static string Describe(OwnershipSource source) => source switch
     {
         OwnershipSource.Dresser => "In your Glamour Dresser",

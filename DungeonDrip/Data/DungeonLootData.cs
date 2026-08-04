@@ -77,6 +77,19 @@ public sealed class DungeonLootData
     public string? GetFallbackName(uint territoryId) =>
         fallbackNames.TryGetValue(territoryId, out var name) ? name : null;
 
+    /// <summary>
+    /// Joins every source into one duty -> items map, resolving map ids to territories on the way.
+    /// </summary>
+    /// <remarks>
+    /// Layered in order of authority, and every layer is additive: the downloaded dataset, then the
+    /// hand-written overrides, then the wiki, then what has been seen dropping. Nothing ever removes
+    /// a piece another source listed, so a bad supplementary source can only over-list - which is the
+    /// direction a collection tool should fail in.
+    ///
+    /// Each layer records the pieces that exist only because of it, which is what lets a UI say why
+    /// something is listed. A piece the dataset already had keeps its original provenance however
+    /// many later sources also mention it.
+    /// </remarks>
     public static DungeonLootData Build(
         LootCacheFile cache,
         string configDirectory,

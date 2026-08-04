@@ -142,6 +142,15 @@ public sealed class OwnershipTracker
                 entry.Value.Equipped)),
     ];
 
+    /// <summary>
+    /// An immutable snapshot of what this character owns, built fresh on every read.
+    /// </summary>
+    /// <remarks>
+    /// Built rather than cached because it is where the user's settings are applied - which stores
+    /// count, whether the bags and the retainers do - so a cached view would have to be invalidated
+    /// by every one of those toggles. The sets inside it are handed over by reference and never
+    /// copied; only the record wrapping them is per call.
+    /// </remarks>
     public OwnershipView Current => new(
         dresser?.DirectItems ?? OwnershipView.Empty.DresserDirect,
         dresser?.ItemsInStoredOutfits ?? OwnershipView.Empty.DresserOutfits,
@@ -248,6 +257,17 @@ public sealed class OwnershipTracker
         SaveToDisk();
     }
 
+    /// <summary>
+    /// The once-a-second poll: reads whichever stores the client currently has, and saves only if
+    /// something actually moved.
+    /// </summary>
+    /// <remarks>
+    /// Reading and noticing are separated on purpose. Every store here stays loaded until the next
+    /// zone change, so from the moment one is opened it is re-read on every poll - cheap - but
+    /// treating each read as news rewrote the cache file and invalidated every derived list once a
+    /// second. Hence the fingerprints: the timestamps move on every read, because those record when a
+    /// store was last looked at, and only a changed fingerprint earns a revision and a save.
+    /// </remarks>
     public void Update()
     {
         if (DateTime.UtcNow < nextPoll)
@@ -485,6 +505,7 @@ public sealed class OwnershipTracker
         public DateTime UpdatedUtc { get; set; }
     }
 
+    /// <summary>One retainer as written to disk. Lists rather than sets, since JSON has no set.</summary>
     private sealed class RetainerCacheEntry
     {
         public ulong RetainerId { get; set; }
@@ -505,6 +526,14 @@ public sealed class OwnershipTracker
         public DateTime UpdatedUtc { get; set; }
     }
 
+    /// <summary>
+    /// The whole per-character cache as it sits on disk, one file per content id.
+    /// </summary>
+    /// <remarks>
+    /// Every field is additive and every reader tolerates a missing one, because these files outlive
+    /// the shape they were written in - a new field has to read back as "not recorded" rather than as
+    /// a claim. See how capacity and the retainer split are handled in <c>LoadFromDisk</c>.
+    /// </remarks>
     private sealed class CacheFile
     {
         public ulong ContentId { get; set; }

@@ -51,6 +51,15 @@ public sealed record SetStanding(
 /// </remarks>
 public static class SetCompletion
 {
+    /// <summary>
+    /// Every outfit set part way done, closest to finished first.
+    /// </summary>
+    /// <remarks>
+    /// Two passes over every set in the game, which is the reason for the shape rather than an
+    /// accident of it: the first counts and names nothing, because the great majority of sets have
+    /// nothing owned from them and naming one costs a sheet lookup per piece. Only what earns a place
+    /// on the list gets described.
+    /// </remarks>
     public static IReadOnlyList<SetStanding> InProgress(
         OutfitCatalog outfits, OwnershipView view, Configuration configuration, EquipLockFilter equipLocks)
     {
@@ -97,6 +106,13 @@ public static class SetCompletion
         ];
     }
 
+    /// <summary>
+    /// One set named, resolved and slot-sorted, whatever state it is in.
+    /// </summary>
+    /// <remarks>
+    /// Its totals can differ from the counting pass above, which is why that one re-checks against
+    /// these: a piece the set lists that resolves to no item row is counted there and absent here.
+    /// </remarks>
     public static SetStanding Describe(
         uint setId,
         OutfitCatalog outfits,

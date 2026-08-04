@@ -22,6 +22,19 @@ public readonly record struct CarriedStack(
     public bool IsSaddlebag => InventoryReader.IsSaddlebag(Container);
 }
 
+/// <summary>
+/// Reads what the character is carrying, in whichever shape the caller needs.
+/// </summary>
+/// <remarks>
+/// Unlike the dresser, the Armoire and the retainers, these containers are loaded for as long as the
+/// character is - so nothing here is cached and none of it can return "no data". The exception is the
+/// saddlebag, which only loads near a bell; <see cref="SaddlebagLoaded"/> exists so an unloaded one
+/// cannot pass for an empty one.
+///
+/// Three reads over the same containers rather than one, because they are wanted at different rates:
+/// a set of ids on the one-second poll, a stack list only when something asks what is being carried,
+/// and a hash every frame for anything watching the bags for movement.
+/// </remarks>
 public static unsafe class InventoryReader
 {
     /// <summary>

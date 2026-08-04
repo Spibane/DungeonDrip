@@ -6,6 +6,12 @@ using Lumina.Excel.Sheets;
 
 namespace DungeonDrip.Core;
 
+/// <summary>One duty the plugin has loot for, as the picker lists it.</summary>
+/// <param name="Level">
+/// The level the duty finder asks for, or zero for a duty with no duty-finder row at all - which is
+/// what sinks those to the bottom of the list rather than letting them lead it.
+/// </param>
+/// <param name="ItemCount">How many pieces are known to drop here, before any filter is applied.</param>
 public sealed record DutyEntry(
     uint TerritoryId,
     string Name,
@@ -34,6 +40,14 @@ public sealed class DutyCatalog
     public string NameOf(uint territoryId) =>
         byTerritory.TryGetValue(territoryId, out var entry) ? entry.Name : $"Territory {territoryId}";
 
+    /// <summary>
+    /// Duties whose name contains the query, or all of them for an empty one.
+    /// </summary>
+    /// <remarks>
+    /// A substring match rather than a prefix, because half these names begin with "the". The cost
+    /// is that a piece of gear whose name appears inside a duty's is unreachable through this, which
+    /// is what <c>/dungeondrip item</c> exists to get past.
+    /// </remarks>
     public IEnumerable<DutyEntry> Search(string filter)
     {
         if (string.IsNullOrWhiteSpace(filter))

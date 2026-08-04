@@ -49,6 +49,18 @@ public static class ItemActions
     /// <summary>How many duties to name before the rest collapse into a count.</summary>
     private const int MaxNamedSources = 8;
 
+    /// <summary>
+    /// The actions for one piece on one surface, in the order they should be drawn.
+    /// </summary>
+    /// <remarks>
+    /// The surface decides what is left out rather than what is added, and the rule is the same in
+    /// both directions: never offer what the surface already provides. The game's own menus have Try
+    /// On and item links, so those are dropped there; the plugin's windows already show where a piece
+    /// drops, so the drop submenu is dropped here.
+    ///
+    /// An empty list is a real answer - a piece the game will not preview, on a menu with nothing else
+    /// to offer - and callers add no entries at all rather than an empty heading.
+    /// </remarks>
     public static IReadOnlyList<ItemAction> For(
         Plugin plugin, uint itemId, string name, ItemActionSurface surface)
     {

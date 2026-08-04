@@ -60,6 +60,10 @@ public sealed class EquipLockFilter
         (gender && locks.HasFlag(EquipLock.Gender)) ||
         (race && locks.HasFlag(EquipLock.Race));
 
+    /// <summary>
+    /// Which locks this character falls foul of, cached by the row and the character it was asked
+    /// about - not by item, since thousands of pieces share a handful of restriction rows.
+    /// </summary>
     public EquipLock LocksOn(Item item)
     {
         var playerState = Plugin.PlayerState;

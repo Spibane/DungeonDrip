@@ -27,6 +27,15 @@ public readonly record struct RoleGroup(int Order, string Label, string JobKey)
     }
 }
 
+/// <summary>
+/// The roll bands a job belongs to, as loot is actually divided.
+/// </summary>
+/// <remarks>
+/// Finer than the game's own ClassJob.Role, which has four values and puts Bard with Black Mage.
+/// The two ranged bands are split because they roll on different gear entirely; melee stays one
+/// value here and is split further by gear type where the headings are built, since that division
+/// comes off the item rather than off the job.
+/// </remarks>
 public enum LootRole
 {
     Tank,
@@ -113,9 +122,19 @@ public sealed class JobRoleIndex
     public IReadOnlyList<uint> JobsIn(RoleGroup group) =>
         jobsByGroup.TryGetValue(group.Label, out var jobs) ? jobs : NoJobs;
 
+    /// <param name="ParentRowId">
+    /// The class a job grew out of, self-referential for a class itself. Read as well as the job's
+    /// own id, because old categories list only the classes and low-level dungeon gear still uses
+    /// them - without it Paladin drops out of the Tank heading there.
+    /// </param>
+    /// <param name="IsFullJob">JobIndex above zero, so labels can name Dragoon without Lancer.</param>
     private readonly record struct JobEntry(
         uint RowId, uint ParentRowId, string Abbreviation, LootRole Role, bool IsFullJob, bool IsLimited);
 
+    /// <summary>
+    /// Sweeps the job and category sheets once at load, producing the heading for every category and
+    /// the jobs behind each heading.
+    /// </summary>
     public static JobRoleIndex Build()
     {
         var jobs = new List<JobEntry>();
