@@ -16,14 +16,20 @@ namespace DungeonDrip.Windows;
 /// already long and its spine is entirely duty-shaped - pinning, auto-open, a title taken from the
 /// report - so this keeps the two apart without adding a second thing to open and find.
 ///
-/// Every section here sweeps the whole collection, which is far too much to do per frame, so all of
-/// it is computed behind <see cref="Stale"/> and cached until something it depends on moves.
+/// Every tab here sweeps the whole collection, which is far too much to do per frame, so all of it is
+/// computed in <see cref="Recompute"/> and cached until something it depends on moves - and computed for
+/// every tab rather than only the visible one, so switching tabs costs nothing and the counts on the
+/// strip cannot go stale behind it.
 /// </remarks>
 public sealed class CollectionView(Plugin plugin)
 {
     /// <summary>
     /// Prefix on the remembered heading state, so nothing here can collide with a slot or role
     /// heading from the duty list, which share the same store.
+    ///
+    /// Only the collapsibles inside a tab use this now. The four top-level sections that used to be
+    /// headings are tabs, so their old keys linger in the config doing nothing - harmless, and not worth
+    /// a migration to sweep up.
     /// </summary>
     private const string CollapsePrefix = "collection:";
 
@@ -33,12 +39,24 @@ public sealed class CollectionView(Plugin plugin)
     private int seenOwnershipRevision = -1;
     private Inputs seenInputs;
     private ulong seenInventory;
+    private ulong seenCurrency;
 
     /// <summary>Sets listed before the "show all" toggle earns its place.</summary>
     private const int InitialSetsShown = 25;
 
+    /// <summary>
+    /// Pieces listed per currency before the same toggle earns its place.
+    /// </summary>
+    /// <remarks>
+    /// Lower than the set cap because there can be a dozen currency groups where there is one set list,
+    /// and because Wolf Marks alone buy 779 pieces. The plugin has no list clipper anywhere, so a cap
+    /// with a toggle is the established answer to a long list rather than a new mechanism.
+    /// </remarks>
+    private const int InitialOffersShown = 10;
+
     private DresserPressureReport? pressure;
     private CarriedGearReport? carried;
+    private ShoppingListReport? shopping;
     private IReadOnlyList<SetStanding> sets = [];
 
     /// <summary>
@@ -47,40 +65,149 @@ public sealed class CollectionView(Plugin plugin)
     /// </summary>
     private bool showAllSets;
 
+    /// <summary>Which currency groups have been expanded past the cap, per session and for the same reason.</summary>
+    private readonly HashSet<uint> showAllOffers = [];
+
     /// <summary>
-    /// Rebuilds anything stale, then draws the three sections inside one scrolling region.
+    /// Whether the stored tab has been forced open yet.
     /// </summary>
     /// <remarks>
-    /// The order is what the sections cost to act on: an outfit part way done is a duty to run, the
-    /// dresser section is housekeeping, and a spare copy of something already collected is the one
-    /// that ends in throwing something away.
+    /// Per instance rather than saved, because it is about this window's lifetime and not the user's
+    /// choice. False again after a plugin reload, which is exactly when the stored tab needs restoring;
+    /// within a session ImGui keeps the selection itself.
+    /// </remarks>
+    private bool tabRestored;
+
+    /// <summary>
+    /// Rebuilds anything stale, then draws the three tabs.
+    /// </summary>
+    /// <remarks>
+    /// Tabs rather than the stack of collapsing headers this used to be. Four headers one under another,
+    /// each with its own collapsibles inside it, made every list look like a row in the list above it -
+    /// there was no reading of the window that told a section apart from a group within one. A tab strip
+    /// says outright that these are three separate questions.
+    ///
+    /// The order is what each one costs to act on: an outfit part way done is a duty to run, gear a held
+    /// currency covers is a walk to a counter, and the dresser is housekeeping.
+    ///
+    /// <b>The dresser tab holds two lists on purpose.</b> How full the box is and which spare copies
+    /// could go are the same errand from both ends - the first says the box is filling and what would
+    /// free space, the second is the gear that could actually be got rid of. Splitting them would put a
+    /// problem on one tab and its lever on another.
     /// </remarks>
     public void Draw()
     {
         Recompute();
 
-        using var child = ImRaii.Child("collectionList", Vector2.Zero, false);
-        if (!child.Success)
+        using var tabs = ImRaii.TabBar("##collectionTabs");
+        if (!tabs.Success)
             return;
 
-        Section("Sets in progress", DrawSetsInProgress);
-        Section("Glamour Dresser", DrawDresserPressure);
-        Section("Already in your collection", DrawAlreadyStored);
+        // Restoring is a one-shot, and has to be: the flag that selects a tab wins over a click, so
+        // asking for it every frame would pin the stored tab open and make the strip unusable.
+        var restoring = !tabRestored;
+
+        // Read before any tab is drawn, and not from the configuration inside the loop. On the restoring
+        // frame ImGui reports the first tab active until the stored one is submitted with its flag, so a
+        // tab that recorded itself as it went would overwrite the target before reaching it.
+        var target = plugin.Configuration.CollectionTab;
+
+        Tab("Sets in progress", CollectionTab.Sets, DrawSetsInProgress, restoring, target);
+        Tab("Ready to buy", CollectionTab.Buy, DrawShoppingList, restoring, target);
+        Tab("Glamour Dresser", CollectionTab.Dresser, DrawDresser, restoring, target);
+
+        tabRestored = true;
     }
 
     /// <summary>
-    /// Rebuilds the sections when, and only when, something they are derived from has changed.
+    /// One tab, its body in a region that scrolls by itself.
     /// </summary>
     /// <remarks>
-    /// Two keys, because the sections do not read the same things.
+    /// The child is what keeps the tab strip in place. Letting the window scroll instead would carry the
+    /// strip off the top edge, so reaching another tab would mean scrolling up first - the same reason
+    /// the settings window wraps its tabs this way.
+    ///
+    /// The selection is written to the configuration on the frame it changes rather than polled, and only
+    /// when it actually changed, so an unchanged tab costs no save.
+    /// </remarks>
+    /// <param name="restoring">
+    /// True only on the first frame the strip is drawn, when the stored tab is forced open.
+    /// <see cref="ImGuiTabItemFlags.SetSelected"/> overrides a click, so passing it on later frames would
+    /// undo every attempt to switch away.
+    /// </param>
+    /// <param name="target">
+    /// The stored tab as it was before any tab was drawn. Nothing is recorded while
+    /// <paramref name="restoring"/> is true, since the selection ImGui reports that frame is not yet the
+    /// one being restored to.
+    /// </param>
+    private void Tab(
+        string label, CollectionTab tab, System.Action body, bool restoring, CollectionTab target)
+    {
+        var flags = restoring && target == tab
+            ? ImGuiTabItemFlags.SetSelected
+            : ImGuiTabItemFlags.None;
+
+        using var item = ImRaii.TabItem(label, flags);
+        if (!item.Success)
+            return;
+
+        if (!restoring && plugin.Configuration.CollectionTab != tab)
+        {
+            plugin.Configuration.CollectionTab = tab;
+            plugin.Configuration.Save();
+        }
+
+        using var child = ImRaii.Child($"collection{tab}", Vector2.Zero, false);
+        if (!child.Success)
+            return;
+
+        body();
+    }
+
+    /// <summary>
+    /// The dresser tab: how full the box is, then the spare copies that could empty some of it.
+    /// </summary>
+    /// <remarks>
+    /// The second list keeps its own heading and its rule, because the two answer different questions and
+    /// ran under separate headings before this became a tab. Losing the heading would leave a reader no
+    /// way to see where the occupancy figures stop and the disposal list starts.
+    /// </remarks>
+    private void DrawDresser()
+    {
+        DrawDresserPressure();
+
+        Rule();
+        ImGui.TextColored(Palette.Muted, "Already in your collection");
+        ImGui.Spacing();
+
+        DrawAlreadyStored();
+    }
+
+    /// <summary>A rule with room around it, for dividing two lists inside one tab.</summary>
+    private static void Rule()
+    {
+        ImGui.Spacing();
+        ImGui.Separator();
+        ImGui.Spacing();
+    }
+
+    /// <summary>
+    /// Rebuilds the tabs' contents when, and only when, something they are derived from has changed.
+    /// </summary>
+    /// <remarks>
+    /// Three keys, because the tabs do not read the same things and only one of those things
+    /// announces when it moves.
     ///
     /// The carried list needs its own. The ownership tracker only bumps its revision for inventory
     /// changes while "also count bags" is on, since that setting is the only reason it reads the
-    /// bags at all - but this section reads them regardless, on purpose, because it asks the
+    /// bags at all - but that list reads them regardless, on purpose, because it asks the
     /// opposite question. With the setting off, which is the default, throwing a piece away left it
     /// on the list with nothing that could ever clear it.
     ///
-    /// Staleness of the snapshot is deliberately in neither key, matching the tracker's own rule:
+    /// The shopping list needs a third for the same reason again: nothing bumps the ownership revision
+    /// when a balance moves, so spending a currency would leave the list quoting the old total.
+    ///
+    /// Staleness of the snapshot is deliberately in none of them, matching the tracker's own rule:
     /// an ageing snapshot changes how the answer should be worded, not what it is.
     /// </remarks>
     private void Recompute()
@@ -93,12 +220,18 @@ public sealed class CollectionView(Plugin plugin)
         var inventory = Game.InventoryReader.Fingerprint();
         var inventoryMoved = inventory != seenInventory;
 
-        if (!ownershipMoved && !inventoryMoved)
+        // A third key, for the same reason as the second: nothing bumps the ownership revision when a
+        // balance moves, so spending a currency would otherwise leave the list claiming the old total.
+        var currency = Game.CurrencyReader.Fingerprint();
+        var currencyMoved = currency != seenCurrency;
+
+        if (!ownershipMoved && !inventoryMoved && !currencyMoved)
             return;
 
         seenOwnershipRevision = plugin.Ownership.Revision;
         seenInputs = inputs;
         seenInventory = inventory;
+        seenCurrency = currency;
 
         var ownership = plugin.Ownership.Current;
 
@@ -109,6 +242,21 @@ public sealed class CollectionView(Plugin plugin)
         carried = CarriedGear.Build(
             Game.InventoryReader.ReadDetailed(), plugin.Ownership.Retainers,
             ownership, plugin.Outfits, plugin.Storage, plugin.Configuration.OutfitOwnership);
+
+        // Rebuilt when the balances move as well as when the collection does, since either changes what
+        // is worth buying. Asking for ItemSources is what triggers its 170ms sheet sweep, but only ever
+        // once, and it answers null by itself while the setting is off - so this is the first frame the
+        // section is looked at and no earlier.
+        if (ownershipMoved || currencyMoved)
+        {
+            var sources = plugin.ItemSources;
+
+            shopping = sources == null
+                ? null
+                : ShoppingList.Build(
+                    Game.CurrencyReader.Read(), sources, ownership, plugin.Outfits, plugin.Storage,
+                    plugin.Configuration, plugin.JobFilter, plugin.EquipLocks);
+        }
 
         if (!ownershipMoved)
             return;
@@ -133,7 +281,10 @@ public sealed class CollectionView(Plugin plugin)
             configuration.HideWeapons,
             configuration.OnlyCurrentJobEquippable,
             configuration.OnlyCurrentGenderEquippable,
-            configuration.OnlyCurrentRaceEquippable);
+            configuration.OnlyCurrentRaceEquippable,
+            configuration.ShowAcquisitionSources,
+            configuration.ReadyToBuyOutfitsOnly,
+            configuration.ExcludeSellBackVendors);
     }
 
     /// <summary>
@@ -145,6 +296,129 @@ public sealed class CollectionView(Plugin plugin)
     /// of them obeys the storage scope, so they disagreed for correct reasons that no row has space
     /// to explain.
     /// </remarks>
+    /// <summary>
+    /// What each currency held will buy that is not collected yet, most spendable currency first.
+    /// </summary>
+    /// <remarks>
+    /// One group per currency actually in the Currency tab - see <see cref="Game.CurrencyReader"/> on why
+    /// the tab is the definition rather than a category filter. A currency held at zero is therefore
+    /// absent, which is the accepted limit of the arrangement: this answers what can be spent, not what
+    /// farming something would eventually be worth.
+    ///
+    /// Gil starts collapsed. It prices roughly five thousand storable pieces, more than every other
+    /// currency together, so an open gil group would be the section as far as anyone scrolled.
+    /// </remarks>
+    private void DrawShoppingList()
+    {
+        if (!plugin.Configuration.ShowAcquisitionSources)
+        {
+            // Named as the setting reads, since that is what has to be found and switched on.
+            ImGui.TextColored(Palette.Muted,
+                "Needs \"Say how gear is obtained besides dropping\", under Settings - Data.");
+            return;
+        }
+
+        if (shopping == null)
+        {
+            ImGui.TextColored(Palette.Muted, "Reading what the shops sell...");
+            return;
+        }
+
+        DrawOutfitsOnlyToggle();
+
+        if (shopping.IsEmpty)
+        {
+            ImGui.TextColored(Palette.Muted, plugin.Configuration.ReadyToBuyOutfitsOnly
+                ? "Nothing your currencies buy towards an outfit set is still missing."
+                : "Nothing your currencies buy is still missing - or there is nothing in the Currency tab yet.");
+            return;
+        }
+
+        foreach (var group in shopping.Groups)
+            DrawCurrencyGroup(group);
+    }
+
+    /// <summary>
+    /// The section's own view filter, on the section rather than only in Settings.
+    /// </summary>
+    /// <remarks>
+    /// Here because it is a filter on one list and gets flipped while reading it, the same argument as
+    /// the duty window's toolbar toggles - a trip to Settings to narrow the list in front of you is a
+    /// trip nobody makes twice. It still writes the setting, so it survives a restart.
+    ///
+    /// Saved here rather than reported upward, because this view has no changed-flag to report through:
+    /// the remembered headings already save themselves the same way.
+    /// </remarks>
+    private void DrawOutfitsOnlyToggle()
+    {
+        var outfitsOnly = plugin.Configuration.ReadyToBuyOutfitsOnly;
+        if (UiParts.Toggle("Outfit sets only", ref outfitsOnly,
+                "Hides pieces that are not part of an outfit set.\n\n" +
+                "Most priced gear is single pieces - only about one in seven belongs to a set, and for " +
+                "gil it is fewer than one in ten - so this is the switch for collecting whole outfits.\n" +
+                "Hunting one particular piece is quicker through /dungeondrip item <name>."))
+        {
+            plugin.Configuration.ReadyToBuyOutfitsOnly = outfitsOnly;
+            plugin.Configuration.Save();
+        }
+    }
+
+    private void DrawCurrencyGroup(CurrencyGroup group)
+    {
+        // The count belongs on the label and must stay off the key, or spending a currency renames the
+        // heading and loses whether it was open.
+        var affordable = group.Affordable > 0
+            ? $"{group.Affordable} affordable"
+            : $"{group.Pieces.Count} to save for";
+
+        var label = $"{group.Name} - {group.Balance:N0}  ({affordable})";
+        var key = CollapsePrefix + "currency:" + group.CurrencyItemId;
+
+        var gil = group.CurrencyItemId == Game.CurrencyReader.GilItemId;
+        // Uncoloured. The heading used to go blue when something was affordable, which was a third copy
+        // of what the label already says in words and what the rows already say on the price. Tinting a
+        // heading now reads as "this is a section", which the tabs say instead.
+        if (!RememberedHeader(label, key, defaultOpen: !gil))
+            return;
+
+        var all = showAllOffers.Contains(group.CurrencyItemId);
+        var shown = all ? group.Pieces.Count : System.Math.Min(group.Pieces.Count, InitialOffersShown);
+
+        for (var i = 0; i < shown; i++)
+            DrawOffer(group.Pieces[i]);
+
+        if (group.Pieces.Count > InitialOffersShown)
+        {
+            ImGui.Spacing();
+            if (ImGui.SmallButton(all
+                    ? $"Show the cheapest {InitialOffersShown}###offers{group.CurrencyItemId}"
+                    : $"Show all {group.Pieces.Count}###offers{group.CurrencyItemId}"))
+            {
+                if (!showAllOffers.Remove(group.CurrencyItemId))
+                    showAllOffers.Add(group.CurrencyItemId);
+            }
+        }
+
+        ImGui.Spacing();
+    }
+
+    /// <remarks>
+    /// The same row as <see cref="DrawMissingPiece"/> - icon, name, context menu, one trailing muted
+    /// fact - so a piece looks the same wherever this view lists it. Only the cost is coloured, and only
+    /// when the balance covers it, so the eye lands on what can be bought now.
+    /// </remarks>
+    private void DrawOffer(ShoppingPiece piece)
+    {
+        UiParts.ItemIcon(piece.IconId, 18);
+        ImGui.Text(piece.Name);
+
+        UiParts.ItemContextMenu(plugin, piece.ItemId, piece.Name);
+
+        ImGui.SameLine();
+        ImGui.TextColored(
+            piece.Affordable ? Palette.Focus : Palette.Muted, $"- {piece.Cost:N0}");
+    }
+
     private void DrawSetsInProgress()
     {
         if (!plugin.Ownership.HasDresserData)
@@ -219,7 +493,7 @@ public sealed class CollectionView(Plugin plugin)
             return;
         }
 
-        var acquisitions = plugin.ItemSources?.For(piece.ItemId);
+        var acquisitions = plugin.SourcesFor(piece.ItemId);
         if (acquisitions is not { Count: > 0 })
             return;
 
@@ -526,9 +800,12 @@ public sealed class CollectionView(Plugin plugin)
         //
         // The count is in the label and not in the key, so collecting something does not lose the
         // state of the heading it is under.
+        // Amber only, and only when the snapshot behind it is old. The blue this used to carry otherwise
+        // was there to tell one section from the next while they were all stacked in one column; the tabs
+        // do that now, so a coloured heading would only be competing with the warning that means something.
         if (!RememberedHeader(
                 $"{label} ({listed.Count})", CollapsePrefix + label,
-                stale ? Palette.Warning : Palette.Focus))
+                stale ? Palette.Warning : null))
         {
             return;
         }
@@ -619,16 +896,6 @@ public sealed class CollectionView(Plugin plugin)
             ImGui.TextColored(Palette.Muted, "No retainer has been read - open one at a bell to include it.");
     }
 
-    /// <summary>One of the three top-level sections, drawn only when it is open.</summary>
-    private void Section(string label, System.Action body)
-    {
-        if (!RememberedHeader(label, CollapsePrefix + label))
-            return;
-
-        body();
-        ImGui.Spacing();
-    }
-
     /// <summary>
     /// A collapsing header whose state survives a restart, as the duty list's headings do.
     /// </summary>
@@ -641,10 +908,17 @@ public sealed class CollectionView(Plugin plugin)
     /// count changes as gear moves, and the state has to outlive that.
     /// </remarks>
     /// <returns>Whether the section's contents should be drawn.</returns>
-    private bool RememberedHeader(string label, string key, Vector4? colour = null)
+    private bool RememberedHeader(
+        string label, string key, Vector4? colour = null, bool defaultOpen = true)
     {
         var configuration = plugin.Configuration;
-        var collapsed = configuration.CollapsedGroups.Contains(key);
+
+        // A parameter rather than seeding the collapsed list at startup. Seeding writes the config as a
+        // side effect of drawing, and worse, it cannot tell a heading nobody has touched from one the
+        // user deliberately opened - so the next launch would close it again.
+        var collapsed = defaultOpen
+            ? configuration.CollapsedGroups.Contains(key)
+            : !configuration.OpenedGroups.Contains(key);
 
         ImGui.SetNextItemOpen(!collapsed, ImGuiCond.Appearing);
 
@@ -654,10 +928,14 @@ public sealed class CollectionView(Plugin plugin)
 
         if (open == collapsed)
         {
-            if (open)
-                configuration.CollapsedGroups.Remove(key);
+            // Which list records the deviation depends on which way the default points, so a heading
+            // that starts shut remembers being opened rather than remembering not being shut.
+            var remembering = defaultOpen ? configuration.CollapsedGroups : configuration.OpenedGroups;
+
+            if (open == defaultOpen)
+                remembering.Remove(key);
             else
-                configuration.CollapsedGroups.Add(key);
+                remembering.Add(key);
 
             configuration.Save();
         }
@@ -675,5 +953,8 @@ public sealed class CollectionView(Plugin plugin)
         bool HideWeapons,
         bool JobOnly,
         bool GenderOnly,
-        bool RaceOnly);
+        bool RaceOnly,
+        bool AcquisitionSources,
+        bool OutfitsOnly,
+        bool ExcludeSellBack);
 }
