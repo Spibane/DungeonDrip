@@ -824,6 +824,37 @@ public class ConfigWindow : Window
             changed = true;
         }
 
+        // Beside the setting it depends on rather than with the other list filters on the General tab,
+        // because it narrows one section and is meaningless without this one on. The section carries the
+        // same toggle, for flipping it while reading the list.
+        var outfitsOnly = configuration.ReadyToBuyOutfitsOnly;
+        if (UiParts.Toggle("\"Ready to buy\" lists outfit-set pieces only", ref outfitsOnly,
+                "Hides single pieces from the Collection view's \"Ready to buy\" list.\n\n" +
+                "Only about one in seven priced pieces belongs to an outfit set, and for gil it is fewer\n" +
+                "than one in ten, so this is the switch for collecting whole outfits. The same toggle is\n" +
+                "on the section itself."))
+        {
+            configuration.ReadyToBuyOutfitsOnly = outfitsOnly;
+            changed = true;
+        }
+
+        var sellBack = configuration.ExcludeSellBackVendors;
+        if (UiParts.Toggle("Leave out gear only sold back to you", ref sellBack,
+                "Some counters only re-sell what you already earned, and the game's files record what\n" +
+                "they stock rather than what you are entitled to - so 1,053 pieces would be listed at a\n" +
+                "price you may not be able to pay at any balance.\n\n" +
+                "Two kinds. The Calamity Salvager and the Recompense Officer restock seasonal and event\n" +
+                "gear for whoever was there at the time. And any special shop charging gil alone is a\n" +
+                "buy-back: Rowena's people re-sell an Augmented Ironworks piece for 345 gil, but\n" +
+                "tomestones are the only way to earn one.\n\n" +
+                "Event gear still says so when you look it up - that is worth knowing either way. Only a\n" +
+                "bare gil buy-back with no other route goes unmentioned.\n\n" +
+                "Turn this off if you have been playing a long time and can buy these back."))
+        {
+            configuration.ExcludeSellBackVendors = sellBack;
+            changed = true;
+        }
+
         var site = configuration.LookupSite;
         if (ImGui.BeginCombo("Look items up on", LookupSiteLabel(site)))
         {

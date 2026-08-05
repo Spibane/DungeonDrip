@@ -151,12 +151,12 @@ public static class ItemActions
 
         // Read once, since the property builds the index on first touch. Null means nothing looked -
         // the setting is off - which has to stay distinct from "looked and found nothing" below.
-        var index = plugin.ItemSources;
-        var acquisitions = index?.For(itemId) ?? [];
+        var routes = plugin.SourcesFor(itemId);
+        var acquisitions = routes ?? [];
 
         // Nothing consulted at all yet: no loot data, and no source index either. A different situation
         // from having looked and found nothing, and not one this menu should editorialise about.
-        if (drops == null && index == null)
+        if (drops == null && routes == null)
             return null;
 
         var duties = drops?.For(itemId) ?? [];
@@ -193,7 +193,7 @@ public static class ItemActions
         // and the wording has to say so rather than implying the sheets were read too.
         if (entries.Count == 0)
         {
-            entries.Add(new ItemAction(index == null
+            entries.Add(new ItemAction(routes == null
                 ? "Nothing in the loot data lists this piece"
                 : "Source unknown"));
         }

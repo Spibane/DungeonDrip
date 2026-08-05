@@ -694,7 +694,7 @@ public class MissingItemsWindow : Window
     /// </remarks>
     private void DrawAcquisitions(uint itemId)
     {
-        var acquisitions = plugin.ItemSources?.For(itemId);
+        var acquisitions = plugin.SourcesFor(itemId);
         if (acquisitions is not { Count: > 0 })
             return;
 
