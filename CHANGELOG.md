@@ -1,5 +1,10 @@
 # Changelog
 
+### v0.17.2 - 2026-08-06
+- **Ready to buy** now says when the collection behind it cannot be trusted, above the list rather than below it. Every row there is a "not owned" claim, and that is the half of a snapshot which goes wrong - the plugin already ambers a red x rather than a grey tick for exactly this reason, since glamours are added far more often than they are removed. So the one list made entirely of that claim was the one making it silently
+- Four cases are called out: no Glamour Dresser data at all, a dresser snapshot older than the warning threshold, an Armoire that has never been read, and the Armoire's age when it has been. The Armoire gets a line of its own rather than being folded into the dresser's, because the two are read on different occasions and either can be the stale one alone
+- That last line comes from a real report: a piece sitting in the Armoire was offered for sale because the cached Armoire read predated it, with a timestamp recent enough to look trustworthy. Opening the Armoire fixed it, and the list now says to do that instead of leaving it to be guessed
+
 ### v0.17.1 - 2026-08-05
 - Fixed achievement rewards appearing in **Ready to buy** at their re-purchase price. Field Commander's Coat is granted by *Between a Rock and a Hard Place V* and carries one 1,000 gil shop row, which is the counter that hands it back to whoever earned it - so the list was offering it to characters who cannot buy it at any price. All 94 achievement-reward pieces were affected
 - The cause was a rule applied to one of the two indexes and not the other. The per-piece answer already dropped the gil route in favour of naming the achievement; the by-currency answer kept it, behind a comment of mine reasoning that a character who earned the achievement really can buy it back. True, and beside the point - the counter will not sell to anyone who has not, and whether it has been earned is per-character state the sheets cannot answer. Every priced route to an achievement reward is now gated on the same setting as the other sell-back counters, and the display continues to name the achievement instead
