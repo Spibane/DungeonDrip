@@ -23,8 +23,11 @@ internal static class ShopSources
 {
     public static void Contribute(ItemSources.Accumulator into)
     {
-        ContributeGilShops(into);
-        ContributeSpecialShops(into);
+        // Resolved once and handed to both shop sweeps, since a row can be reached from either sheet.
+        var restricted = RestrictedVendors.ShopRows();
+
+        ContributeGilShops(into, restricted);
+        ContributeSpecialShops(into, restricted);
         ContributeGrandCompany(into);
     }
 
@@ -36,12 +39,14 @@ internal static class ShopSources
     /// only records that the vendor stocks it. So this sweep exists to establish *that* a piece is
     /// sold at all; the number comes from somewhere else entirely.
     /// </remarks>
-    private static void ContributeGilShops(ItemSources.Accumulator into)
+    private static void ContributeGilShops(ItemSources.Accumulator into, HashSet<uint> restricted)
     {
         var items = Plugin.DataManager.GetExcelSheet<Item>();
 
         foreach (var subrows in Plugin.DataManager.GetSubrowExcelSheet<GilShopItem>())
         {
+            var eventNpc = restricted.Contains(subrows.RowId);
+
             foreach (var entry in subrows)
             {
                 var itemId = entry.Item.RowId;
@@ -52,7 +57,12 @@ internal static class ShopSources
                 into.Add(itemId, new AcquisitionSource(
                     AcquisitionKind.GilShop,
                     "Vendor",
-                    price > 0 ? ItemSources.Price(price, "gil") : null));
+                    price > 0 ? ItemSources.Price(price, "gil") : null,
+                    price > 0 ? Game.CurrencyReader.GilItemId : 0,
+                    price));
+
+                if (eventNpc)
+                    into.MarkEventOnly(itemId);
             }
         }
     }
@@ -70,23 +80,35 @@ internal static class ShopSources
     /// kept, which is why naming the currency matters more here than anywhere else - "Special Shop"
     /// alone cannot distinguish a tomestone counter from a material hand-in.
     /// </remarks>
-    private static void ContributeSpecialShops(ItemSources.Accumulator into)
+    private static void ContributeSpecialShops(ItemSources.Accumulator into, HashSet<uint> restricted)
     {
         foreach (var shop in Plugin.DataManager.GetExcelSheet<SpecialShop>())
         {
+            var eventNpc = restricted.Contains(shop.RowId);
+
             foreach (var trade in shop.Item)
             {
-                var (currencyId, cost) = CostOf(trade);
+                var (currencyId, amount, cost, gilOnly) = CostOf(trade);
 
-                // A special shop charging gil is a vendor, whatever sheet describes it - the Calamity
-                // Salvager and the junkmonger buyback counters are both modelled this way, and 716
-                // storable pieces come through here. Labelling those "Special Shop" would give one
-                // transaction two different answers, so they join the gil vendors.
-                var kind = currencyId == GilItemId
+                // A special shop charging gil is priced like a vendor, so it is labelled like one rather
+                // than giving one transaction two different answers.
+                var kind = currencyId == Game.CurrencyReader.GilItemId
                     ? AcquisitionKind.GilShop
                     : AcquisitionKind.CurrencyShop;
 
                 var label = kind == AcquisitionKind.GilShop ? "Vendor" : "Special Shop";
+
+                // <b>But a special shop whose only cost is gil is a buy-back counter, not a vendor.</b>
+                // All 716 storable pieces reached this way belong to Rowena's representatives - Auriana,
+                // Aelina, Cihanti, Aymark, Enna, Hismena - who sell gear for tomestones and will re-sell
+                // for small change what a character already earned. 712 of the 716 carry the real route
+                // too, an upgrade trade of the base piece plus a 100 gil fee, so hiding the gil listing
+                // loses nothing and stops "Augmented Ironworks Helm of Fending - 345 gil" reading as a
+                // way to obtain a piece that only tomestones buy.
+                //
+                // Gil as one of several costs is the opposite case and must not be caught: that is the
+                // upgrade fee itself, and CostOf reports the piece being handed in rather than the gil.
+                var repurchase = gilOnly;
 
                 foreach (var received in trade.ReceiveItems)
                 {
@@ -94,42 +116,61 @@ internal static class ShopSources
                     if (itemId == 0 || !into.Wanted(itemId))
                         continue;
 
-                    into.Add(itemId, new AcquisitionSource(kind, label, cost));
+                    into.Add(itemId, new AcquisitionSource(
+                        kind, label, cost, currencyId, amount, repurchase));
+
+                    // A fact about the piece rather than this route: whatever else stocks it, an event
+                    // counter having it means most characters were never entitled to it.
+                    if (eventNpc)
+                        into.MarkEventOnly(itemId);
                 }
             }
         }
     }
 
-    /// <summary>Gil, which is an ordinary item row and so turns up as a shop currency like any other.</summary>
-    private const uint GilItemId = 1;
-
     /// <summary>
     /// The first real cost in a trade, as its currency's row id and a rendered price.
     /// </summary>
     /// <remarks>
-    /// The id comes back alongside the string because the caller has to recognise gil specifically,
-    /// and matching on the rendered name would break the moment the client language changes.
+    /// The id and the amount come back alongside the rendered string because the caller has to
+    /// recognise gil specifically, and because a shopping list has to group and compare on them -
+    /// matching on the rendered name would break the moment the client language changes.
     ///
-    /// Only the first cost entry is reported. A trade can demand several things at once, but for gear
-    /// that is rare, and "375 Poetics and 1 Grade 4 Glaze" would be wrong more often than the shorter
-    /// line is incomplete.
+    /// Only the first cost entry is reported, and for the upgrade trades that matters: the base piece is
+    /// listed before the gil fee, so "1 Ironworks Helm of Fending" is what comes back rather than the
+    /// 100 gil beside it. That is the useful half - 3,589 trades for storable gear demand more than one
+    /// thing, and gil is never the first of them.
+    ///
+    /// <paramref name="GilOnly"/> is what separates that fee from a buy-back price, so it counts the real
+    /// costs rather than stopping at the first.
     /// </remarks>
-    private static (uint CurrencyId, string? Cost) CostOf(SpecialShop.ItemStruct trade)
+    private static (uint CurrencyId, uint Amount, string? Cost, bool GilOnly) CostOf(
+        SpecialShop.ItemStruct trade)
     {
+        var costs = 0;
+        var onlyGil = false;
+        var found = (CurrencyId: 0u, Amount: 0u, Cost: (string?)null);
+
         foreach (var cost in trade.ItemCosts)
         {
             var currencyId = cost.ItemCost.RowId;
             if (currencyId == 0 || cost.CurrencyCost == 0)
                 continue;
 
+            costs++;
+            onlyGil = costs == 1 && currencyId == Game.CurrencyReader.GilItemId;
+
+            if (found.CurrencyId != 0)
+                continue;
+
             var currency = ItemSources.CurrencyName(currencyId, cost.CurrencyCost != 1);
             if (currency == null)
                 continue;
 
-            return (currencyId, ItemSources.Price(cost.CurrencyCost, currency));
+            found = (currencyId, cost.CurrencyCost, ItemSources.Price(cost.CurrencyCost, currency));
         }
 
-        return (0, null);
+        return (found.CurrencyId, found.Amount, found.Cost, onlyGil && costs == 1);
     }
 
     /// <summary>
@@ -202,10 +243,22 @@ internal static class ShopSources
                 ? ItemSources.CurrencyName(FirstSealItemId + FirstOf(companies) - 1, seals != 1)
                 : null;
 
-            into.Add(itemId, new AcquisitionSource(
-                AcquisitionKind.GrandCompany,
-                "Grand Company",
-                ItemSources.Price(seals, currency ?? "Grand Company seals")));
+            var detail = ItemSources.Price(seals, currency ?? "Grand Company seals");
+
+            // One route per company that stocks it, all carrying the same wording. The display only
+            // ever shows one line, because Finish keeps one route per kind - but the by-currency index
+            // keeps all three, which is what puts a piece every company sells under whichever seal the
+            // character actually holds. Emitting a single route with no typed price instead would drop
+            // those 19 pieces out of the shopping list entirely.
+            foreach (var company in companies)
+            {
+                into.Add(itemId, new AcquisitionSource(
+                    AcquisitionKind.GrandCompany,
+                    "Grand Company",
+                    detail,
+                    FirstSealItemId + company - 1,
+                    seals));
+            }
         }
     }
 

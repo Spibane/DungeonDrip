@@ -88,6 +88,45 @@ public sealed class Plugin : IDalamudPlugin
             ? itemSources ??= Core.Sources.ItemSources.Build(Storage)
             : null;
 
+    /// <summary>
+    /// How a piece can be obtained, as the surfaces that describe one should report it.
+    /// </summary>
+    /// <remarks>
+    /// The one way anything draws acquisition routes, so the sell-back setting cannot be honoured by three
+    /// surfaces and forgotten by the fourth. Going through <see cref="ItemSources"/> directly is what a new
+    /// surface would do by default, and it would be subtly wrong.
+    ///
+    /// <b>Returns null when nothing has been consulted</b> - the setting that builds the index is off -
+    /// which callers must keep distinct from an empty list meaning "looked, and found nothing". Saying
+    /// "source unknown" about a question never asked is the mistake this distinction exists to prevent.
+    ///
+    /// A plain buy-back is dropped when the setting asks for it; an event piece keeps its line either way.
+    /// The two are separated because hiding "Event re-purchase - 47 gil" would leave the lookup answering
+    /// "source unknown" about a Pumpkin Head, which the plugin plainly does know the answer to. Filtered
+    /// here rather than in the index because the index is built once per load and the setting is not.
+    /// </remarks>
+    public IReadOnlyList<Core.Sources.AcquisitionSource>? SourcesFor(uint itemId)
+    {
+        var sources = ItemSources;
+        if (sources == null)
+            return null;
+
+        var routes = sources.For(itemId);
+        if (!Configuration.ExcludeSellBackVendors)
+            return routes;
+
+        var kept = new List<Core.Sources.AcquisitionSource>(routes.Count);
+        foreach (var route in routes)
+        {
+            if (route.Repurchase && !route.EventOnly)
+                continue;
+
+            kept.Add(route);
+        }
+
+        return kept;
+    }
+
     /// <summary>Outfit-set membership, needed anywhere ownership is judged.</summary>
     public OutfitCatalog Outfits { get; }
 
@@ -631,10 +670,11 @@ public sealed class Plugin : IDalamudPlugin
             ChatGui.Print($"   Drops in: {string.Join(", ", named)}{tail}.");
         }
 
-        // Read once: the property builds the index on first touch, and asking twice would also let the
-        // setting change between the two reads.
-        var sources = ItemSources;
-        var acquisitions = sources?.For(itemId) ?? [];
+        // Read once: the accessor builds the index on first touch, and asking twice would also let the
+        // setting change between the two reads. Null means nothing looked, which is not the same as
+        // nothing found - see SourcesFor.
+        var routes = SourcesFor(itemId);
+        var acquisitions = routes ?? [];
 
         // No cap. One line per kind holds this to three lines in practice and six at the structural
         // worst, so there is nothing left to truncate - see ItemSources.Accumulator.Finish.
@@ -643,7 +683,7 @@ public sealed class Plugin : IDalamudPlugin
 
         // Only claim nothing is known where something actually looked. With the setting off the index
         // was never built, so saying the source is unknown would be reporting a question not asked.
-        if (drops.Count == 0 && acquisitions.Count == 0 && sources != null)
+        if (drops.Count == 0 && acquisitions.Count == 0 && routes != null)
             DescribeNoSource(itemId);
 
         PrintReferenceLink(itemId);

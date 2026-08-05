@@ -4,7 +4,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-0.16.0-121212)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.17.0-121212)](./CHANGELOG.md)
 [![Status](https://img.shields.io/badge/status-Beta-yellow)](./CHANGELOG.md)
 [![Changelog](https://img.shields.io/badge/changelog-blue)](./CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-AGPL--3.0--or--later-663366)](./LICENSE)
@@ -238,20 +238,88 @@ that lands back here and a thumbtack when it lands on the duty currently being s
 ## Collection
 
 The toolbar's first button swaps the window between duty loot and the collection as a whole. Three
-sections, none of which involves a duty:
+tabs, none of which involves a duty, and the window reopens on whichever was last used:
 
 **Sets in progress** — outfit sets part way through, closest to done first. Expanding one lists what is
 missing and where each piece drops. A set with nothing collected from it is not "in progress", and
 neither is a finished one; that definition is what keeps the list a readable length.
 
-**Glamour Dresser** — how full the box is and what would free space. An outfit stored a piece at a
+**Ready to buy** — one group per currency in your Currency tab, listing the unowned gear it buys with
+what you can afford right now on top. The balance and an affordable count sit on the heading, so a
+currency worth spending is the one at the top of the section.
+
+**A currency is whatever is in that tab, and that is deliberate.** The shops sheet prices gear in 2,919
+different things, of which 2,530 buy exactly one piece — because most are not currencies at all but gear
+being traded up, one base piece for one augmented one. Reading the tab settles it with no guesswork and
+follows whatever a patch does. The limit that comes with it: a currency you hold none of is absent, so
+this answers *what can I spend* rather than *what would farming this be worth*.
+
+Gil starts collapsed — it prices around 5,000 storable pieces, more than every other currency together.
+Each group lists its ten cheapest with a **Show all** toggle, and a piece appears once per currency,
+since the same till often lists one piece twice. A piece buyable two different ways appears under both.
+Needs **Say how gear is obtained besides dropping**.
+
+**Outfit sets only** — a toggle on the section, and in Settings, holding the list to pieces that belong
+to an outfit set. Worth having because most priced gear is single pieces: about one in seven belongs to a
+set, and for gil it is 483 of 5,690. A currency that buys no set pieces at all drops out entirely — Sack
+of Nuts prices 450 pieces and none of them is in a set — so the section gets shorter by whole groups as
+well as by rows. Hunting one particular piece is quicker through `/dungeondrip item <name>` than by
+scrolling this.
+
+**Gear a counter will only sell back to you is left out by default.** The game's files record what a
+shop stocks, not what you are entitled to, so 1,053 pieces would otherwise be listed at a price most
+characters cannot pay at any balance — 1,028 of them in gil, the balance everybody has. This is the one
+filter here that is **on** by default, because it corrects the list rather than narrowing it.
+
+Two kinds of counter, recognised differently:
+
+| Counter | How it is spotted | Pieces |
+| --- | --- | --- |
+| Calamity Salvager, Recompense Officer | the shops those NPCs offer | 337 |
+| Rowena's representatives, buying back | any special shop whose **only** cost is gil | 716 |
+
+**For the event counters, being in their stock is enough on its own.** A third of those pieces are listed
+against another vendor too, which looks like proof the piece is ordinarily for sale and is the opposite —
+those vendors are the events' own: the creepy peddler, the Starlight supplier, the House Valentione maid,
+the Moonfire Faire vendor, the Little Lady, the uma and hitsuji shonin. None is in the world the rest of
+the year.
+
+**Gil alone means a buy-back; gil beside another cost does not.** *Augmented Ironworks Helm of Fending* is
+listed at 345 gil, and that is a re-purchase — the real route is the upgrade trade, one Ironworks Helm
+plus a 100 gil fee, which 712 of the 716 also carry. So a lone gil price is hidden and a gil fee paid
+alongside something else is not.
+
+Everywhere a piece is described — the chat lookup, the right-click menu, the tooltips — a buy-back is
+named as one rather than as a vendor:
+
+| Piece | Reads |
+| --- | --- |
+| *Augmented Ironworks Helm of Fending* | **Special Shop — 1 Ironworks Helm of Fending** (the real route; the 345 gil buy-back is dropped) |
+| *Augmented Crystarium Milpreves* | **Re-purchase — 600 gil** (no other route exists; one of only 4) |
+| *Pumpkin Head* | **Event re-purchase — 47 gil** (337 pieces; gone unless you were there) |
+
+The price is kept in every case, since it is still what the counter charges. Only the claim that it is a
+way to obtain the piece is removed.
+
+**The setting reaches these descriptions too, but not evenly.** With it on, the 4 pieces whose only route
+is a bare gil buy-back read *Source unknown* everywhere — a price with no way to earn the thing tells you
+nothing. The 337 event pieces keep their line, because hiding it would have a lookup answer *Source
+unknown* about a Pumpkin Head, which is the one thing worth knowing about it.
+
+**MGP quotes the dearer of its two prices.** The cheaper is the Make It Rain campaign, a fortnight a
+year, and the sheet marks neither — so the standard price is the honest one to plan against. MGP is the
+only currency this applies to: its discount is a consistent 30% across all 158 pieces it prices twice,
+and nothing else in the sheet behaves that way.
+
+**Glamour Dresser** — two lists, because they are the same errand from both ends: the box filling up,
+and the gear that could be got rid of to empty it. First, how full it is and what would free space. An outfit stored a piece at a
 time could be one set item instead; a piece in both the dresser and the Armoire is duplicated.
 Collapsing is phrased as a conditional, because it needs the outfit item — a tradeable attire box — and
 owning all the pieces does not produce one. The loose copies also come back to the bags, so the space
 only appears once those are cleared.
 
-**Already in your collection** — every row is **two copies of one piece**: one being held, and one the
-collection already has. Named for the fact rather than the conclusion: it reports the second copy and
+Then **Already in your collection**, under a rule on the same tab — every row is **two copies of one
+piece**: one being held, and one the collection already has. Named for the fact rather than the conclusion: it reports the second copy and
 leaves the decision alone, because that decision is irreversible and is being read off a snapshot that
 may be days old. Split by where the held copy is — bags, armoury, saddlebag, then one heading per
 retainer, with **In Ysayle's bags** and **Worn by Ysayle** kept apart — since what is safe to do differs
@@ -368,6 +436,8 @@ plugin can bound.
 | Record gear that drops in duties | Data | on |
 | Fill gaps from the wiki | Data | on |
 | Say how gear is obtained besides dropping | Data | on |
+| "Ready to buy" lists outfit-set pieces only | Data | off |
+| Leave out gear only sold back to you | Data | on |
 | Reference site for item links | Data | Teamcraft |
 
 Labels above are shortened from the in-game wording. Everywhere the plugin lists gear, only pieces

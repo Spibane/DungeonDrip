@@ -66,6 +66,29 @@ public enum LookupSite
     Lodestone,
 }
 
+/// <summary>
+/// Which of the Collection view's three tabs is showing.
+/// </summary>
+/// <remarks>
+/// Serialised by ordinal, so new members are appended and never inserted.
+///
+/// Window state rather than a preference, like <see cref="MainWindowMode"/>, so it has no control in
+/// Settings. It is stored for the same reason that one is: the window already reopens on whichever of
+/// its two halves was last used, and landing on the first tab every time would half-remember where the
+/// reader had got to.
+/// </remarks>
+public enum CollectionTab
+{
+    /// <summary>Outfit sets part way through.</summary>
+    Sets,
+
+    /// <summary>What a held currency will buy that is not collected.</summary>
+    Buy,
+
+    /// <summary>How full the Glamour Dresser is, and the spare copies that would empty it.</summary>
+    Dresser,
+}
+
 /// <summary>How the missing list is grouped.</summary>
 public enum MissingGrouping
 {
@@ -201,8 +224,22 @@ public class Configuration : IPluginConfiguration
     /// </summary>
     public MainWindowMode MainWindowMode { get; set; } = MainWindowMode.Duty;
 
+    /// <summary>Which Collection tab was last showing. Window state, as above.</summary>
+    public CollectionTab CollectionTab { get; set; } = CollectionTab.Sets;
+
     /// <summary>Headings the user has collapsed, remembered between sessions.</summary>
     public List<string> CollapsedGroups { get; set; } = [];
+
+    /// <summary>
+    /// Headings the user has opened, for the few that start shut.
+    /// </summary>
+    /// <remarks>
+    /// A second list rather than a flag inside the first, because both record a <em>deviation from the
+    /// default</em> and the defaults point opposite ways. A heading that starts open remembers being
+    /// shut; one that starts shut - the gil group, which buys thousands of pieces - remembers being
+    /// opened. Storing "open" and "closed" in one list would make an absent key ambiguous.
+    /// </remarks>
+    public List<string> OpenedGroups { get; set; } = [];
 
     /// <summary>Age at which the cached Glamour Dresser snapshot starts warning.</summary>
     public int StaleAfterDays { get; set; } = 7;
@@ -321,6 +358,51 @@ public class Configuration : IPluginConfiguration
 
     /// <summary>Which reference site the item links open.</summary>
     public LookupSite LookupSite { get; set; } = LookupSite.Teamcraft;
+
+    /// <summary>
+    /// Hold the "Ready to buy" list to pieces that belong to an outfit set.
+    /// </summary>
+    /// <remarks>
+    /// Off by default, like every other filter here, since a filter that hides things before being asked
+    /// to is the wrong way round. It is worth having because the unfiltered list is mostly single pieces:
+    /// only 14% of priced gear belongs to an outfit set, and for gil it is 8% - 483 pieces of 5,690. On
+    /// somebody collecting whole outfits the rest is noise, and someone hunting one specific piece is
+    /// better served by looking it up by name than by scrolling this.
+    ///
+    /// Written from the section's own toggle rather than only from Settings, which is why it lives here
+    /// rather than in per-session state: a view filter that resets every launch would be re-set every
+    /// launch.
+    /// </remarks>
+    public bool ReadyToBuyOutfitsOnly { get; set; }
+
+    /// <summary>
+    /// Leave out gear that a counter will only sell back to whoever already earned it.
+    /// </summary>
+    /// <remarks>
+    /// <b>On by default, unlike the other filters here, because this one corrects the list rather than
+    /// narrowing it.</b> The sheets record what a counter stocks and not what a character is entitled to,
+    /// so 1,053 pieces are offered at a price most characters cannot pay at any balance - 1,028 of them
+    /// in gil, which is the balance everybody has. Shipping that as the default would ship a list that is
+    /// wrong for nearly everyone.
+    ///
+    /// Two counters are involved and they need different tests. 337 pieces come from the Calamity
+    /// Salvager and the Recompense Officer, who restock seasonal and event gear for whoever was there at
+    /// the time. The other 716 come from any special shop whose only cost is gil, which is a buy-back
+    /// price wherever it appears - Rowena's representatives re-selling for small change what tomestones
+    /// bought.
+    ///
+    /// Off is still worth offering: a long-standing character really can buy these back, and for them the
+    /// exclusion hides real answers. See <see cref="Core.Sources.RestrictedVendors"/> and
+    /// <see cref="Core.Sources.ShopSources"/>.
+    ///
+    /// <b>Reaches the descriptions as well as the list, but not evenly.</b> With this on, the 4 pieces whose
+    /// only route is a nameless gil buy-back are described as unknown everywhere, since a price with no way
+    /// to earn the thing tells nobody anything. The 337 event pieces keep their line: hiding "Event
+    /// re-purchase - 47 gil" would leave a lookup answering "source unknown" about a Pumpkin Head, which is
+    /// the one thing worth saying about it. Applied in <see cref="Plugin.SourcesFor"/>, which every surface
+    /// that describes a piece goes through.
+    /// </remarks>
+    public bool ExcludeSellBackVendors { get; set; } = true;
 
     public void Save() => Plugin.PluginInterface.SavePluginConfig(this);
 }
