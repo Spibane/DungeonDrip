@@ -5,9 +5,16 @@ Every field is derived from something that already exists - the plugin manifest,
 csproj version, and the Dalamud SDK version - so the store entry cannot drift out of step
 with what was actually built. Run by the release workflow; safe to run by hand.
 
-Download links point at releases/latest rather than a pinned tag, so publishing a new
-release does not require touching the links at all. Only AssemblyVersion moves, and that
-is what tells Dalamud an update exists.
+Download links are pinned to the release tag rather than pointing at releases/latest. That
+matters because this file is committed before the release is published: with "latest" the
+manifest would advertise the new version while the link still served the previous release's
+zip, so anyone refreshing in that window installed the old plugin under the new version
+number. A pinned link simply is not there yet, which fails visibly instead.
+
+Nothing here reads the build output - not the zip, not its size, not a hash - which is why
+this file belongs in the release commit rather than being written back to main afterwards.
+Run with --check, the release workflow verifies the committed file instead of rewriting it,
+so main needs no push from CI and can require pull requests like any other branch.
 """
 
 from __future__ import annotations
@@ -73,7 +80,11 @@ def main() -> None:
 
     if "--check-tag" in sys.argv:
         check_tag(sys.argv[sys.argv.index("--check-tag") + 1], version)
-    download = f"{REPO}/releases/latest/download/{ASSET}"
+
+    # The csproj carries four parts and the tag three, so the tag is derived rather than read
+    # from the environment - this has to produce the same manifest run by hand as it does in CI.
+    tag = "v" + ".".join(version.split(".")[:3])
+    download = f"{REPO}/releases/download/{tag}/{ASSET}"
 
     entry = {
         "Author": manifest["Author"],
@@ -97,8 +108,35 @@ def main() -> None:
         "CategoryTags": manifest.get("CategoryTags", []),
     }
 
-    OUTPUT.write_text(json.dumps([entry], indent=2) + "\n", encoding="utf-8")
+    rendered = json.dumps([entry], indent=2) + "\n"
+
+    if "--check" in sys.argv:
+        check(rendered, version, api_level)
+        return
+
+    OUTPUT.write_text(rendered, encoding="utf-8")
     print(f"wrote {OUTPUT.name}: {entry['Name']} {version}, API {api_level}")
+
+
+def check(rendered: str, version: str, api_level: int) -> None:
+    """Verifies the committed manifest is what this script would write, without writing it.
+
+    The point of generating repo.json was that the store entry cannot drift from what was
+    built. Comparing gives the same guarantee without CI needing to push to main - which is
+    what lets main require pull requests. The failure names the command that fixes it,
+    because the usual cause is a version bump that forgot this file.
+    """
+    if not OUTPUT.exists():
+        fail(f"{OUTPUT.name} is missing; run tools/make-repo-json.py and commit it")
+
+    if OUTPUT.read_text(encoding="utf-8") == rendered:
+        print(f"{OUTPUT.name} is current: {version}, API {api_level}")
+        return
+
+    fail(
+        f"{OUTPUT.name} does not match the csproj ({version}, API {api_level}). "
+        "Run tools/make-repo-json.py and commit the result."
+    )
 
 
 if __name__ == "__main__":

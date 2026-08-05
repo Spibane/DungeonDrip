@@ -4,15 +4,19 @@ name: Release
 #
 #   git tag v0.11.0 && git push origin v0.11.0
 #
-# which builds, attaches the zip to a GitHub Release, regenerates repo.json and commits it
-# back to main. Users of the third-party repository then see the update on their next
-# plugin-list refresh.
+# which builds the tagged commit and attaches the zip to a GitHub Release. Users of the
+# third-party repository then see the update on their next plugin-list refresh.
+#
+# Nothing here writes to main. repo.json is committed as part of the release change and only
+# verified below, so main can require pull requests without CI needing to bypass that. The
+# version bump, the changelog heading and repo.json therefore all belong in the same pull
+# request - see the Releasing section of the readme.
 
 on:
   push:
     tags: ['v*']
 
-# Needed to create the release and to push the regenerated manifest.
+# Creating the release needs this. Pushing does not happen at all.
 permissions:
   contents: write
 
@@ -20,16 +24,17 @@ jobs:
   release:
     runs-on: windows-latest
     steps:
-      # main, not the tag, because repo.json is committed back here and must land on a
-      # branch. The next step proves the tag actually points into main's history.
+      # The tag itself, so the zip is built from exactly what was tagged. This used to check
+      # out main because repo.json was committed back onto it, which meant a commit landing
+      # between the tag and this run was what actually got published.
       - uses: actions/checkout@v4
         with:
-          ref: main
+          ref: ${{ github.ref_name }}
           fetch-depth: 0
 
       - name: Verify the tag is on main
         run: |
-          git fetch --tags --force
+          git fetch origin main --tags --force
           $tagSha = git rev-list -n 1 $env:GITHUB_REF_NAME
           git merge-base --is-ancestor $tagSha origin/main
           if ($LASTEXITCODE -ne 0) {
@@ -62,10 +67,12 @@ jobs:
           Copy-Item $zip.FullName dist\DungeonDrip.zip
           Write-Host "Packaged $($zip.FullName) -> dist\DungeonDrip.zip"
 
-      # Fails the run if the tag and the built AssemblyVersion disagree, which would produce
-      # a release Dalamud never offers as an update.
-      - name: Regenerate repo.json
-        run: python tools\make-repo-json.py --check-tag $env:GITHUB_REF_NAME
+      # Verifies rather than rewrites: the committed manifest has to be what the generator
+      # would produce, and its version has to match the tag. Either mismatch would give a
+      # release Dalamud never offers as an update, and both are the author's to fix in the
+      # release pull request rather than something CI can paper over by pushing.
+      - name: Verify repo.json
+        run: python tools\make-repo-json.py --check --check-tag $env:GITHUB_REF_NAME
 
       # Release first: repo.json points at releases/latest/download, so the target has to
       # exist before the manifest advertising it is published.
@@ -77,17 +84,3 @@ jobs:
           gh release create $env:GITHUB_REF_NAME dist\DungeonDrip.zip `
             --title "Dungeon Drip $env:GITHUB_REF_NAME" `
             --notes-file notes.md
-
-      - name: Commit repo.json if it changed
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add repo.json
-          git diff --cached --quiet
-          if ($LASTEXITCODE -ne 0) {
-            git commit -m "Update repo.json for $env:GITHUB_REF_NAME"
-            git push origin HEAD:main
-            Write-Host "repo.json updated on main."
-          } else {
-            Write-Host "repo.json already current."
-          }

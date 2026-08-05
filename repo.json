@@ -13,9 +13,9 @@
     "IsTestingExclusive": false,
     "DownloadCount": 0,
     "LastUpdate": 0,
-    "DownloadLinkInstall": "https://github.com/Spibane/DungeonDrip/releases/latest/download/DungeonDrip.zip",
-    "DownloadLinkUpdate": "https://github.com/Spibane/DungeonDrip/releases/latest/download/DungeonDrip.zip",
-    "DownloadLinkTesting": "https://github.com/Spibane/DungeonDrip/releases/latest/download/DungeonDrip.zip",
+    "DownloadLinkInstall": "https://github.com/Spibane/DungeonDrip/releases/download/v0.16.0/DungeonDrip.zip",
+    "DownloadLinkUpdate": "https://github.com/Spibane/DungeonDrip/releases/download/v0.16.0/DungeonDrip.zip",
+    "DownloadLinkTesting": "https://github.com/Spibane/DungeonDrip/releases/download/v0.16.0/DungeonDrip.zip",
     "IconUrl": "https://raw.githubusercontent.com/Spibane/DungeonDrip/main/images/icon.png",
     "Tags": [
       "glamour",
