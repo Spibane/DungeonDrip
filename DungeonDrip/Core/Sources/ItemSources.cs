@@ -339,9 +339,14 @@ public sealed class ItemSources
         /// whichever balance the character actually holds. Merging the two would silently break whichever
         /// guarantee the merge dropped.
         ///
-        /// The gil-for-achievement suppression is not applied either. It exists so a re-purchase counter
-        /// does not read as a way to obtain a piece; someone browsing what their gil will buy is asking a
-        /// question that counter genuinely answers.
+        /// <b>An achievement piece's shop routes are marked unavailable here, which they were not at
+        /// first.</b> The reasoning for leaving them alone was that a character who earned the achievement
+        /// really can buy the piece back - true, and beside the point: the counter will not sell it to
+        /// anyone who has not, so listing Field Commander's Coat at 1,000 gil promised most characters
+        /// something they cannot do. All 94 achievement-reward pieces carry such a route. Whether the
+        /// achievement is earned is per-character state the sheets cannot answer, so the honest default is
+        /// to treat the route as gated - the same setting that hides the other sell-back counters governs
+        /// it, and the display already names the achievement instead.
         ///
         /// Around 11,700 offers over the retail sheets, so holding both indexes costs nothing worth
         /// measuring.
@@ -352,6 +357,15 @@ public sealed class ItemSources
 
             foreach (var (itemId, sources) in byItem)
             {
+                // A piece the achievements grant is one no counter will sell to a character who has not
+                // earned it, whatever the till takes - so every priced route to it is gated.
+                var claimable = false;
+                foreach (var source in sources)
+                {
+                    if (source.Kind == AcquisitionKind.Achievement)
+                        claimable = true;
+                }
+
                 foreach (var source in sources)
                 {
                     if (!source.HasPrice)
@@ -360,10 +374,11 @@ public sealed class ItemSources
                     if (!byCurrency.TryGetValue(source.CurrencyItemId, out var offers))
                         byCurrency[source.CurrencyItemId] = offers = [];
 
-                    // Both halves of "cannot actually be bought" are folded in here, since the shopping
-                    // list needs one answer: the piece is event stock, or this route is a buy-back price.
-                    offers.Add(new CurrencyOffer(
-                        itemId, source.Amount, eventOnly.Contains(itemId) || source.Repurchase));
+                    // Every reason a price cannot actually be paid is folded in here, since the shopping
+                    // list needs one answer: event stock, a buy-back price, or an achievement's reward.
+                    var gated = eventOnly.Contains(itemId) || source.Repurchase || claimable;
+
+                    offers.Add(new CurrencyOffer(itemId, source.Amount, gated));
                 }
             }
 

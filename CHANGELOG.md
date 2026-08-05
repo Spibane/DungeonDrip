@@ -1,5 +1,9 @@
 # Changelog
 
+### v0.17.1 - 2026-08-05
+- Fixed achievement rewards appearing in **Ready to buy** at their re-purchase price. Field Commander's Coat is granted by *Between a Rock and a Hard Place V* and carries one 1,000 gil shop row, which is the counter that hands it back to whoever earned it - so the list was offering it to characters who cannot buy it at any price. All 94 achievement-reward pieces were affected
+- The cause was a rule applied to one of the two indexes and not the other. The per-piece answer already dropped the gil route in favour of naming the achievement; the by-currency answer kept it, behind a comment of mine reasoning that a character who earned the achievement really can buy it back. True, and beside the point - the counter will not sell to anyone who has not, and whether it has been earned is per-character state the sheets cannot answer. Every priced route to an achievement reward is now gated on the same setting as the other sell-back counters, and the display continues to name the achievement instead
+
 ### v0.17.0 - 2026-08-05
 - **The Collection view is three tabs rather than a stack of collapsing headers.** Four headers one under another, each with its own collapsibles inside it, gave no reading of the window that told a section apart from a group within one - every list looked like a row in the list above it. A tab strip says outright that these are separate questions. The window reopens on whichever tab was last used, as it already reopens on whichever half of the window was last used
 - The collapsible headings inside those tabs are no longer tinted blue. That colour was there to tell one section from the next while all four were stacked in one column, and with a tab strip doing that job a coloured heading only competes with the amber that means a stale snapshot. Amber stays where it is a warning; blue stays on the rows and figures where it marks something out rather than merely separating it
