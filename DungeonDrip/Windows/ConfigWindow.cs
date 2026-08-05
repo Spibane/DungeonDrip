@@ -1,4 +1,5 @@
 using System;
+using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
@@ -43,11 +44,40 @@ public class ConfigWindow : Window
     /// <summary>Said on both copies of a setting that has one value.</summary>
     private const string StorePanelShared = "Applies to the Glamour Dresser and Armoire panels alike.";
 
+    /// <remarks>
+    /// Not <see cref="ImGuiWindowFlags.AlwaysAutoResize"/>, which this used to be. Auto-resize grows the
+    /// window to whatever the tallest tab needs and never scrolls, so the Data tab ran off the bottom of
+    /// smaller screens - and it could not be fixed by shortening the tab, because that tab lists one row
+    /// per retainer read and a character may have ten. A height the plugin cannot bound needs a scrollbar
+    /// rather than a tidier layout.
+    /// </remarks>
     public ConfigWindow(Plugin plugin)
-        : base("Dungeon Drip Settings###DungeonDripConfig", ImGuiWindowFlags.AlwaysAutoResize)
+        : base("Dungeon Drip Settings###DungeonDripConfig")
     {
         this.plugin = plugin;
         configuration = plugin.Configuration;
+
+        Size = new Vector2(560, 620);
+        SizeCondition = ImGuiCond.FirstUseEver;
+    }
+
+    /// <summary>
+    /// Holds the window inside the screen, whatever the tallest tab wants.
+    /// </summary>
+    /// <remarks>
+    /// Per frame rather than in the constructor, because the viewport is not reliably sized that early
+    /// and the game window can be resized afterwards. The minimum is clamped under the maximum for the
+    /// case that would otherwise invert it - a very short screen, or the game windowed small.
+    /// </remarks>
+    public override void PreDraw()
+    {
+        var available = ImGuiHelpers.MainViewport.WorkSize.Y * 0.9f;
+
+        SizeConstraints = new WindowSizeConstraints
+        {
+            MinimumSize = new Vector2(460, Math.Min(320, available)),
+            MaximumSize = new Vector2(float.MaxValue, available),
+        };
     }
 
 
@@ -70,31 +100,37 @@ public class ConfigWindow : Window
         using (var general = ImRaii.TabItem("General"))
         {
             if (general.Success)
-                changed |= DrawGeneralTab();
+                changed |= Body("general", DrawGeneralTab);
         }
 
         using (var duties = ImRaii.TabItem("Duties"))
         {
             if (duties.Success)
-                changed |= DrawDutiesTab();
+                changed |= Body("duties", DrawDutiesTab);
         }
 
         using (var panels = ImRaii.TabItem("Panels"))
         {
             if (panels.Success)
-                changed |= DrawPanelsTab();
+                changed |= Body("panels", DrawPanelsTab);
         }
 
         using (var inGame = ImRaii.TabItem("In-game UI"))
         {
             if (inGame.Success)
-                changed |= DrawInGameTab();
+                changed |= Body("inGame", DrawInGameTab);
         }
 
         using (var data = ImRaii.TabItem("Data"))
         {
             if (data.Success)
-                changed |= DrawDataTab();
+                changed |= Body("data", DrawDataTab);
+        }
+
+        using (var files = ImRaii.TabItem("Files"))
+        {
+            if (files.Success)
+                changed |= Body("files", DrawFilesTab);
         }
 
         if (changed)
@@ -102,6 +138,20 @@ public class ConfigWindow : Window
             configuration.Save();
             plugin.InvalidateReport();
         }
+    }
+
+    /// <summary>
+    /// Draws one tab's contents into a region that scrolls on its own.
+    /// </summary>
+    /// <remarks>
+    /// A child filling the remaining space, so the scrollbar belongs to the body and the tab strip stays
+    /// put. Letting the window itself scroll instead would carry the tabs off the top edge, leaving no
+    /// way back to another tab without scrolling up first.
+    /// </remarks>
+    private static bool Body(string id, Func<bool> draw)
+    {
+        using var child = ImRaii.Child(id, Vector2.Zero);
+        return child.Success && draw();
     }
 
     /// <summary>
@@ -759,6 +809,42 @@ public class ConfigWindow : Window
             }
         }
 
+        SectionHeading(
+            "Where gear comes from",
+            "Read out of the game's own files, so this needs no download and is never out of date.");
+
+        var sources = configuration.ShowAcquisitionSources;
+        if (UiParts.Toggle("Say how gear is obtained besides dropping", ref sources,
+                "Adds crafted, sold, traded, quest and achievement sources - with the currency and\n" +
+                "price - to lookups, right-click menus and the gear tooltips.\n\n" +
+                "Reading every recipe, shop, quest and achievement in the game takes a moment. It is\n" +
+                "done the first time you ask, not at login, and not at all while this is off."))
+        {
+            configuration.ShowAcquisitionSources = sources;
+            changed = true;
+        }
+
+        var site = configuration.LookupSite;
+        if (ImGui.BeginCombo("Look items up on", LookupSiteLabel(site)))
+        {
+            foreach (var option in Enum.GetValues<LookupSite>())
+            {
+                if (ImGui.Selectable(LookupSiteLabel(option), site == option))
+                {
+                    configuration.LookupSite = option;
+                    changed = true;
+                }
+            }
+
+            ImGui.EndCombo();
+        }
+
+        ImGui.TextWrapped(
+            "Where the \"look it up\" link and menu entry go. The first three find the item by its ID " +
+            "and always land on the right page; the wikis and the Lodestone go by name, so an oddly " +
+            "titled piece may not have a page there. Universalis shows market board prices rather " +
+            "than sources.");
+
         SectionHeading("Learning from what you see drop");
 
         var learn = configuration.LearnDropsFromLoot;
@@ -795,7 +881,22 @@ public class ConfigWindow : Window
             "Learned drops are written to learned-loot.json in the same format as loot-overrides.json, " +
             "so you can promote them by hand or contribute them upstream.");
 
-        SectionHeading("Files");
+        ImGui.Spacing();
+        return changed;
+    }
+
+    /// <summary>
+    /// Where the caches live on disk, and the button that empties all of them.
+    /// </summary>
+    /// <remarks>
+    /// Split off the Data tab, which had grown to seven sections. Neither of these is a setting - one is
+    /// a path and two buttons, the other is a destructive action - so they were the two blocks that could
+    /// leave without splitting a subject in half. The per-cache resets stay on the Data tab beside the
+    /// refresh each belongs to, since a reset only makes sense next to what it resets.
+    /// </remarks>
+    private bool DrawFilesTab()
+    {
+        TabHeading("Files");
 
         ImGui.TextWrapped(
             "Missing drops for a very recent dungeon? Add them to loot-overrides.json in the config " +
@@ -816,24 +917,30 @@ public class ConfigWindow : Window
         SectionHeading("Start again");
 
         ImGui.TextWrapped(
-            "Everything above in one go: the collection snapshot for this character, the downloaded " +
-            "loot data, the wiki lookups and the drops learned in game. Each of them rebuilds itself " +
-            "from the game or from upstream, so this costs time rather than anything permanent.");
+            "Every cache in one go: the collection snapshot for this character, the downloaded loot " +
+            "data, the wiki lookups and the drops learned in game. Each of them rebuilds itself from " +
+            "the game or from upstream, so this costs time rather than anything permanent.");
 
         // Said plainly, because "reset everything" is exactly the phrase somebody reaches for when they
         // want their settings back to defaults, and this button does not do that.
         ImGui.TextColored(Palette.Muted, "Your settings are not touched.");
 
+        // "on the Data tab" rather than "above", now that they are not above. The wording matters more
+        // than it looks: this button is destructive and the tooltip is where its scope is stated.
         if (ResetButton(
                 "everything",
                 "Forget everything cached",
-                "The four resets above, together. Nothing in the game is touched and no setting changes."))
+                "The four resets on the Data tab, together. Nothing in the game is touched and no\n" +
+                "setting changes."))
         {
             ForgetEverything();
         }
 
         ImGui.Spacing();
-        return changed;
+
+        // Nothing here writes a setting, and saying so beats returning a bare false that reads like an
+        // oversight next to five tabs that do.
+        return false;
     }
 
     /// <summary>Every cache the plugin keeps, dropped in one press.</summary>
@@ -973,6 +1080,21 @@ public class ConfigWindow : Window
         MissingGrouping.Role => "Role that can roll Need",
         MissingGrouping.Source => "Boss or coffer",
         _ => "Equipment slot",
+    };
+
+    /// <remarks>
+    /// Says which of the two keying schemes each site uses, because that is what decides whether the
+    /// link can miss - and the combo is the only place a player is choosing between them.
+    /// </remarks>
+    private static string LookupSiteLabel(LookupSite site) => site switch
+    {
+        LookupSite.Teamcraft => "Teamcraft (by ID)",
+        LookupSite.GarlandTools => "Garland Tools (by ID)",
+        LookupSite.Universalis => "Universalis - market prices (by ID)",
+        LookupSite.ConsoleGamesWiki => "Console Games Wiki (by name)",
+        LookupSite.GamerEscape => "Gamer Escape (by name)",
+        LookupSite.Lodestone => "Lodestone Eorzea Database (search)",
+        _ => site.ToString(),
     };
 
     private static string ScopeLabel(CollectionScope scope) => scope switch

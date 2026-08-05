@@ -45,6 +45,27 @@ public enum MainWindowMode
     Collection,
 }
 
+/// <summary>
+/// Which reference site the plugin's item links point at.
+/// </summary>
+/// <remarks>
+/// Serialised by ordinal, so new members must be appended and never inserted - reordering silently
+/// repoints every existing install at a different site.
+///
+/// The order is also the order of the Settings combo, and it puts the three sites addressed by item id
+/// first. Those cannot land on the wrong page; the three below them are addressed by article title,
+/// which is a guess that can miss. See <see cref="Core.Sources.ItemLink"/>.
+/// </remarks>
+public enum LookupSite
+{
+    Teamcraft,
+    GarlandTools,
+    Universalis,
+    ConsoleGamesWiki,
+    GamerEscape,
+    Lodestone,
+}
+
 /// <summary>How the missing list is grouped.</summary>
 public enum MissingGrouping
 {
@@ -286,6 +307,20 @@ public class Configuration : IPluginConfiguration
     /// function, so it is opted into rather than out of.
     /// </remarks>
     public bool ShowTooltipLine { get; set; }
+
+    /// <summary>
+    /// Say where a piece comes from besides a duty - crafted, bought, or given for something.
+    /// </summary>
+    /// <remarks>
+    /// On by default, but worth a switch rather than being unconditional: answering it means sweeping
+    /// every recipe, shop, quest and achievement row in the game, and that build is skipped entirely
+    /// while this is off. Somebody who only uses the plugin inside duties pays nothing for a question
+    /// they never ask.
+    /// </remarks>
+    public bool ShowAcquisitionSources { get; set; } = true;
+
+    /// <summary>Which reference site the item links open.</summary>
+    public LookupSite LookupSite { get; set; } = LookupSite.Teamcraft;
 
     public void Save() => Plugin.PluginInterface.SavePluginConfig(this);
 }

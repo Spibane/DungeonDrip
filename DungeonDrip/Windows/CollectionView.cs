@@ -204,15 +204,27 @@ public sealed class CollectionView(Plugin plugin)
 
         UiParts.ItemContextMenu(plugin, piece.ItemId, piece.Name);
 
-        var sources = plugin.Drops?.For(piece.ItemId);
-        if (sources is not { Count: > 0 })
+        // One line, so one route: the duty if there is one, otherwise the best non-duty route. The
+        // duty wins because this view is about finishing a set and a duty can be queued for from here,
+        // where a vendor cannot. Both being absent leaves the row bare, which is the honest state -
+        // see the drop index and the source index on why neither can say "nowhere".
+        var drops = plugin.Drops?.For(piece.ItemId);
+        if (drops is { Count: > 0 })
+        {
+            var best = drops[0];
+            ImGui.SameLine();
+            ImGui.TextColored(Palette.Muted, best.Level > 0
+                ? $"- {best.DutyName} (Lv. {best.Level})"
+                : $"- {best.DutyName}");
+            return;
+        }
+
+        var acquisitions = plugin.ItemSources?.For(piece.ItemId);
+        if (acquisitions is not { Count: > 0 })
             return;
 
-        var best = sources[0];
         ImGui.SameLine();
-        ImGui.TextColored(Palette.Muted, best.Level > 0
-            ? $"- {best.DutyName} (Lv. {best.Level})"
-            : $"- {best.DutyName}");
+        ImGui.TextColored(Palette.Muted, $"- {acquisitions[0].Describe()}");
     }
 
     private void DrawDresserPressure()

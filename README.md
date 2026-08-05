@@ -4,7 +4,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-0.15.1-121212)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.16.0-121212)](./CHANGELOG.md)
 [![Status](https://img.shields.io/badge/status-Beta-yellow)](./CHANGELOG.md)
 [![Changelog](https://img.shields.io/badge/changelog-blue)](./CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-AGPL--3.0--or--later-663366)](./LICENSE)
@@ -78,6 +78,11 @@ were used, so treat this as temporary — it goes away once the official submiss
 Everything on the right branches straight off the collection: those ask only "do I have this?", so
 they need no loot data and work at any shop, any board and any dresser — not just the ones that
 involve duty gear.
+
+Sitting outside that pipeline entirely is a second answer about a piece: how it can be obtained when
+it is not a duty drop, read from the game's own recipe, shop, quest and achievement sheets. It joins
+none of the merging above — it is keyed by item rather than by territory, and it changes only when the
+game does — but it appears wherever a piece does. See [Where gear comes from](#where-gear-comes-from).
 
 **The Glamour Dresser needs opening now and then.** The game wipes dresser data on every zone change
 and only loads the Armoire on demand, so nothing is readable from inside a dungeon. Dungeon Drip
@@ -313,7 +318,7 @@ so — nothing else is affected.
 | `/dungeondrip` | Toggle the window |
 | `/drip`, `/ddrip` | Aliases, claimed only if no other plugin owns them |
 | `/dungeondrip <duty name>` | Show that duty; an ambiguous name opens the picker |
-| `/dungeondrip <gear name>` | Say where a piece is in the collection and where it drops |
+| `/dungeondrip <gear name>` | Say where a piece is in the collection and every way to obtain it |
 | `/dungeondrip item <name>` | The same, forced — for a piece whose name is inside a duty's |
 | `/dungeondrip config` | Settings |
 | `/dungeondrip refresh` | Re-read the dresser and armoire |
@@ -324,7 +329,13 @@ so — nothing else is affected.
 
 Settings are split by what they affect. **General** holds the rules every gear list obeys — the duty
 window, the loot-roll companion and the vendor panel alike. **Duties** and **Vendors** hold only
-what is specific to that surface.
+what is specific to that surface. **Data** covers where the plugin's answers come from, and **Files**
+holds the config folder and the one button that empties every cache — neither of those is a setting,
+which is why they sit apart from the rest.
+
+Each tab scrolls on its own if it does not fit, and the window is held inside the screen rather than
+growing past it — the Data tab lists one row per retainer read, so its height is not something the
+plugin can bound.
 
 | Setting | Tab | Default |
 | --- | --- | --- |
@@ -356,15 +367,80 @@ what is specific to that surface.
 | Warn when dresser data is older than | Data | 7 days |
 | Record gear that drops in duties | Data | on |
 | Fill gaps from the wiki | Data | on |
+| Say how gear is obtained besides dropping | Data | on |
+| Reference site for item links | Data | Teamcraft |
 
 Labels above are shortened from the in-game wording. Everywhere the plugin lists gear, only pieces
 the chosen store can actually hold are shown. Duty coverage is dungeons and alliance raids; trials,
 8-player raids, deep dungeons and the rest are not tracked.
 
+## Where gear comes from
+
+Beside the duty it drops in, a piece carries the other routes to it, read out of the game's own Excel
+sheets — so this needs no download, cannot go stale, and is exact to the installed patch.
+
+Every line reads `Route - detail`.
+
+| Line | Read from | Detail |
+| --- | --- | --- |
+| **Crafted** | `Recipe` | the crafting job and recipe level |
+| **Vendor** | `GilShopItem`, and any special shop charging gil | gil |
+| **Special Shop** | `SpecialShop` | whatever the till takes, named — tomestones, scrips, marks, gemstones, or an exchange material |
+| **Grand Company** | `GCScripShopItem`, `GCScripShopCategory` | Storm, Serpent or Flame Seals — the company that actually stocks it |
+| **Quest** | `Quest` | the quest and its level |
+| **Achievement** | `Achievement` | the achievement |
+
+**One line per kind, not one per route.** A piece handed over for any of eight different materials
+would otherwise spend eight near-identical **Special Shop** lines and push the useful one off the end.
+Of 18,707 pieces answered, 13,737 have one line, 3,792 two and 1,178 three.
+
+**The seal is named because the stock is company-exclusive.** Of the 464 storable pieces a
+quartermaster sells, 445 come from exactly one company and only 19 from all three — so "Grand Company
+seals" would hide a real restriction on 96% of them. The 19 sold by every company keep the generic
+wording. Prices never differ between companies.
+
+**A gil route is hidden where an achievement route exists.** An achievement reward can be re-bought
+from a vendor once claimed, which the sheets record as an ordinary sale — so the piece would look
+purchasable outright. All 94 achievement-reward pieces carry such a route, so this is exact rather
+than a heuristic.
+
+**The sheets are exhaustive about recipes and shops and silent about everything distributed another
+way.** The Mog Station, seasonal events, PvP series rewards, deep dungeons, treasure maps and relic
+steps leave no trace in them. So nothing here ever says a piece cannot be obtained. The answer is
+**Source unknown**, with *untradable* or *try the market board* after it where the item row settles
+that much — and nothing of the sort while the setting is off, since a question never asked cannot have
+come back empty.
+
+A price names its own currency because the route name cannot carry the distinction. Most of what the
+special-shop sheet describes is an item-for-item exchange rather than a currency purchase, so
+**Special Shop** alone would read identically for a tomestone counter and an upgrade hand-in.
+
+Which vendor, and where they stand, is deliberately not answered — see **Not implemented**.
+
+### Looking a piece up elsewhere
+
+Any piece's right-click menu, and the end of a chat lookup, links out to a reference site of your
+choosing.
+
+Links are labelled with the site's bare name — a coloured, hoverable name in chat is already
+recognisable as a link.
+
+| Site | Addressed by | Can it miss? |
+| --- | --- | --- |
+| Teamcraft (default) | item ID | no |
+| Garland Tools | item ID | no |
+| Universalis — market prices rather than sources | item ID | no |
+| Console Games Wiki | article title | yes |
+| Gamer Escape | article title | yes |
+| Lodestone Eorzea Database | search query | lands on a results list |
+
+**A title-addressed link is a guess.** The URL is built from the item's name, so an oddly titled piece
+lands on the site's "no such page" screen. That is why the default is addressed by ID.
+
 ### Starting again
 
-Every cache has a reset on the **Data** tab beside its refresh, and one button at the bottom does all
-four at once:
+Every cache has a reset on the **Data** tab beside its own refresh, since a reset only makes sense next
+to what it resets. The one button that does all four together is on the **Files** tab:
 
 | Reset | Throws away | Comes back |
 | --- | --- | --- |
@@ -563,9 +639,17 @@ DungeonDrip/
 │   ├── JobRoles.cs              who can roll Need on a piece
 │   ├── StorageEligibility.cs    what each store can hold
 │   ├── ItemNameIndex.cs         item name → id, for the wiki
-│   ├── GearNameIndex.cs         the same for gear that drops, for the command
+│   ├── GearNameIndex.cs         the same for every storable piece, for the command
 │   ├── EquipSlots.cs
-│   └── Format.cs
+│   ├── Format.cs
+│   └── Sources/                 how a piece is obtained when it is not a duty drop
+│       ├── ItemSources.cs       the facade, and the rules its builders obey
+│       ├── AcquisitionSource.cs one route, and what it costs
+│       ├── ItemLink.cs          an item's URL on the chosen reference site
+│       ├── CraftSources.cs      Recipe: the job and level that makes it
+│       ├── ShopSources.cs       gil, currency and Grand Company tills
+│       ├── QuestSources.cs      Quest reward columns, checked before believed
+│       └── AchievementSources.cs
 └── Windows/
     ├── MissingItemsWindow.cs    picker, freshness banner, item list, roulette advice
     ├── CollectionView.cs        the window's other mode: sets, dresser, carried gear
@@ -626,6 +710,19 @@ game install is needed, and uploads the packaged plugin.
   drops gear has a page laying it out per boss, so a duty is attributed as soon as it has been looked
   up — but a piece only the downloaded dataset knows about was never in a table to be read out of one,
   and is left unattributed rather than guessed into the nearest fight.
+- Which vendor sells a piece, and in which zone. The chain that would answer it — `ENpcBase`'s handler
+  ids matched against shop rows, then the `Level` sheet for a location — was tried and dropped: a shop
+  reached through `CustomTalk`, `TopicSelect` or `PreHandler` indirection resolves to no NPC at all, and
+  an NPC appears in several `Level` rows with nothing to say which is meant. The currency and the price
+  are given instead, and the linked reference site answers the rest properly.
+- Gathering, fishing and retainer ventures as sources. Mining, botany, fishing and spearfishing were
+  measured against the sheets and yield no equippable gear at all. Ventures do turn up 358 pieces, but
+  357 come from Quick Exploration — random, gated on the retainer's level, and every piece in the pool
+  obtainable some other way that can actually be aimed at.
+- Whether a named quest or achievement is already done. Both are per-character state the client only
+  holds once its own window has been opened, so the honest answers would be "done", "not done" and
+  "cannot say yet", with the third showing most often. The quest's level is given instead, which is what
+  makes an old one recognisable.
 - Nothing else currently planned.
 
 ## Licence

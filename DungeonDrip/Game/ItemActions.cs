@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Game.Text.SeStringHandling;
+using DungeonDrip.Core.Sources;
 
 namespace DungeonDrip.Game;
 
@@ -47,7 +48,11 @@ public sealed record ItemAction(
 public static class ItemActions
 {
     /// <summary>How many duties to name before the rest collapse into a count.</summary>
-    private const int MaxNamedSources = 8;
+    /// <remarks>
+    /// Only the duties are capped. The non-duty routes below them are already one line per kind, which
+    /// caps them at three in practice - see <see cref="Core.Sources.ItemSources.Accumulator.Finish"/>.
+    /// </remarks>
+    private const int MaxNamedDuties = 8;
 
     /// <summary>
     /// The actions for one piece on one surface, in the order they should be drawn.
@@ -87,9 +92,21 @@ public static class ItemActions
         // missing piece.
         if (surface == ItemActionSurface.GameMenu)
         {
-            var drops = DropSubmenu(plugin, itemId);
+            var drops = SourceSubmenu(plugin, itemId);
             if (drops != null)
                 actions.Add(drops with { StartsGroup = actions.Count > 0 });
+        }
+
+        // On both surfaces, unlike everything else here. The window rows show where a piece comes
+        // from but cannot be clicked through to a reference site, and the game's menus offer no such
+        // link at all, so neither surface already provides this.
+        if (plugin.Storage.CanBeStored(itemId))
+        {
+            var site = plugin.Configuration.LookupSite;
+            actions.Add(new ItemAction(
+                ItemLink.NameOf(site),
+                () => Dalamud.Utility.Util.OpenLink(ItemLink.For(site, itemId, name)),
+                StartsGroup: actions.Count > 0));
         }
 
         // Both of these the game offers already on its own menus. Divided off from the entries
@@ -108,57 +125,79 @@ public static class ItemActions
     }
 
     /// <summary>
-    /// The duties a piece drops in, as a submenu that navigates to whichever one is chosen.
+    /// Every route to a piece, as a submenu: duties first, which are the only navigable ones.
     /// </summary>
     /// <remarks>
-    /// An empty answer still gets the entry, carrying the reason. Loot coverage is thin for new
-    /// content by design - the wiki is only read for duties that have been opened - so "nothing lists
-    /// this" and "this does not drop" are different statements and only the first can honestly be
-    /// made here. Dropping the entry when there is no answer would read as the menu being broken,
-    /// which is why it is a disabled line rather than an absence.
+    /// Duties lead because they are the only entries that can be acted on - choosing one pins it and
+    /// opens the window. The crafted and bought routes below them carry no destination and are drawn
+    /// as inert lines, an <see cref="ItemAction"/> with no <see cref="ItemAction.Invoke"/>, exactly as
+    /// the "nothing lists this" line already was.
+    ///
+    /// An empty answer still gets the entry, carrying the reason, and the reason has to be careful in
+    /// both directions. Loot coverage is thin for new content by design - the wiki is only read for
+    /// duties that have been opened - and the sheets, while exact about recipes and shops, know
+    /// nothing of the Mog Station, seasonal events, deep dungeons or relic steps. So "nothing lists
+    /// this" is sayable and "this cannot be obtained" is not. Dropping the entry when there is no
+    /// answer would read as the menu being broken, which is why it is an inert line rather than an
+    /// absence.
     /// </remarks>
-    private static ItemAction? DropSubmenu(Plugin plugin, uint itemId)
+    private static ItemAction? SourceSubmenu(Plugin plugin, uint itemId)
     {
-        var drops = plugin.Drops;
-
-        // No loot data at all yet - a different situation from having looked and found nothing,
-        // and not one this menu should editorialise about.
-        if (drops == null)
-            return null;
-
         // Only worth answering for something that could have been a drop in the first place.
         if (!plugin.Storage.CanBeStored(itemId))
             return null;
 
-        var sources = drops.For(itemId);
-        var entries = new List<ItemAction>(Math.Min(sources.Count, MaxNamedSources) + 2);
+        var drops = plugin.Drops;
 
-        if (sources.Count == 0)
+        // Read once, since the property builds the index on first touch. Null means nothing looked -
+        // the setting is off - which has to stay distinct from "looked and found nothing" below.
+        var index = plugin.ItemSources;
+        var acquisitions = index?.For(itemId) ?? [];
+
+        // Nothing consulted at all yet: no loot data, and no source index either. A different situation
+        // from having looked and found nothing, and not one this menu should editorialise about.
+        if (drops == null && index == null)
+            return null;
+
+        var duties = drops?.For(itemId) ?? [];
+        var entries = new List<ItemAction>(
+            Math.Min(duties.Count, MaxNamedDuties) + acquisitions.Count + 2);
+
+        for (var i = 0; i < duties.Count; i++)
         {
-            entries.Add(new ItemAction("Nothing in the loot data lists this piece"));
-        }
-        else
-        {
-            for (var i = 0; i < sources.Count; i++)
+            if (i == MaxNamedDuties)
             {
-                if (i == MaxNamedSources)
-                {
-                    // Hands the rest to the picker rather than growing the menu without limit.
-                    var name = plugin.Duties?.NameOf(sources[i].TerritoryId) ?? string.Empty;
-                    entries.Add(new ItemAction(
-                        $"...and {sources.Count - i} more", () => plugin.ShowDutyPicker(name)));
-                    break;
-                }
-
-                var source = sources[i];
-                var label = source.Level > 0
-                    ? $"{source.DutyName}  (Lv. {source.Level})"
-                    : source.DutyName;
-
-                entries.Add(new ItemAction(label, () => plugin.ShowDuty(source.TerritoryId)));
+                // Hands the rest to the picker rather than growing the menu without limit.
+                var dutyName = plugin.Duties?.NameOf(duties[i].TerritoryId) ?? string.Empty;
+                entries.Add(new ItemAction(
+                    $"...and {duties.Count - i} more", () => plugin.ShowDutyPicker(dutyName)));
+                break;
             }
+
+            var duty = duties[i];
+            var label = duty.Level > 0 ? $"{duty.DutyName}  (Lv. {duty.Level})" : duty.DutyName;
+            entries.Add(new ItemAction(label, () => plugin.ShowDuty(duty.TerritoryId)));
         }
 
-        return new ItemAction("Where does this drop?", Submenu: entries);
+        // Divided off from the duties above, which are the clickable ones. Uncapped, because one line
+        // per kind holds it to three in practice - see ItemSources.Accumulator.Finish.
+        var first = true;
+        foreach (var acquisition in acquisitions)
+        {
+            entries.Add(new ItemAction(
+                acquisition.Describe(), StartsGroup: first && entries.Count > 0));
+            first = false;
+        }
+
+        // Only where something looked. With the source index off, the duties are all that was consulted
+        // and the wording has to say so rather than implying the sheets were read too.
+        if (entries.Count == 0)
+        {
+            entries.Add(new ItemAction(index == null
+                ? "Nothing in the loot data lists this piece"
+                : "Source unknown"));
+        }
+
+        return new ItemAction("Where does this come from?", Submenu: entries);
     }
 }

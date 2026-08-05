@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Dalamud.Game.Player;
 using Dalamud.Game.Text.SeStringHandling;
+using Dalamud.Game.Text.SeStringHandling.Payloads;
 using Dalamud.Interface.Windowing;
 using Dalamud.IoC;
 using Dalamud.Plugin;
@@ -62,8 +63,30 @@ public sealed class Plugin : IDalamudPlugin
     /// <summary>The loot tables read backwards, for "where does this drop?".</summary>
     public DropSources? Drops { get; private set; }
 
-    /// <summary>Names of the gear <see cref="Drops"/> knows a source for, for looking one up.</summary>
-    public GearNameIndex? GearNames { get; private set; }
+    /// <summary>
+    /// Every storable piece by name, for looking one up by typing it.
+    /// </summary>
+    /// <remarks>
+    /// Not nullable and not rebuilt, unlike its neighbours above. It reads only the Item sheet, so it
+    /// is ready in the constructor and stays correct for the life of the load - which is what lets a
+    /// piece be named before the loot download has landed.
+    /// </remarks>
+    public GearNameIndex GearNames { get; }
+
+    /// <summary>
+    /// Where a piece comes from other than a duty, built on first ask.
+    /// </summary>
+    /// <remarks>
+    /// Lazy because the build sweeps every recipe, shop, quest and achievement row in the game -
+    /// around 170ms, far past a frame. Doing it at load would be a visible hitch during login for a
+    /// question that may never be asked; doing it here makes the one stall coincide with the player
+    /// asking for it. Null while <see cref="Configuration.ShowAcquisitionSources"/> is off, so the
+    /// setting costs nothing rather than merely hiding the result.
+    /// </remarks>
+    public Core.Sources.ItemSources? ItemSources =>
+        Configuration.ShowAcquisitionSources
+            ? itemSources ??= Core.Sources.ItemSources.Build(Storage)
+            : null;
 
     /// <summary>Outfit-set membership, needed anywhere ownership is judged.</summary>
     public OutfitCatalog Outfits { get; }
@@ -112,6 +135,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly MissingItemsWindow mainWindow;
     private readonly ConfigWindow configWindow;
 
+    private Core.Sources.ItemSources? itemSources;
     private DutyReportBuilder? reportBuilder;
     private RouletteAdviceBuilder? adviceBuilder;
     private IReadOnlyList<RouletteAdvice>? advice;
@@ -145,6 +169,10 @@ public sealed class Plugin : IDalamudPlugin
         contentFinder = ContentFinderIndex.Build();
         jobRoles = JobRoleIndex.Build();
         Storage = StorageEligibility.Build();
+
+        // After the storage filter it depends on, and before anything can be looked up. Not tied to
+        // the loot dataset like the catalogues below, because the Item sheet does not move.
+        GearNames = GearNameIndex.BuildAll(Storage);
         Ownership = new OwnershipTracker(configDirectory, Configuration);
 
         LearnedLoot = new LearnedLootStore(configDirectory);
@@ -178,6 +206,7 @@ public sealed class Plugin : IDalamudPlugin
 
         Commands = new CommandRegistration(CommandName, CommandAliases, OnCommand);
 
+
         ClientState.TerritoryChanged += OnTerritoryChanged;
         Framework.Update += OnFrameworkUpdate;
         PluginInterface.UiBuilder.Draw += windowSystem.Draw;
@@ -192,6 +221,9 @@ public sealed class Plugin : IDalamudPlugin
         PluginInterface.UiBuilder.OpenMainUi -= ToggleMainUi;
         Framework.Update -= OnFrameworkUpdate;
         ClientState.TerritoryChanged -= OnTerritoryChanged;
+
+        foreach (var itemId in referenceLinks.Keys)
+            ChatGui.RemoveChatLinkHandler(ReferenceLinkBase + itemId);
 
         windowSystem.RemoveAllWindows();
         lootObserver.Dispose();
@@ -321,7 +353,6 @@ public sealed class Plugin : IDalamudPlugin
             seenLootRevision = LootData.Revision;
             Duties = DutyCatalog.Build(LootData.Data, contentFinder);
             Drops = DropSources.Build(LootData.Data, Duties);
-            GearNames = GearNameIndex.Build(Drops.Items);
             reportBuilder = new DutyReportBuilder(
                 LootData.Data, Duties, Outfits, jobRoles, Storage, JobFilter, EquipLocks);
             adviceBuilder = new RouletteAdviceBuilder(
@@ -500,29 +531,25 @@ public sealed class Plugin : IDalamudPlugin
     /// </remarks>
     private void LookUpGear(string query)
     {
-        if (GearNames == null || Drops == null)
-        {
-            ChatGui.PrintError($"Dungeon Drip: loot data is not loaded yet ({LootData.StatusMessage})");
-            return;
-        }
-
         if (query.Length == 0)
         {
             ChatGui.PrintError("Dungeon Drip: name a duty or a piece of gear.");
             return;
         }
 
+        // No loot-data gate any more. The name index reads only the Item sheet, so a piece can be
+        // named and answered about before the download has landed - only the drop line below waits.
         // An exact name beats any number of partial ones, matching how the duty search resolves the
         // same tie a few lines up.
-        if (!GearNames.TryGetExact(query, out var itemId))
+        if (!GearNames.TryResolve(query, out var itemId))
         {
-            var matches = GearNames.Search(query, MaxGearMatches + 1);
+            var (matches, total) = GearNames.Search(query, MaxGearMatches + 1);
             switch (matches.Count)
             {
                 case 0:
                     ChatGui.PrintError(
-                        $"Dungeon Drip: nothing matching \"{query}\". Duty names and gear that " +
-                        "drops in a dungeon or alliance raid are what can be looked up.");
+                        $"Dungeon Drip: nothing matching \"{query}\". Duty names and any piece of " +
+                        "gear that can be kept as a glamour are what can be looked up.");
                     return;
 
                 case 1:
@@ -530,7 +557,7 @@ public sealed class Plugin : IDalamudPlugin
                     break;
 
                 default:
-                    DescribeAmbiguity(query, matches);
+                    DescribeAmbiguity(query, matches, total);
                     return;
             }
         }
@@ -542,12 +569,15 @@ public sealed class Plugin : IDalamudPlugin
     /// Lists the pieces a query could have meant, as item links so one can be hovered rather than
     /// retyped. Above <see cref="MaxGearMatches"/> it asks for a longer query instead of filling chat.
     /// </summary>
-    private void DescribeAmbiguity(string query, IReadOnlyList<(uint ItemId, string Name)> matches)
+    private void DescribeAmbiguity(
+        string query, IReadOnlyList<(uint ItemId, string Name)> matches, int total)
     {
         if (matches.Count > MaxGearMatches)
         {
+            // The real total, not "more than 8" - knowing it is 12 rather than 2,770 is what decides
+            // between typing three more letters and giving up on the search.
             ChatGui.Print(
-                $"Dungeon Drip: more than {MaxGearMatches} pieces match \"{query}\" - try more of the name.");
+                $"Dungeon Drip: {total} pieces match \"{query}\" - try more of the name.");
             return;
         }
 
@@ -563,7 +593,15 @@ public sealed class Plugin : IDalamudPlugin
         ChatGui.Print(line.Build());
     }
 
-    /// <summary>Prints one piece's answer: the link, whether it is collected, and where it drops.</summary>
+    /// <summary>
+    /// Prints one piece's answer: the link, whether it is collected, and every way to obtain it.
+    /// </summary>
+    /// <remarks>
+    /// Drops first, then the other routes, because a duty is the one route this plugin can then take
+    /// the player to. The two halves come from different data with opposite failure modes, so their
+    /// empty cases are worded separately and the combined "nothing knows anything" case is worded
+    /// once, at the end - see <see cref="DescribeNoSource"/>.
+    /// </remarks>
     private void DescribeGear(uint itemId)
     {
         ChatGui.Print(new SeStringBuilder()
@@ -581,20 +619,114 @@ public sealed class Plugin : IDalamudPlugin
             ? $"   {MissingItems.Describe(source)}."
             : "   No dresser data yet - open a Glamour Dresser once so this can be answered.");
 
-        var sources = Drops!.For(itemId);
-        if (sources.Count == 0)
+        var drops = Drops?.For(itemId) ?? [];
+        if (drops.Count > 0)
         {
-            ChatGui.Print("   Nothing in the loot data lists this piece.");
-            return;
+            var named = drops.Take(MaxNamedDuties)
+                .Select(entry => entry.Level > 0 ? $"{entry.DutyName} (Lv. {entry.Level})" : entry.DutyName);
+
+            var rest = drops.Count - MaxNamedDuties;
+            var tail = rest > 0 ? $" and {rest} more" : string.Empty;
+
+            ChatGui.Print($"   Drops in: {string.Join(", ", named)}{tail}.");
         }
 
-        var named = sources.Take(MaxNamedDuties)
-            .Select(entry => entry.Level > 0 ? $"{entry.DutyName} (Lv. {entry.Level})" : entry.DutyName);
+        // Read once: the property builds the index on first touch, and asking twice would also let the
+        // setting change between the two reads.
+        var sources = ItemSources;
+        var acquisitions = sources?.For(itemId) ?? [];
 
-        var rest = sources.Count - MaxNamedDuties;
-        var tail = rest > 0 ? $" and {rest} more" : string.Empty;
+        // No cap. One line per kind holds this to three lines in practice and six at the structural
+        // worst, so there is nothing left to truncate - see ItemSources.Accumulator.Finish.
+        foreach (var acquisition in acquisitions)
+            ChatGui.Print($"   {acquisition.Describe()}.");
 
-        ChatGui.Print($"   Drops in: {string.Join(", ", named)}{tail}.");
+        // Only claim nothing is known where something actually looked. With the setting off the index
+        // was never built, so saying the source is unknown would be reporting a question not asked.
+        if (drops.Count == 0 && acquisitions.Count == 0 && sources != null)
+            DescribeNoSource(itemId);
+
+        PrintReferenceLink(itemId);
+    }
+
+    /// <summary>
+    /// Says that nothing was found, briefly, and without overclaiming.
+    /// </summary>
+    /// <remarks>
+    /// "Source unknown", never "cannot be obtained". The loot data is thin for new content by design,
+    /// and the sheets - exact about recipes and shops - know nothing of the Mog Station, seasonal
+    /// events, PvP series, deep dungeons, treasure maps or relic steps.
+    ///
+    /// One line, and it used to be three: a sentence naming every dataset consulted, then a second
+    /// about the market board. That was a paragraph explaining a failure, where the useful part is the
+    /// single word that narrows the search - untradable rules the market board out, marketable rules it
+    /// in, and neither needs a clause.
+    /// </remarks>
+    private void DescribeNoSource(uint itemId)
+    {
+        var qualifier = string.Empty;
+        if (DataManager.GetExcelSheet<Lumina.Excel.Sheets.Item>().TryGetRow(itemId, out var item))
+        {
+            qualifier = item.IsUntradable
+                ? " - untradable"
+                : item.ItemSearchCategory.RowId != 0 ? " - try the market board" : string.Empty;
+        }
+
+        ChatGui.Print($"   Source unknown{qualifier}.");
+    }
+
+    /// <summary>
+    /// Appends a clickable link to the configured reference site.
+    /// </summary>
+    /// <remarks>
+    /// The label is the site's bare name - see <see cref="Core.Sources.ItemLink.NameOf"/> on why it
+    /// carries no verb.
+    ///
+    /// <para><b>The command id is the item id, offset.</b> Dalamud hands a handler nothing but its own
+    /// command id, so the handler has to recover the item from that alone. Encoding it means no state
+    /// to go stale and every line correct forever, however many lookups follow.</para>
+    ///
+    /// <para>A fixed pool of ids cycled round was tried first and was wrong: the ninth lookup reused
+    /// the first slot, so clicking the oldest visible line opened whatever had overwritten it. That is
+    /// the failure the pool was meant to prevent, merely postponed by eight.</para>
+    /// </remarks>
+    private void PrintReferenceLink(uint itemId)
+    {
+        var site = Configuration.LookupSite;
+
+        // Registered on first sight of a piece and left registered. One entry per piece looked up in a
+        // session is a few dozen at most, and unregistering would break lines still on screen. The
+        // payload has to be the one the registration handed back - it cannot be constructed.
+        if (!referenceLinks.TryGetValue(itemId, out var payload))
+        {
+            payload = ChatGui.AddChatLinkHandler(ReferenceLinkBase + itemId, OnReferenceLinkClicked);
+            referenceLinks[itemId] = payload;
+        }
+
+        ChatGui.Print(new SeStringBuilder()
+            .AddText("   ")
+            .Add(payload)
+            .AddUiForeground(LinkColour)
+            .AddText($"[{Core.Sources.ItemLink.NameOf(site)}]")
+            .AddUiForegroundOff()
+            .Add(RawPayload.LinkTerminator)
+            .Build());
+    }
+
+    /// <remarks>
+    /// Reads the site out of the configuration now rather than remembering the one in force when the
+    /// line was printed, so changing the setting re-points every link already on screen. That is the
+    /// more useful of the two behaviours and falls out of holding no state at all.
+    /// </remarks>
+    private void OnReferenceLinkClicked(uint commandId, SeString _)
+    {
+        if (commandId < ReferenceLinkBase)
+            return;
+
+        var itemId = commandId - ReferenceLinkBase;
+        var name = GearNames.TryGetName(itemId, out var resolved) ? resolved : string.Empty;
+
+        Dalamud.Utility.Util.OpenLink(Core.Sources.ItemLink.For(Configuration.LookupSite, itemId, name));
     }
 
     /// <summary>Partial matches to list before asking for a longer query.</summary>
@@ -602,4 +734,33 @@ public sealed class Plugin : IDalamudPlugin
 
     /// <summary>Duties to name in the chat answer before collapsing the rest into a count.</summary>
     private const int MaxNamedDuties = 3;
+
+    /// <summary>
+    /// Added to an item id to make a chat-link command id.
+    /// </summary>
+    /// <remarks>
+    /// Only has to sit above every other command id this plugin registers - which is none - and leave
+    /// room above itself for the whole Item sheet.
+    /// </remarks>
+    private const uint ReferenceLinkBase = 1_000_000;
+
+    /// <summary>
+    /// The game's own colour for a clickable link, so this reads as one rather than as coloured text.
+    /// </summary>
+    /// <remarks>
+    /// A raw index into the game's UIColor sheet, as the tooltip marker's colours are - there is no
+    /// named enum for these, and a colour from the plugin's own palette would make the one element in
+    /// chat that is clickable look least like it.
+    /// </remarks>
+    private const ushort LinkColour = 34;
+
+    /// <summary>
+    /// Link payloads by item id, registered once each and kept for the life of the load.
+    /// </summary>
+    /// <remarks>
+    /// Holds payloads, never URLs. The URL is rebuilt from the item id on every click, which is what
+    /// makes an old chat line still correct - storing it is what the discarded pool of cycled ids got
+    /// wrong.
+    /// </remarks>
+    private readonly Dictionary<uint, DalamudLinkPayload> referenceLinks = [];
 }
