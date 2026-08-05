@@ -36,9 +36,6 @@ public sealed class DropSources
     public IReadOnlyList<DropSource> For(uint itemId) =>
         byItem.TryGetValue(itemId, out var sources) ? sources : None;
 
-    /// <summary>Every piece that drops somewhere known. Feeds the by-name lookup.</summary>
-    public IReadOnlyCollection<uint> Items => byItem.Keys;
-
     public static DropSources Build(DungeonLootData loot, DutyCatalog duties)
     {
         var accumulated = new Dictionary<uint, List<DropSource>>();

@@ -59,7 +59,10 @@ public sealed class WikiEntry
 /// </remarks>
 public sealed class WikiLootSource : IDisposable
 {
-    private const string ApiUrl = "https://ffxiv.consolegameswiki.com/mediawiki/api.php";
+    /// <summary>
+    /// The wiki's API. The host is shared with the article links so the two cannot drift apart.
+    /// </summary>
+    private const string ApiUrl = Core.Sources.ItemLink.ConsoleGamesWikiHost + "/mediawiki/api.php";
     private const string CacheFileName = "wiki-loot-cache.json";
 
     /// <summary>How long a successful lookup is trusted before re-checking the page revision.</summary>

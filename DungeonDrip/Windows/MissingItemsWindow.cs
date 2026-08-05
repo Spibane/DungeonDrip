@@ -670,10 +670,37 @@ public class MissingItemsWindow : Window
         ImGui.TextColored(Palette.Muted, ProvenanceDescription(item.Provenance));
 
         DrawOrigins(item);
+        DrawAcquisitions(item.ItemId);
         DrawOutfitMembership(item.ItemId);
 
         ImGui.Spacing();
         ImGui.TextColored(Palette.Muted, "Right-click for options.");
+    }
+
+    /// <summary>
+    /// The ways to get a piece that do not involve running the duty being looked at.
+    /// </summary>
+    /// <remarks>
+    /// Worth showing even here, where the piece is listed precisely because it drops in this duty: a
+    /// craftable or purchasable alternative is the reason to stop running the duty for it. Silent when
+    /// nothing knows, like <see cref="DrawOrigins"/> above, and for the same reason - a line saying the
+    /// sheets found nothing would be spent on the absence of a line.
+    ///
+    /// Uncapped, and safe to be: one line per kind holds this to three, where listing every route could
+    /// reach thirty and push the outfit-set section off the bottom of the screen.
+    ///
+    /// No link out to a reference site here. A tooltip cannot be clicked, so that entry lives on the
+    /// row's right-click menu, which this same row already has.
+    /// </remarks>
+    private void DrawAcquisitions(uint itemId)
+    {
+        var acquisitions = plugin.ItemSources?.For(itemId);
+        if (acquisitions is not { Count: > 0 })
+            return;
+
+        ImGui.Spacing();
+        foreach (var acquisition in acquisitions)
+            ImGui.TextColored(Palette.Muted, acquisition.Describe());
     }
 
     /// <summary>
