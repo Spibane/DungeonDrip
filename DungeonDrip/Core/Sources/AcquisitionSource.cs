@@ -46,11 +46,51 @@ public enum AcquisitionKind
 /// the plugin cannot say who or where any of them are, so a shop identity would be a field that
 /// multiplied the rows without answering anything. See <see cref="ItemSources"/> on the collapse to one
 /// line per kind that follows from that.
+///
+/// <para><see cref="CurrencyItemId"/> and <see cref="Amount"/> are the same price as
+/// <paramref name="Detail"/>, in the form arithmetic can be done on. They exist because grouping
+/// pieces by what buys them, or comparing a cost to a balance, cannot be done from
+/// <paramref name="Detail"/>: it is rendered, and it is translated, so it would group on the client's
+/// language. Nothing draws them - every surface still prints <paramref name="Detail"/>, and the two
+/// must stay descriptions of one fact rather than drifting apart.</para>
 /// </remarks>
 /// <param name="Label">The route, named as briefly as it can be: "Vendor", "Special Shop", "Quest".</param>
 /// <param name="Detail">Null when there is nothing to add, which no current builder produces.</param>
-public sealed record AcquisitionSource(AcquisitionKind Kind, string Label, string? Detail = null)
+/// <param name="CurrencyItemId">
+/// The item row the price is paid in, or 0 for a route with no price - crafted, a quest, an
+/// achievement. Gil is row 1 and is a currency here like any other.
+/// </param>
+/// <param name="Amount">How many of it, or 0 wherever <paramref name="CurrencyItemId"/> is 0.</param>
+/// <param name="Repurchase">
+/// Whether this particular route is a buy-back price - a special shop charging gil and nothing else.
+/// Recorded rather than dropped because it is still true of the shop, and because a piece whose
+/// <em>only</em> route is a buy-back has to be described somehow.
+///
+/// Per route, unlike <paramref name="EventOnly"/>, which is a fact about the piece. The two were one flag
+/// and had to be separated: a buy-back route means "prefer the real route", where event stock means "there
+/// is no real route".
+/// </param>
+/// <param name="EventOnly">
+/// Whether the piece is stocked by an event sell-back counter, and so out of reach of anyone who was not
+/// there. Set when the index is finished rather than by a builder, because it is decided from all of a
+/// piece's routes at once.
+///
+/// Kept apart from <paramref name="Repurchase"/> so a reader can hide one without the other: a plain
+/// buy-back tells nobody anything, where "this is event gear" is often the most useful thing that can be
+/// said about a piece.
+/// </param>
+public sealed record AcquisitionSource(
+    AcquisitionKind Kind,
+    string Label,
+    string? Detail = null,
+    uint CurrencyItemId = 0,
+    uint Amount = 0,
+    bool Repurchase = false,
+    bool EventOnly = false)
 {
     /// <summary>The whole route as one line, which is all any surface draws.</summary>
     public string Describe() => Detail == null ? Label : $"{Label} - {Detail}";
+
+    /// <summary>Whether this route can be priced against a balance rather than only printed.</summary>
+    public bool HasPrice => CurrencyItemId != 0 && Amount > 0;
 }
