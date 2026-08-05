@@ -27,6 +27,12 @@ jobs:
       - name: Build
         run: dotnet build DungeonDrip.sln -c Release --nologo
 
+      # Here as well as in the release workflow, and deliberately: the release run only fires on
+      # a tag, by which point a forgotten manifest means deleting the tag and starting again.
+      # A version bump that did not regenerate repo.json fails on the pull request instead.
+      - name: Verify repo.json
+        run: python tools\make-repo-json.py --check
+
       # DalamudPackager writes the installable zip here; the platform folder depends on how
       # MSBuild resolved the solution configuration.
       - uses: actions/upload-artifact@v4
