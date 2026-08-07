@@ -63,10 +63,6 @@ internal static class NativeRenderer
     /// <summary>How big a game item icon actually is, as opposed to how big it is drawn.</summary>
     private const float GameIconSize = 40f;
 
-    /// <summary>Colours for a heading, which sits on a bar that no theme lightens.</summary>
-    private static readonly System.Numerics.Vector4 HeaderText = new(0.94f, 0.91f, 0.84f, 1.00f);
-
-    private static readonly System.Numerics.Vector4 HeaderTextOutline = new(0.09f, 0.08f, 0.07f, 1.00f);
 
     /// <summary>
     /// Builds a list of rows into a vertical list, replacing whatever was there.
@@ -120,10 +116,16 @@ internal static class NativeRenderer
     /// A native header keeps its children and hides them, where ImGui simply stops drawing them -
     /// so this attaches every row up front and lets the header do the hiding.
     ///
-    /// <b>The label is the one place the themed pair is the wrong answer.</b> The header bar is a
-    /// dark texture under every theme, so its text wants to be pale in all four - where holder id 1
-    /// goes dark brown on the light themes and leaves dark text on a dark bar. It is set to a fixed
-    /// pale colour here for that reason, and only here.
+    /// <b>The heading is hard to read on the two light themes, and that is a standing limit.</b>
+    /// The header bar is a dark texture under every theme, so its text wants to be pale in all
+    /// four - but the library colours the label from the themed body text colour, which goes dark
+    /// brown on the light themes and leaves dark text on a dark bar.
+    ///
+    /// It is the one place in the panel where following the theme is the wrong answer, and it
+    /// cannot be corrected from here: the label sits on a node the library keeps private. Exposing
+    /// it is a one-line change upstream and the fix is waiting on that rather than on a different
+    /// approach. Carrying the change as a local patch was tried and rejected - it pins the
+    /// submodule to a commit no clone can fetch, which trades a colour for a build.
     /// </remarks>
     private static NodeBase Collapsible(
         NativeContextMenu menu, HeaderState headers, CollapsibleNode group, float width,
@@ -141,11 +143,6 @@ internal static class NativeRenderer
         // Folding changes this header's height but nothing tells the list holding it, so without
         // the callback the rows below stay where they were: a collapsed group leaves a hole, and
         // reopening it draws over the group beneath. The scroll extent moves with it.
-        // Fixed rather than themed. See the remarks: the bar it sits on does not change with the
-        // theme, so neither should the text on it.
-        header.LabelTextNode.TextColor = HeaderText;
-        header.LabelTextNode.TextOutlineColor = HeaderTextOutline;
-
         header.OnCollapse = () =>
         {
             headers.Record(group.Key, false);

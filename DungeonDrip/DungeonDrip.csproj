@@ -15,17 +15,10 @@
     publishes no releases and no package; see the readme on why that is the accepted arrangement and
     what happens if it stops being maintained. MIT, so its notice ships in THIRD-PARTY-NOTICES.md.
 
-    CARRIES A LOCAL PATCH, AND THE PIN IS NOT A COMMIT ANYONE ELSE HAS. One commit on top of
-    upstream's master exposes CollapsingHeaderNode's label so the native panels can colour their
-    group headings; without it those headings are dark text on a dark bar under the light themes.
-
-    Two consequences, both live:
-
-    - A fresh clone cannot resolve the submodule, so CI will fail on any push until the pin points
-      at a commit that exists on a remote. The patch is in the local clone only.
-    - Nothing has been pushed to, forked from, or filed against the upstream repository, and nothing
-      should be without asking. The change is written to be offerable upstream, but offering it is a
-      decision rather than a step.
+    Pinned to a commit on upstream's own master and kept that way deliberately. A local patch was
+    tried, to expose the header label the native panels want to recolour, and reverted: it pins the
+    submodule to a commit no other clone can fetch, so every build but this one fails. A wrong
+    colour on two themes is the cheaper of the two. See NativeRenderer's collapsible.
   -->
   <ItemGroup>
     <ProjectReference Include="..\external\KamiToolKit\KamiToolKit.csproj" />
