@@ -71,12 +71,14 @@ internal static class NativeRenderer
     /// filters change, so index N is not the same piece between two builds, and a reused row that
     /// kept its tooltip would describe the piece that used to be there.
     /// </remarks>
-    public static void Fill(VerticalListNode list, IReadOnlyList<RowNode> rows)
+    /// <param name="reservedRight">
+    /// Width at the right edge a row must not reach into. The scroll bar sits over the list rather
+    /// than beside it - the list is given the full width and the bar is drawn on top of its last
+    /// few pixels - so nothing about the list's own size keeps a long name out from under it.
+    /// </param>
+    public static void Fill(VerticalListNode list, IReadOnlyList<RowNode> rows, float reservedRight)
     {
-        // The list's own width, not the window's. The two differ by the window's padding and by
-        // whatever the scrollbar takes, and sizing a row to the window is how a name ends up
-        // running under the bar.
-        var width = list.Width;
+        var width = list.Width - reservedRight;
 
         list.Clear();
 
@@ -171,7 +173,10 @@ internal static class NativeRenderer
             String = content,
             TextColor = fill,
             TextOutlineColor = outline,
-            TextFlags = TextFlags.Edge,
+            // Ellipsis, because a text node otherwise draws past its own width rather than
+            // stopping at it - which is how a long name ended up under the scroll bar. Nothing is
+            // lost by cutting it: the row's tooltip opens with the name in full.
+            TextFlags = TextFlags.Edge | TextFlags.Ellipsis,
             FontSize = FontSize,
             AlignmentType = alignment,
             Size = new System.Numerics.Vector2(width, RowHeight),

@@ -39,10 +39,11 @@ internal sealed unsafe class VendorPanelAddon : IDisposable
     /// </remarks>
     private static readonly Vector2 UnanchoredSize = new(260f, 400f);
 
-    /// <summary>How far the subtitle sits right of the title, and how far below its baseline.</summary>
+    /// <summary>How far the subtitle sits right of the title, and how far off its baseline.</summary>
     private const float SubtitleGap = 12f;
 
-    private const float SubtitleDrop = 2f;
+    /// <remarks>Negative: the subtitle sits high against the title, not low.</remarks>
+    private const float SubtitleRise = -2f;
 
     private readonly Plugin plugin;
     private readonly Panel addon;
@@ -144,7 +145,7 @@ internal sealed unsafe class VendorPanelAddon : IDisposable
         foreach (var row in rows)
             built.Add(PanelPresenter.Row(row, stale, UncertainNote));
 
-        NativeRenderer.Fill(list, built);
+        NativeRenderer.Fill(list, built, addon.ScrollBarWidth);
 
         // The scroll area measures its content when it is sized, and filling it afterwards changes
         // that content - so without this the bar appears at whatever extent the list had when it
@@ -214,6 +215,9 @@ internal sealed unsafe class VendorPanelAddon : IDisposable
         /// <summary>Tells the scroll area its contents changed size. Call after filling the list.</summary>
         public void RemeasureScroll() => scroller?.RecalculateSizes();
 
+        /// <summary>How much of the list's right edge the scroll bar covers.</summary>
+        public float ScrollBarWidth => scroller?.ScrollBarNode.Width ?? 0f;
+
         protected override unsafe void OnSetup(AtkUnitBase* addon, Span<AtkValue> values)
         {
             scroller = new ScrollingNode<VerticalListNode>
@@ -251,7 +255,7 @@ internal sealed unsafe class VendorPanelAddon : IDisposable
 
             window.SubtitleNode.Position = new Vector2(
                 window.TitleNode.Bounds.Right + SubtitleGap,
-                window.SubtitleNode.Y + SubtitleDrop);
+                window.SubtitleNode.Y + SubtitleRise);
         }
 
         /// <remarks>
