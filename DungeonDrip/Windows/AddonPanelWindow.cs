@@ -235,7 +235,8 @@ public abstract unsafe class AddonPanelWindow : Window
             SizeCondition = ImGuiCond.Appearing;
         }
 
-        Position = AddonAnchor.Beside(unit, Settings.Side, desired);
+        var placement = AddonPlacement.Of(unit);
+        Position = AddonAnchor.Beside(placement.Position, placement.Width, Settings.Side, desired, display);
         PositionCondition = ImGuiCond.Always;
     }
 

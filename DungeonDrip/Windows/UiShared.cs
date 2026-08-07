@@ -130,39 +130,14 @@ internal static class UiParts
     }
 }
 
-/// <summary>
-/// Places a window alongside a game addon.
-/// </summary>
+/// <summary>Reads an addon's placement off the live struct, for <see cref="AddonAnchor"/>.</summary>
 /// <remarks>
-/// Game screen pixels and ImGui pixels are the same thing here, so nothing on this path is
-/// multiplied by <see cref="ImGuiHelpers.GlobalScale"/>. That scales glyphs, not coordinates;
-/// applying it to a position is how these panels drift away from their addon.
+/// The arithmetic lives in <see cref="AddonAnchor"/>, which both backends share. This is the half
+/// that has to touch the game's own memory, kept here so the shared half does not have to.
 /// </remarks>
-internal static unsafe class AddonAnchor
+internal static unsafe class AddonPlacement
 {
-    private const float Gap = 6f;
-
-    /// <summary>Top-left corner for a panel of <paramref name="ownSize"/> beside this addon.</summary>
-    public static Vector2 Beside(AtkUnitBase* unit, PanelSide side, Vector2 ownSize)
-    {
-        var display = ImGui.GetIO().DisplaySize;
-        var width = unit->GetScaledWidth(true);
-
-        var toRight = side switch
-        {
-            PanelSide.Left => false,
-            PanelSide.Right => true,
-            _ => unit->X + width + Gap + ownSize.X <= display.X,
-        };
-
-        var x = toRight
-            ? unit->X + width + Gap
-            : unit->X - ownSize.X - Gap;
-
-        // Clamped against the panel's own size: an addon jammed against an edge would otherwise
-        // push it off screen.
-        return new Vector2(
-            Math.Clamp(x, 0f, Math.Max(0f, display.X - ownSize.X)),
-            Math.Clamp(unit->Y, 0f, Math.Max(0f, display.Y - ownSize.Y)));
-    }
+    /// <summary>The addon's top-left and its width on screen, both in screen pixels.</summary>
+    public static (Vector2 Position, float Width) Of(AtkUnitBase* unit) =>
+        (new Vector2(unit->X, unit->Y), unit->GetScaledWidth(true));
 }

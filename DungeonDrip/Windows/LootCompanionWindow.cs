@@ -68,7 +68,10 @@ public sealed unsafe class LootCompanionWindow : Window
         // Auto-sized, so its own height is not knowable here; the roll window's is the stand-in.
         var ownSize = new Vector2(lastWidth, unit->GetScaledHeight(true));
 
-        Position = AddonAnchor.Beside(unit, plugin.Configuration.LootCompanionSide, ownSize);
+        var placement = AddonPlacement.Of(unit);
+        Position = AddonAnchor.Beside(
+            placement.Position, placement.Width, plugin.Configuration.LootCompanionSide, ownSize,
+            ImGui.GetIO().DisplaySize);
         PositionCondition = ImGuiCond.Always;
     }
 

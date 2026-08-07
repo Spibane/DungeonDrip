@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using DungeonDrip.Core;
 
-namespace DungeonDrip.Windows;
+namespace DungeonDrip.Presentation;
 
 /// <summary>Everything that changes the shape of a panel's list, compared by value in one go.</summary>
 public readonly record struct ViewOptions(

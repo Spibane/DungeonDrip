@@ -30,11 +30,6 @@ namespace DungeonDrip.Windows;
 /// </remarks>
 public class MissingItemsWindow : Window
 {
-    /// <summary>Heading for pieces no source is known for, and the order that puts it last.</summary>
-    private const string UnattributedLabel = "Not attributed to a boss or coffer";
-
-    private const int UnattributedOrder = int.MaxValue;
-
     private readonly Plugin plugin;
     private readonly CollectionView collection;
 
@@ -447,7 +442,7 @@ public class MissingItemsWindow : Window
         if (!plugin.Configuration.ShowRoleSummary || report.MissingCount == 0)
             return;
 
-        var byRole = BuildGroups([.. report.Items.Where(item => !item.IsOwned)], MissingGrouping.Role)
+        var byRole = DutyGrouping.Build([.. report.Items.Where(item => !item.IsOwned)], MissingGrouping.Role)
             .Select(bucket => (bucket.Group.Label, bucket.Group.Order, Count: bucket.MissingCount))
             .Where(entry => entry.Count > 0)
             .OrderByDescending(entry => entry.Count)
@@ -480,107 +475,6 @@ public class MissingItemsWindow : Window
         }
     }
 
-    /// <summary>
-    /// Buckets pieces into the headings they should be drawn under.
-    /// </summary>
-    /// <remarks>
-    /// Role view deliberately duplicates. It answers "what can I claim if I queue as this", so a
-    /// piece belongs under every heading whose jobs can roll on it: "of Slaying" accessories show
-    /// under their own MNK DRG SAM RPR heading and again under Maiming and Striking, and "of Aiming"
-    /// under both Physical Ranged and Scouting. Slot view never duplicates and stays the true list,
-    /// which is where the counts in the summary come from.
-    ///
-    /// Broader headings are only folded into narrower ones that some item already created in this
-    /// duty. A blind subset rule would conjure a "Melee DPS (DRG)" heading out of a legacy sheet row
-    /// and fill it with nothing but shared accessories.
-    ///
-    /// Source view duplicates for its own reason: a piece in two coffers is genuinely in both, and the
-    /// question being asked - what comes out of this - wants it under each. Pieces nothing attributes
-    /// share one heading at the end, which on a duty with no wiki lookup is the whole list.
-    /// </remarks>
-    private static List<Bucket> BuildGroups(IReadOnlyList<ReportItem> items, MissingGrouping grouping)
-    {
-        var byRole = grouping == MissingGrouping.Role;
-        var buckets = new Dictionary<string, Bucket>();
-
-        Bucket Ensure(RoleGroup group)
-        {
-            if (!buckets.TryGetValue(group.Label, out var bucket))
-                buckets[group.Label] = bucket = new Bucket(group);
-
-            return bucket;
-        }
-
-        foreach (var item in items)
-        {
-            switch (grouping)
-            {
-                case MissingGrouping.Role:
-                    foreach (var group in item.RoleGroups)
-                        Ensure(group).Add(item);
-
-                    break;
-
-                case MissingGrouping.Source when item.Origins.Count > 0:
-                    foreach (var origin in item.Origins)
-                        Ensure(new RoleGroup(origin.Order, origin.Label, string.Empty)).Add(item);
-
-                    break;
-
-                case MissingGrouping.Source:
-                    Ensure(new RoleGroup(UnattributedOrder, UnattributedLabel, string.Empty)).Add(item);
-                    break;
-
-                default:
-                    Ensure(new RoleGroup(item.SlotOrder, item.SlotName, string.Empty)).Add(item);
-                    break;
-            }
-        }
-
-        if (byRole)
-        {
-            foreach (var bucket in buckets.Values.ToList())
-            {
-                foreach (var item in items)
-                {
-                    if (item.RoleGroups.Any(group => bucket.Group.IsCoveredBy(group)))
-                        bucket.Add(item);
-                }
-            }
-        }
-
-        return [.. buckets.Values.OrderBy(b => b.Group.Order).ThenBy(b => b.Group.Label, StringComparer.OrdinalIgnoreCase)];
-    }
-
-    /// <summary>
-    /// One role heading's rows, counting its own missing pieces and refusing duplicates.
-    /// </summary>
-    /// <remarks>
-    /// The seen set is what makes the covering pass safe: a piece can reach a heading both as its own
-    /// role and by way of a broader heading that covers it, and a heading claiming the same piece
-    /// twice would double its count as well as list it twice.
-    /// </remarks>
-    private sealed class Bucket(RoleGroup group)
-    {
-        private readonly HashSet<uint> seen = [];
-
-        public RoleGroup Group { get; } = group;
-
-        public List<ReportItem> Items { get; } = [];
-
-        public int MissingCount { get; private set; }
-
-        public void Add(ReportItem item)
-        {
-            if (!seen.Add(item.ItemId))
-                return;
-
-            Items.Add(item);
-            if (!item.IsOwned)
-                MissingCount++;
-        }
-    }
-
     private void DrawItems(DutyReport report)
     {
         var configuration = plugin.Configuration;
@@ -605,7 +499,7 @@ public class MissingItemsWindow : Window
         }
 
         var visible = report.Items.Where(item => showOwned || !item.IsOwned).ToList();
-        var groups = BuildGroups(visible, configuration.Grouping);
+        var groups = DutyGrouping.Build(visible, configuration.Grouping);
 
         if (groups.Count == 0)
         {
