@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Text;
 using DungeonDrip.Presentation;
 using KamiToolKit.BaseTypes;
+using FFXIVClientStructs.FFXIV.Component.GUI;
 using KamiToolKit.Nodes;
 
 // The two vocabularies collide by design - a description's TextNode and the game's are the same
@@ -26,11 +27,25 @@ namespace DungeonDrip.Native;
 /// </remarks>
 internal static class NativeRenderer
 {
-    /// <summary>Height of one gear row, and the step between them.</summary>
-    private const float RowHeight = 24f;
+    /// <summary>
+    /// One row's height, and the widths of the two fixed columns before the name.
+    /// </summary>
+    /// <remarks>
+    /// The row has to be at least as tall as the icon or consecutive icons overlap, which is what
+    /// the first cut got wrong: nothing clips a node to its row, so an icon taller than the step
+    /// between rows simply draws over its neighbour.
+    ///
+    /// The two leading columns are fixed widths rather than measured, so the names line up down the
+    /// list whichever marker each row carries - the same reason the ImGui panel pushes the
+    /// fixed-width icon font for its glyph.
+    /// </remarks>
+    private const float RowHeight = 28f;
 
-    private const float GlyphWidth = 22f;
-    private const float IconSize = 20f;
+    private const float GlyphWidth = 16f;
+    private const float IconSize = 24f;
+
+    /// <summary>Space between the marker, the icon and the name.</summary>
+    private const float ColumnGap = 4f;
 
     /// <summary>
     /// Builds a list of rows into a vertical list, replacing whatever was there.
@@ -56,12 +71,18 @@ internal static class NativeRenderer
         var line = new HorizontalListNode
         {
             Size = new System.Numerics.Vector2(width, RowHeight),
+            ItemSpacing = ColumnGap,
             IsVisible = true,
         };
 
+        // What the name has left after the fixed columns and the gaps between them. A text node
+        // given no width does not shrink to fit - it reports zero, the row lays the next part out
+        // on top of it, and the name ends up over the icon.
+        var remaining = width - GlyphWidth - IconSize - (ColumnGap * 3f);
+
         foreach (var part in row.Parts)
         {
-            var node = Part(part);
+            var node = Part(part, remaining);
             if (node != null)
                 line.AddNode(node);
         }
@@ -74,44 +95,45 @@ internal static class NativeRenderer
         return line;
     }
 
-    private static NodeBase? Part(Node part) => part switch
+    private static NodeBase? Part(Node part, float textWidth) => part switch
     {
         // A text mark rather than an icon, for now - see NativeGlyphs on why a guessed icon id is
         // worse than a visible placeholder. Fixed width so the names line up whichever mark a row
         // carries, which is the same reason the ImGui panels push the fixed-width icon font.
-        GlyphNode glyph => Fixed(
-            Text(new TextNode(NativeGlyphs.For(glyph.Token), glyph.Colour)), GlyphWidth),
+        GlyphNode glyph => Text(NativeGlyphs.For(glyph.Token), glyph.Colour, GlyphWidth),
 
+        // Centred against the row rather than sat on its top edge, since the icon is shorter than
+        // the line and the eye reads the two as one row.
         IconNode icon => new GameIcon
         {
             IconId = icon.IconId,
             Size = new System.Numerics.Vector2(IconSize, IconSize),
+            Y = (RowHeight - IconSize) / 2f,
             IsVisible = true,
         },
 
-        TextNode text => Text(text),
+        TextNode text => Text(text.Text, text.Colour, textWidth),
 
         _ => null,
     };
 
-    /// <summary>Pins a node to a width, so a column of them lines up.</summary>
-    private static NodeBase Fixed(NodeBase node, float width)
+    /// <remarks>
+    /// <see cref="AlignmentType.Left"/> is left-aligned and <em>vertically centred</em>, which is
+    /// what makes the text sit on the same line as the icon beside it rather than on the row's top
+    /// edge.
+    /// </remarks>
+    private static GameText Text(string content, ColourRole role, float width)
     {
-        node.Size = new System.Numerics.Vector2(width, RowHeight);
-        return node;
-    }
-
-    private static GameText Text(TextNode text)
-    {
-        var (fill, outline) = NativePalette.For(text.Colour);
+        var (fill, outline) = NativePalette.For(role);
 
         return new GameText
         {
-            String = text.Text,
+            String = content,
             TextColor = fill,
             TextOutlineColor = outline,
-            TextFlags = FFXIVClientStructs.FFXIV.Component.GUI.TextFlags.Edge,
-            Size = new System.Numerics.Vector2(0f, RowHeight),
+            TextFlags = TextFlags.Edge,
+            AlignmentType = AlignmentType.Left,
+            Size = new System.Numerics.Vector2(width, RowHeight),
             IsVisible = true,
         };
     }

@@ -48,7 +48,9 @@ internal sealed class NativeUi : IPluginUi
     {
         try
         {
-            KamiToolKitLibrary.Initialize(Plugin.PluginInterface, "Dungeon Drip");
+            // No default subtitle: the panels set their own titles, and a default would print twice in
+            // the header beside a title that already says the same thing.
+            KamiToolKitLibrary.Initialize(Plugin.PluginInterface);
             return new NativeUi(plugin, new VendorPanelAddon(plugin));
         }
         catch (System.Exception exception)

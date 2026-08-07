@@ -50,8 +50,6 @@ internal sealed unsafe class VendorPanelAddon : IDisposable
     /// </remarks>
     private IReadOnlyList<GearRow>? builtFrom;
 
-    private bool opened;
-
     public VendorPanelAddon(Plugin plugin)
     {
         this.plugin = plugin;
@@ -60,11 +58,19 @@ internal sealed unsafe class VendorPanelAddon : IDisposable
         {
             InternalName = "DungeonDripVendor",
             Title = "Dungeon Drip",
+            Subtitle = "At this vendor",
             Size = UnanchoredSize,
 
             // The panel belongs beside its shop, so it is placed every frame and there is no
             // remembered position to restore. Leaving this on would fight the anchoring.
             RememberClosePosition = false,
+
+            // Not the player's to close, exactly as the ImGui panel is not: it belongs to the shop
+            // window and comes and goes with it. Both of these default to letting it be closed, and
+            // between them they are why the panel used to vanish for good after a few visits -
+            // Esc closed the addon, nothing here knew, and it was never reopened.
+            DisableClose = true,
+            RespectCloseAll = false,
         };
 
         Plugin.Framework.Update += OnUpdate;
@@ -84,21 +90,17 @@ internal sealed unsafe class VendorPanelAddon : IDisposable
 
         if (rows == null)
         {
-            if (opened)
-            {
+            if (addon.IsOpen)
                 addon.Close();
-                opened = false;
-                builtFrom = null;
-            }
 
             return;
         }
 
-        if (!opened)
-        {
+        // Asked of the addon rather than remembered here. A flag of its own was the bug that made
+        // the panel disappear permanently: the addon can close without being told to, and a
+        // remembered "still open" then means it is never opened again.
+        if (!addon.IsOpen)
             addon.Open();
-            opened = true;
-        }
 
         // The list only exists once the game has run the addon's setup, which is not guaranteed to
         // have happened by the time Open returns. Leaving builtFrom alone rather than recording a
@@ -176,7 +178,7 @@ internal sealed unsafe class VendorPanelAddon : IDisposable
     {
         Plugin.Framework.Update -= OnUpdate;
 
-        if (opened)
+        if (addon.IsOpen)
             addon.Close();
 
         addon.Dispose();
@@ -194,18 +196,35 @@ internal sealed unsafe class VendorPanelAddon : IDisposable
     /// </remarks>
     private sealed class Panel : NativeAddon
     {
-        public VerticalListNode? List { get; private set; }
+        private ScrollingNode<VerticalListNode>? scroller;
+
+        /// <summary>The list to put rows in, or null while the addon is not allocated.</summary>
+        public VerticalListNode? List => scroller?.ContentNode;
 
         protected override unsafe void OnSetup(AtkUnitBase* addon, Span<AtkValue> values)
         {
-            List = new VerticalListNode
+            scroller = new ScrollingNode<VerticalListNode>
             {
                 Position = ContentStartPosition,
-                Size = ContentSize,
                 IsVisible = true,
             };
 
-            AddNode(List);
+            // Before Size, which is what the scrolling node measures against - and FitContents is
+            // what tells it how far there is to scroll, since a list that never reports growing
+            // gives a scroll area nothing to scroll.
+            scroller.ContentNode.FitContents = true;
+            scroller.ContentNode.FitWidth = true;
+            scroller.Size = ContentSize;
+
+            AddNode(scroller);
         }
+
+        /// <remarks>
+        /// Closing deallocates the whole tree, so the reference has to go with it. Keeping it would
+        /// leave the next visit writing rows into a node the game has already freed, which is the
+        /// quiet version of the same bug as the open flag.
+        /// </remarks>
+        protected override unsafe void OnFinalize(AtkUnitBase* addon)
+            => scroller = null;
     }
 }
