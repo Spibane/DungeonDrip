@@ -77,19 +77,20 @@ internal static class NativeRenderer
     /// few pixels - so nothing about the list's own size keeps a long name out from under it.
     /// </param>
     public static void Fill(
-        Plugin plugin, VerticalListNode list, IReadOnlyList<RowNode> rows, float reservedRight)
+        NativeContextMenu menu, VerticalListNode list, IReadOnlyList<RowNode> rows,
+        float reservedRight)
     {
         var width = list.Width - reservedRight;
 
         list.Clear();
 
         foreach (var row in rows)
-            list.AddNode(Row(plugin, row, width));
+            list.AddNode(Row(menu, row, width));
 
         list.RecalculateLayout();
     }
 
-    private static NodeBase Row(Plugin plugin, RowNode row, float width)
+    private static NodeBase Row(NativeContextMenu menu, RowNode row, float width)
     {
         var line = new HorizontalListNode
         {
@@ -117,7 +118,7 @@ internal static class NativeRenderer
             line.TextTooltip = Tooltip(row.Tooltip);
 
         if (row.Context is { } context)
-            NativeContextMenu.Attach(line, plugin, context.ItemId, context.Name);
+            menu.Attach(line, context.ItemId, context.Name);
 
         return line;
     }

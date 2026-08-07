@@ -42,6 +42,9 @@ internal sealed unsafe class VendorPanelAddon : IDisposable
     private readonly Plugin plugin;
     private readonly Panel addon;
 
+    /// <summary>One menu for every row. See <see cref="NativeContextMenu"/> on why not one each.</summary>
+    private readonly NativeContextMenu menu;
+
     /// <summary>The row list this panel was last built from, so an unchanged list is not rebuilt.</summary>
     /// <remarks>
     /// Reference equality against the watcher's cached list, which is the same instance frame to
@@ -59,6 +62,7 @@ internal sealed unsafe class VendorPanelAddon : IDisposable
     public VendorPanelAddon(Plugin plugin)
     {
         this.plugin = plugin;
+        menu = new NativeContextMenu(plugin);
 
         addon = new Panel
         {
@@ -159,7 +163,7 @@ internal sealed unsafe class VendorPanelAddon : IDisposable
                 built.Add(PanelPresenter.Row(row, stale, UncertainNote));
         }
 
-        NativeRenderer.Fill(plugin, list, built, addon.ScrollBarWidth);
+        NativeRenderer.Fill(menu, list, built, addon.ScrollBarWidth);
 
         // The scroll area measures its content when it is sized, and filling it afterwards changes
         // that content - so without this the bar appears at whatever extent the list had when it
@@ -207,6 +211,7 @@ internal sealed unsafe class VendorPanelAddon : IDisposable
             addon.Close();
 
         addon.Dispose();
+        menu.Dispose();
     }
 
     /// <summary>The addon itself, and the list of rows inside it.</summary>
