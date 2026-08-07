@@ -96,9 +96,11 @@ public abstract class StorePanelWindow : AddonPanelWindow
         ImGui.AlignTextToFramePadding();
 
         using (Plugin.PluginInterface.UiBuilder.IconFontFixedWidthHandle.Push())
+        {
             ImGui.TextColored(
-                held.Blocked == null ? Palette.For(ColourRole.Muted) : Palette.For(ColourRole.Warning),
-                LocationGlyph(held.Location).ToIconString());
+                Palette.For(held.Blocked == null ? ColourRole.Muted : ColourRole.Warning),
+                Glyphs.For(MarkerGlyph.For(held.Location)).ToIconString());
+        }
 
         ImGui.SameLine();
         UiParts.ItemIcon(row.IconId, 20);
@@ -124,14 +126,6 @@ public abstract class StorePanelWindow : AddonPanelWindow
         ImGui.Spacing();
         ImGui.TextColored(Palette.For(ColourRole.Muted), "Right-click for options.");
     }
-
-    private static FontAwesomeIcon LocationGlyph(CarryLocation location) => location switch
-    {
-        CarryLocation.Bags => FontAwesomeIcon.Briefcase,
-        CarryLocation.Armoury => FontAwesomeIcon.Archive,
-        CarryLocation.Equipped => FontAwesomeIcon.User,
-        _ => FontAwesomeIcon.Horse,
-    };
 
     private static string Describe(CarryLocation location) => location switch
     {

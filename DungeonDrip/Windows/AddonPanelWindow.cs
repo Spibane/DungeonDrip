@@ -338,35 +338,20 @@ public abstract unsafe class AddonPanelWindow : Window
     {
         var uncertain = CollectionMarkers.IsUncertain(row.Marker, stale);
 
-        // The glyph carries the state; the name only says whether the thing is needed. Hence the
-        // untinted name - any colour on it would compete with the glyph for meaning.
-        var glyphColour = row.Marker switch
-        {
-            CollectionMarker.OutfitComplete => Palette.For(ColourRole.Good),
-            CollectionMarker.NotCollected => uncertain ? Palette.For(ColourRole.Warning) : Palette.For(ColourRole.NotOwned),
-
-            // Warning rather than the missing red: the piece is in the box, the rule is what is
-            // unsatisfied, and the hover says by how much.
-            CollectionMarker.OutfitPartial => Palette.For(ColourRole.Warning),
-            CollectionMarker.Unknown => Palette.For(ColourRole.Warning),
-            _ => Palette.For(ColourRole.Muted),
-        };
-
         ImGui.AlignTextToFramePadding();
 
         // Fixed width so the names line up regardless of which glyph each row carries.
         using (Plugin.PluginInterface.UiBuilder.IconFontFixedWidthHandle.Push())
-            ImGui.TextColored(glyphColour, Glyph(row.Marker).ToIconString());
+        {
+            ImGui.TextColored(
+                Palette.For(MarkerGlyph.ColourFor(row.Marker, uncertain)),
+                Glyphs.For(MarkerGlyph.For(row.Marker)).ToIconString());
+        }
 
         ImGui.SameLine();
         UiParts.ItemIcon(row.IconId, 20);
 
-        if (CollectionMarkers.IsMissing(row.Marker))
-            ImGui.Text(row.Name);
-        else if (row.Marker == CollectionMarker.Unknown)
-            ImGui.TextColored(Palette.For(ColourRole.Warning), row.Name);
-        else
-            ImGui.TextColored(Palette.For(ColourRole.Muted), row.Name);
+        ImGui.TextColored(Palette.For(MarkerGlyph.NameColourFor(row.Marker)), row.Name);
 
         // Both bind to the last item drawn, so the hover flag has to be taken against the name
         // before the menu goes on this row.
@@ -594,29 +579,4 @@ public abstract unsafe class AddonPanelWindow : Window
         // at its drawn size, and the floor has to be a floor in the same pixels.
         contentWidth = Math.Max(FallbackWidth * ImGuiHelpers.GlobalScale, widest + furniture);
     }
-
-    /// <remarks>
-    /// The star marks a finished outfit and nothing else. A star is a reward everywhere else in the
-    /// game, so it must never land on the pieces still missing.
-    /// </remarks>
-    protected static FontAwesomeIcon Glyph(CollectionMarker marker) => marker switch
-    {
-        CollectionMarker.Dresser => FontAwesomeIcon.Check,
-        CollectionMarker.Outfit => FontAwesomeIcon.LayerGroup,
-        CollectionMarker.OutfitComplete => FontAwesomeIcon.Star,
-
-        // Half-filled, not a cross and not a star: the outfit-shaped states share the layered look
-        // and this one is the one that is partway there.
-        CollectionMarker.OutfitPartial => FontAwesomeIcon.Adjust,
-        CollectionMarker.Armoire => FontAwesomeIcon.Archive,
-        CollectionMarker.Inventory => FontAwesomeIcon.Briefcase,
-
-        // Not a second case. A retainer is somewhere to be travelled to, and the figure says so.
-        CollectionMarker.Retainer => FontAwesomeIcon.UserTag,
-
-        // The dressed figure, because this one is not in any bag: the retainer has it on.
-        CollectionMarker.RetainerEquipped => FontAwesomeIcon.UserTie,
-        CollectionMarker.NotCollected => FontAwesomeIcon.Times,
-        _ => FontAwesomeIcon.Question,
-    };
 }
