@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Dalamud.Bindings.ImGui;
 using DungeonDrip.Core;
+using DungeonDrip.Presentation;
 
 namespace DungeonDrip.Windows;
 
@@ -54,7 +55,7 @@ public sealed class ArmoirePanelWindow(Plugin plugin)
         if (duplicates == 0)
             return;
 
-        ImGui.TextColored(Palette.Muted, duplicates == 1
+        ImGui.TextColored(Palette.For(ColourRole.Muted), duplicates == 1
             ? "1 piece on you is in the Armoire already."
             : $"{duplicates} pieces on you are in the Armoire already.");
     }

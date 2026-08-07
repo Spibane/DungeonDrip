@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using Dalamud.Bindings.ImGui;
 using DungeonDrip.Core;
 using DungeonDrip.Game;
+using DungeonDrip.Presentation;
 
 namespace DungeonDrip.Windows;
 
@@ -38,7 +39,7 @@ public sealed class DresserPanelWindow(Plugin plugin)
             return;
 
         var free = capacity - used;
-        ImGui.TextColored(free <= 0 ? Palette.Warning : Palette.Muted,
+        ImGui.TextColored(free <= 0 ? Palette.For(ColourRole.Warning) : Palette.For(ColourRole.Muted),
             $"{used} of {capacity} slots used.");
     }
 
@@ -61,16 +62,16 @@ public sealed class DresserPanelWindow(Plugin plugin)
         var add = (DresserAddRow)row;
 
         if (add.ArmoireWouldTake)
-            ImGui.TextColored(Palette.Good, "The Armoire would take this, at no dresser slot.");
+            ImGui.TextColored(Palette.For(ColourRole.Good), "The Armoire would take this, at no dresser slot.");
 
         if (add.OutfitsStored > 0 && add.OutfitsTotal > add.OutfitsStored)
         {
             // Split across lines by hand: a tooltip does not wrap, and one sentence of this length
             // would drag it across the screen.
-            ImGui.TextColored(Palette.Warning,
+            ImGui.TextColored(Palette.For(ColourRole.Warning),
                 $"Stored inside {add.OutfitsStored} of the {add.OutfitsTotal} outfit sets using it.");
 
-            ImGui.TextColored(Palette.Warning,
+            ImGui.TextColored(Palette.For(ColourRole.Warning),
                 "Your setting only counts that as owned once every one of them is\n" +
                 "stored, so storing this copy on its own settles it.");
         }

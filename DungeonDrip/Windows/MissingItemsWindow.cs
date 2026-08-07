@@ -9,6 +9,7 @@ using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
 using DungeonDrip.Core;
 using DungeonDrip.Data;
+using DungeonDrip.Presentation;
 
 namespace DungeonDrip.Windows;
 
@@ -29,12 +30,8 @@ namespace DungeonDrip.Windows;
 /// </remarks>
 public class MissingItemsWindow : Window
 {
-    /// <summary>Heading for pieces no source is known for, and the order that puts it last.</summary>
-    private const string UnattributedLabel = "Not attributed to a boss or coffer";
-
-    private const int UnattributedOrder = int.MaxValue;
-
     private readonly Plugin plugin;
+    private readonly HeaderState headers;
     private readonly CollectionView collection;
 
     private string dutyFilter = string.Empty;
@@ -44,6 +41,7 @@ public class MissingItemsWindow : Window
         : base("Dungeon Drip###DungeonDripMain")
     {
         this.plugin = plugin;
+        headers = new HeaderState(plugin.Configuration);
         collection = new CollectionView(plugin);
         SizeConstraints = new WindowSizeConstraints
         {
@@ -101,7 +99,7 @@ public class MissingItemsWindow : Window
         if (plugin.Duties == null)
         {
             ImGui.Spacing();
-            ImGui.TextColored(Palette.Warning, plugin.LootData.StatusMessage);
+            ImGui.TextColored(Palette.For(ColourRole.Warning), plugin.LootData.StatusMessage);
             ImGui.TextWrapped(
                 "The dungeon loot list is downloaded rather than shipped with the plugin, so it stays " +
                 "current. This only takes a moment the first time.");
@@ -253,22 +251,22 @@ public class MissingItemsWindow : Window
 
         if (!tracker.HasDresserData)
         {
-            ImGui.TextColored(Palette.Warning,
+            ImGui.TextColored(Palette.For(ColourRole.Warning),
                 "No Glamour Dresser data yet - open a Glamour Dresser once so the plugin can read it.");
             return;
         }
 
         var age = Format.Age(tracker.DresserUpdatedUtc!.Value);
         if (tracker.IsDresserStale)
-            ImGui.TextColored(Palette.Warning, $"Glamour Dresser snapshot is {age} old - open your dresser to refresh it.");
+            ImGui.TextColored(Palette.For(ColourRole.Warning), $"Glamour Dresser snapshot is {age} old - open your dresser to refresh it.");
         else
-            ImGui.TextColored(Palette.Muted, tracker.DresserSlotCapacity > 0
+            ImGui.TextColored(Palette.For(ColourRole.Muted), tracker.DresserSlotCapacity > 0
                 ? $"Dresser: {tracker.DresserSlotsUsed} of {tracker.DresserSlotCapacity} slots, read {age} ago."
                 : $"Dresser: {tracker.DresserSlotsUsed} slots, read {age} ago.");
 
         if (tracker.ArmoireUpdatedUtc == null)
         {
-            ImGui.TextColored(Palette.Muted, "Armoire has never been read - open it at an inn to include it.");
+            ImGui.TextColored(Palette.For(ColourRole.Muted), "Armoire has never been read - open it at an inn to include it.");
         }
     }
 
@@ -316,7 +314,7 @@ public class MissingItemsWindow : Window
             return;
 
         ImGui.Spacing();
-        ImGui.TextColored(Palette.Focus, "Or queue a roulette on whichever job stands to gain the most:");
+        ImGui.TextColored(Palette.For(ColourRole.Focus), "Or queue a roulette on whichever job stands to gain the most:");
         ImGui.Spacing();
 
         using var table = ImRaii.Table(
@@ -348,7 +346,7 @@ public class MissingItemsWindow : Window
         if (best == null || best.Missing == 0)
         {
             ImGui.TableNextColumn();
-            ImGui.TextColored(best != null ? Palette.Good : Palette.Muted, best != null
+            ImGui.TextColored(best != null ? Palette.For(ColourRole.Good) : Palette.For(ColourRole.Muted), best != null
                 ? "all collected"
                 : advice.DutyCount == 0 ? "no loot data" : $"needs Lv. {advice.RequiredLevel}");
 
@@ -359,7 +357,7 @@ public class MissingItemsWindow : Window
         }
 
         ImGui.TableNextColumn();
-        ImGui.TextColored(Palette.Focus, best.Label);
+        ImGui.TextColored(Palette.For(ColourRole.Focus), best.Label);
 
         ImGui.TableNextColumn();
         ImGui.Text($"{best.Missing}");
@@ -376,7 +374,7 @@ public class MissingItemsWindow : Window
         using var tooltip = ImRaii.Tooltip();
 
         ImGui.Text(advice.Name);
-        ImGui.TextColored(Palette.Muted, advice.DutyCount == advice.PoolCount
+        ImGui.TextColored(Palette.For(ColourRole.Muted), advice.DutyCount == advice.PoolCount
             ? $"All {advice.PoolCount} duties in this roulette, counted."
             : $"{advice.DutyCount} of {advice.PoolCount} duties - no loot list for the rest.");
 
@@ -387,23 +385,23 @@ public class MissingItemsWindow : Window
 
             // Three ways to have nothing to say, and they want different answers from the reader.
             if (advice.DutyCount == 0)
-                ImGui.TextColored(Palette.Muted, "Nothing here has a loot list yet.");
+                ImGui.TextColored(Palette.For(ColourRole.Muted), "Nothing here has a loot list yet.");
             else if (advice.Roles.Count == 0)
-                ImGui.TextColored(Palette.Muted, $"No job of yours is Lv. {advice.RequiredLevel} yet.");
+                ImGui.TextColored(Palette.For(ColourRole.Muted), $"No job of yours is Lv. {advice.RequiredLevel} yet.");
             else
-                ImGui.TextColored(Palette.Muted, "Nothing here you have not already collected.");
+                ImGui.TextColored(Palette.For(ColourRole.Muted), "Nothing here you have not already collected.");
 
             return;
         }
 
         ImGui.Spacing();
-        ImGui.TextColored(Palette.Muted, "Uncollected, by role:");
+        ImGui.TextColored(Palette.For(ColourRole.Muted), "Uncollected, by role:");
         foreach (var odds in worthwhile)
             ImGui.Text($"   {odds.Missing,4} of {odds.Total,-4}  {odds.Share * 100,3:0}%   {odds.Label}");
 
         ImGui.Spacing();
-        ImGui.TextColored(Palette.Muted, "Odds per piece you can roll on, not per run.");
-        ImGui.TextColored(Palette.Muted, "Assumes every duty in the roulette is unlocked.");
+        ImGui.TextColored(Palette.For(ColourRole.Muted), "Odds per piece you can roll on, not per run.");
+        ImGui.TextColored(Palette.For(ColourRole.Muted), "Assumes every duty in the roulette is unlocked.");
     }
 
     private static void DrawSummary(DutyReport report)
@@ -411,26 +409,26 @@ public class MissingItemsWindow : Window
         ImGui.Spacing();
         if (report.TotalCount == 0)
         {
-            ImGui.TextColored(Palette.Muted, "No glamour-able gear listed for this duty.");
+            ImGui.TextColored(Palette.For(ColourRole.Muted), "No glamour-able gear listed for this duty.");
             return;
         }
 
         if (report.MissingCount == 0)
-            ImGui.TextColored(Palette.Good, $"You have all {report.TotalCount} pieces from this duty.");
+            ImGui.TextColored(Palette.For(ColourRole.Good), $"You have all {report.TotalCount} pieces from this duty.");
         else
             ImGui.Text($"Missing {report.MissingCount} of {report.TotalCount} pieces.");
 
         if (report.HiddenByJobFilter > 0)
-            ImGui.TextColored(Palette.Muted, $"{report.HiddenByJobFilter} hidden by the current-job filter.");
+            ImGui.TextColored(Palette.For(ColourRole.Muted), $"{report.HiddenByJobFilter} hidden by the current-job filter.");
 
         if (report.HiddenUnwearable > 0)
         {
-            ImGui.TextColored(Palette.Muted,
+            ImGui.TextColored(Palette.For(ColourRole.Muted),
                 $"{report.HiddenUnwearable} hidden as this character cannot wear them.");
         }
 
         if (report.HiddenWeapons > 0)
-            ImGui.TextColored(Palette.Muted, $"{report.HiddenWeapons} weapons hidden.");
+            ImGui.TextColored(Palette.For(ColourRole.Muted), $"{report.HiddenWeapons} weapons hidden.");
     }
 
     /// <summary>
@@ -446,7 +444,7 @@ public class MissingItemsWindow : Window
         if (!plugin.Configuration.ShowRoleSummary || report.MissingCount == 0)
             return;
 
-        var byRole = BuildGroups([.. report.Items.Where(item => !item.IsOwned)], MissingGrouping.Role)
+        var byRole = DutyGrouping.Build([.. report.Items.Where(item => !item.IsOwned)], MissingGrouping.Role)
             .Select(bucket => (bucket.Group.Label, bucket.Group.Order, Count: bucket.MissingCount))
             .Where(entry => entry.Count > 0)
             .OrderByDescending(entry => entry.Count)
@@ -460,7 +458,7 @@ public class MissingItemsWindow : Window
         var leaders = byRole.Where(entry => entry.Count == most).Select(entry => entry.Label).ToList();
 
         ImGui.Spacing();
-        ImGui.TextColored(Palette.Focus, leaders.Count == 1
+        ImGui.TextColored(Palette.For(ColourRole.Focus), leaders.Count == 1
             ? $"Most missing: {leaders[0]} ({most})"
             : $"Most missing: {string.Join(", ", leaders)} ({most} each)");
 
@@ -468,115 +466,14 @@ public class MissingItemsWindow : Window
             return;
 
         using var tooltip = ImRaii.Tooltip();
-        ImGui.TextColored(Palette.Muted, "Still missing by role:");
+        ImGui.TextColored(Palette.For(ColourRole.Muted), "Still missing by role:");
         foreach (var (label, _, count) in byRole)
             ImGui.Text($"   {count,3}   {label}");
 
         if (byRole.Sum(entry => entry.Count) > report.MissingCount)
         {
             ImGui.Spacing();
-            ImGui.TextColored(Palette.Muted, "Shared gear is counted under every role that can roll on it.");
-        }
-    }
-
-    /// <summary>
-    /// Buckets pieces into the headings they should be drawn under.
-    /// </summary>
-    /// <remarks>
-    /// Role view deliberately duplicates. It answers "what can I claim if I queue as this", so a
-    /// piece belongs under every heading whose jobs can roll on it: "of Slaying" accessories show
-    /// under their own MNK DRG SAM RPR heading and again under Maiming and Striking, and "of Aiming"
-    /// under both Physical Ranged and Scouting. Slot view never duplicates and stays the true list,
-    /// which is where the counts in the summary come from.
-    ///
-    /// Broader headings are only folded into narrower ones that some item already created in this
-    /// duty. A blind subset rule would conjure a "Melee DPS (DRG)" heading out of a legacy sheet row
-    /// and fill it with nothing but shared accessories.
-    ///
-    /// Source view duplicates for its own reason: a piece in two coffers is genuinely in both, and the
-    /// question being asked - what comes out of this - wants it under each. Pieces nothing attributes
-    /// share one heading at the end, which on a duty with no wiki lookup is the whole list.
-    /// </remarks>
-    private static List<Bucket> BuildGroups(IReadOnlyList<ReportItem> items, MissingGrouping grouping)
-    {
-        var byRole = grouping == MissingGrouping.Role;
-        var buckets = new Dictionary<string, Bucket>();
-
-        Bucket Ensure(RoleGroup group)
-        {
-            if (!buckets.TryGetValue(group.Label, out var bucket))
-                buckets[group.Label] = bucket = new Bucket(group);
-
-            return bucket;
-        }
-
-        foreach (var item in items)
-        {
-            switch (grouping)
-            {
-                case MissingGrouping.Role:
-                    foreach (var group in item.RoleGroups)
-                        Ensure(group).Add(item);
-
-                    break;
-
-                case MissingGrouping.Source when item.Origins.Count > 0:
-                    foreach (var origin in item.Origins)
-                        Ensure(new RoleGroup(origin.Order, origin.Label, string.Empty)).Add(item);
-
-                    break;
-
-                case MissingGrouping.Source:
-                    Ensure(new RoleGroup(UnattributedOrder, UnattributedLabel, string.Empty)).Add(item);
-                    break;
-
-                default:
-                    Ensure(new RoleGroup(item.SlotOrder, item.SlotName, string.Empty)).Add(item);
-                    break;
-            }
-        }
-
-        if (byRole)
-        {
-            foreach (var bucket in buckets.Values.ToList())
-            {
-                foreach (var item in items)
-                {
-                    if (item.RoleGroups.Any(group => bucket.Group.IsCoveredBy(group)))
-                        bucket.Add(item);
-                }
-            }
-        }
-
-        return [.. buckets.Values.OrderBy(b => b.Group.Order).ThenBy(b => b.Group.Label, StringComparer.OrdinalIgnoreCase)];
-    }
-
-    /// <summary>
-    /// One role heading's rows, counting its own missing pieces and refusing duplicates.
-    /// </summary>
-    /// <remarks>
-    /// The seen set is what makes the covering pass safe: a piece can reach a heading both as its own
-    /// role and by way of a broader heading that covers it, and a heading claiming the same piece
-    /// twice would double its count as well as list it twice.
-    /// </remarks>
-    private sealed class Bucket(RoleGroup group)
-    {
-        private readonly HashSet<uint> seen = [];
-
-        public RoleGroup Group { get; } = group;
-
-        public List<ReportItem> Items { get; } = [];
-
-        public int MissingCount { get; private set; }
-
-        public void Add(ReportItem item)
-        {
-            if (!seen.Add(item.ItemId))
-                return;
-
-            Items.Add(item);
-            if (!item.IsOwned)
-                MissingCount++;
+            ImGui.TextColored(Palette.For(ColourRole.Muted), "Shared gear is counted under every role that can roll on it.");
         }
     }
 
@@ -594,9 +491,9 @@ public class MissingItemsWindow : Window
         // says "not attributed" reads as the grouping being broken.
         if (configuration.Grouping == MissingGrouping.Source && !report.HasOrigins)
         {
-            ImGui.TextColored(Palette.Warning,
+            ImGui.TextColored(Palette.For(ColourRole.Warning),
                 "Nothing here is attributed to a boss or coffer yet.");
-            ImGui.TextColored(Palette.Muted,
+            ImGui.TextColored(Palette.For(ColourRole.Muted),
                 configuration.UseWikiSource
                     ? "Only the wiki says where inside a duty a piece drops, and this duty has no lookup yet."
                     : "Only the wiki says where inside a duty a piece drops, and it is switched off under Data.");
@@ -604,12 +501,12 @@ public class MissingItemsWindow : Window
         }
 
         var visible = report.Items.Where(item => showOwned || !item.IsOwned).ToList();
-        var groups = BuildGroups(visible, configuration.Grouping);
+        var groups = DutyGrouping.Build(visible, configuration.Grouping);
 
         if (groups.Count == 0)
         {
             if (report.TotalCount > 0)
-                ImGui.TextColored(Palette.Good, "Nothing missing here.");
+                ImGui.TextColored(Palette.For(ColourRole.Good), "Nothing missing here.");
 
             return;
         }
@@ -619,24 +516,11 @@ public class MissingItemsWindow : Window
             var missing = group.MissingCount;
             var label = missing > 0 ? $"{group.Group.Label}  ({missing})" : group.Group.Label;
 
-            // Restore the remembered state when the window appears, then let clicks win and write
-            // whatever the user settles on back to the config.
-            var collapsed = configuration.CollapsedGroups.Contains(group.Group.Label);
-            ImGui.SetNextItemOpen(!collapsed, ImGuiCond.Appearing);
-
-            var open = ImGui.CollapsingHeader($"{label}###group{group.Group.Label}");
-            if (open == collapsed)
+            if (!UiParts.CollapsingHeader(
+                    headers, label, group.Group.Label, $"group{group.Group.Label}"))
             {
-                if (open)
-                    configuration.CollapsedGroups.Remove(group.Group.Label);
-                else
-                    configuration.CollapsedGroups.Add(group.Group.Label);
-
-                configuration.Save();
-            }
-
-            if (!open)
                 continue;
+            }
 
             foreach (var item in group.Items)
                 DrawItemRow(item);
@@ -650,7 +534,7 @@ public class MissingItemsWindow : Window
         UiParts.ItemIcon(item.IconId, 28);
 
         if (item.IsOwned)
-            ImGui.TextColored(Palette.Muted, item.Name);
+            ImGui.TextColored(Palette.For(ColourRole.Muted), item.Name);
         else
             ImGui.Text(item.Name);
 
@@ -665,16 +549,16 @@ public class MissingItemsWindow : Window
 
         using var tooltip = ImRaii.Tooltip();
         ImGui.Text(item.Name);
-        ImGui.TextColored(Palette.Muted, $"iLvl {item.ItemLevel}");
+        ImGui.TextColored(Palette.For(ColourRole.Muted), $"iLvl {item.ItemLevel}");
         ImGui.Text(MissingItems.Describe(item.Source));
-        ImGui.TextColored(Palette.Muted, ProvenanceDescription(item.Provenance));
+        ImGui.TextColored(Palette.For(ColourRole.Muted), ProvenanceDescription(item.Provenance));
 
         DrawOrigins(item);
         DrawAcquisitions(item.ItemId);
         DrawOutfitMembership(item.ItemId);
 
         ImGui.Spacing();
-        ImGui.TextColored(Palette.Muted, "Right-click for options.");
+        ImGui.TextColored(Palette.For(ColourRole.Muted), "Right-click for options.");
     }
 
     /// <summary>
@@ -700,7 +584,7 @@ public class MissingItemsWindow : Window
 
         ImGui.Spacing();
         foreach (var acquisition in acquisitions)
-            ImGui.TextColored(Palette.Muted, acquisition.Describe());
+            ImGui.TextColored(Palette.For(ColourRole.Muted), acquisition.Describe());
     }
 
     /// <summary>
@@ -716,7 +600,7 @@ public class MissingItemsWindow : Window
         if (item.Origins.Count == 0)
             return;
 
-        ImGui.TextColored(Palette.Focus, item.Origins.Count == 1
+        ImGui.TextColored(Palette.For(ColourRole.Focus), item.Origins.Count == 1
             ? $"Drops from: {item.Origins[0].Label}"
             : $"Drops from: {string.Join(", ", item.Origins.Select(origin => origin.Label))}");
     }
@@ -740,18 +624,18 @@ public class MissingItemsWindow : Window
 
         ImGui.Spacing();
         ImGui.Separator();
-        ImGui.TextColored(Palette.Muted, named.Count == 1
+        ImGui.TextColored(Palette.For(ColourRole.Muted), named.Count == 1
             ? "Part of 1 outfit set:"
             : $"Part of {named.Count} outfit sets:");
 
         foreach (var (setId, name) in named)
         {
             if (holdingThisPiece?.Contains(setId) == true)
-                ImGui.TextColored(Palette.Good, $"   {name} — stored, includes this piece");
+                ImGui.TextColored(Palette.For(ColourRole.Good), $"   {name} — stored, includes this piece");
             else if (ownership.StoredOutfits.Contains(setId))
-                ImGui.TextColored(Palette.Warning, $"   {name} — stored, but this slot is empty");
+                ImGui.TextColored(Palette.For(ColourRole.Warning), $"   {name} — stored, but this slot is empty");
             else
-                ImGui.TextColored(Palette.Muted, $"   {name} — not stored");
+                ImGui.TextColored(Palette.For(ColourRole.Muted), $"   {name} — not stored");
         }
     }
 

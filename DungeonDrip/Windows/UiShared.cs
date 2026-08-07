@@ -7,31 +7,10 @@ using Dalamud.Interface.Textures;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using DungeonDrip.Game;
+using DungeonDrip.Presentation;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 
 namespace DungeonDrip.Windows;
-
-/// <summary>The plugin's colours, in one place so they cannot drift apart again.</summary>
-internal static class Palette
-{
-    /// <summary>Something the user should act on or distrust: stale data, hidden weapons.</summary>
-    public static readonly Vector4 Warning = new(1.00f, 0.71f, 0.20f, 1f);
-
-    /// <summary>Finished: a complete duty list, a completed outfit.</summary>
-    public static readonly Vector4 Good = new(0.45f, 0.85f, 0.45f, 1f);
-
-    /// <summary>Present but not the point - owned pieces, secondary lines.</summary>
-    public static readonly Vector4 Muted = new(0.58f, 0.58f, 0.58f, 1f);
-
-    /// <summary>Not collected, in the loot roll list.</summary>
-    public static readonly Vector4 Missing = new(1.00f, 0.85f, 0.40f, 1f);
-
-    /// <summary>Not collected, at a vendor, where gold read as a recommendation to buy.</summary>
-    public static readonly Vector4 NotOwned = new(0.94f, 0.38f, 0.38f, 1f);
-
-    /// <summary>The duty currently being looked at.</summary>
-    public static readonly Vector4 Focus = new(0.55f, 0.80f, 1.00f, 1f);
-}
 
 /// <summary>
 /// The widgets more than one window draws, so they cannot come to look or behave differently.
@@ -114,7 +93,7 @@ internal static class UiParts
             // itself. Disabled rather than absent, because a missing row reads as a broken menu.
             if (action.Invoke == null)
             {
-                ImGui.TextColored(Palette.Muted, action.Label);
+                ImGui.TextColored(Palette.For(ColourRole.Muted), action.Label);
                 return;
             }
 
@@ -130,6 +109,34 @@ internal static class UiParts
 
         foreach (var entry in action.Submenu!)
             DrawAction(entry);
+    }
+
+    /// <summary>
+    /// A collapsing header whose folded state survives a restart.
+    /// </summary>
+    /// <remarks>
+    /// The remembered state is applied on <see cref="ImGuiCond.Appearing"/> only, so a click wins
+    /// for the rest of the session rather than being overruled on the next frame, and whatever it
+    /// settles on is written back.
+    ///
+    /// <paramref name="id"/> is separate from <paramref name="key"/> because the duty list's
+    /// headings are keyed on the bare group label but carry a prefixed ImGui id. Folding them
+    /// together would be tidier and would silently unfold every heading anyone has folded, since the
+    /// key is what is already written in their config.
+    /// </remarks>
+    /// <returns>Whether the section's contents should be drawn.</returns>
+    public static bool CollapsingHeader(
+        HeaderState state, string label, string key, string? id = null, ColourRole? colour = null,
+        bool defaultOpen = true)
+    {
+        ImGui.SetNextItemOpen(state.IsOpen(key, defaultOpen), ImGuiCond.Appearing);
+
+        bool open;
+        using (ImRaii.PushColor(ImGuiCol.Text, Palette.For(colour ?? ColourRole.Default), colour != null))
+            open = ImGui.CollapsingHeader($"{label}###{id ?? key}");
+
+        state.Record(key, open, defaultOpen);
+        return open;
     }
 
     /// <summary>
@@ -151,39 +158,14 @@ internal static class UiParts
     }
 }
 
-/// <summary>
-/// Places a window alongside a game addon.
-/// </summary>
+/// <summary>Reads an addon's placement off the live struct, for <see cref="AddonAnchor"/>.</summary>
 /// <remarks>
-/// Game screen pixels and ImGui pixels are the same thing here, so nothing on this path is
-/// multiplied by <see cref="ImGuiHelpers.GlobalScale"/>. That scales glyphs, not coordinates;
-/// applying it to a position is how these panels drift away from their addon.
+/// The arithmetic lives in <see cref="AddonAnchor"/>, which both backends share. This is the half
+/// that has to touch the game's own memory, kept here so the shared half does not have to.
 /// </remarks>
-internal static unsafe class AddonAnchor
+internal static unsafe class AddonPlacement
 {
-    private const float Gap = 6f;
-
-    /// <summary>Top-left corner for a panel of <paramref name="ownSize"/> beside this addon.</summary>
-    public static Vector2 Beside(AtkUnitBase* unit, PanelSide side, Vector2 ownSize)
-    {
-        var display = ImGui.GetIO().DisplaySize;
-        var width = unit->GetScaledWidth(true);
-
-        var toRight = side switch
-        {
-            PanelSide.Left => false,
-            PanelSide.Right => true,
-            _ => unit->X + width + Gap + ownSize.X <= display.X,
-        };
-
-        var x = toRight
-            ? unit->X + width + Gap
-            : unit->X - ownSize.X - Gap;
-
-        // Clamped against the panel's own size: an addon jammed against an edge would otherwise
-        // push it off screen.
-        return new Vector2(
-            Math.Clamp(x, 0f, Math.Max(0f, display.X - ownSize.X)),
-            Math.Clamp(unit->Y, 0f, Math.Max(0f, display.Y - ownSize.Y)));
-    }
+    /// <summary>The addon's top-left and its width on screen, both in screen pixels.</summary>
+    public static (Vector2 Position, float Width) Of(AtkUnitBase* unit) =>
+        (new Vector2(unit->X, unit->Y), unit->GetScaledWidth(true));
 }

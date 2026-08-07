@@ -2,6 +2,7 @@ using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
 using Dalamud.Interface.Utility.Raii;
 using DungeonDrip.Core;
+using DungeonDrip.Presentation;
 
 namespace DungeonDrip.Windows;
 
@@ -95,9 +96,11 @@ public abstract class StorePanelWindow : AddonPanelWindow
         ImGui.AlignTextToFramePadding();
 
         using (Plugin.PluginInterface.UiBuilder.IconFontFixedWidthHandle.Push())
+        {
             ImGui.TextColored(
-                held.Blocked == null ? Palette.Muted : Palette.Warning,
-                LocationGlyph(held.Location).ToIconString());
+                Palette.For(held.Blocked == null ? ColourRole.Muted : ColourRole.Warning),
+                Glyphs.For(MarkerGlyph.For(held.Location)).ToIconString());
+        }
 
         ImGui.SameLine();
         UiParts.ItemIcon(row.IconId, 20);
@@ -113,24 +116,16 @@ public abstract class StorePanelWindow : AddonPanelWindow
 
         using var tooltip = ImRaii.Tooltip();
         ImGui.Text(row.Name);
-        ImGui.TextColored(Palette.Muted, Describe(held.Location));
+        ImGui.TextColored(Palette.For(ColourRole.Muted), Describe(held.Location));
 
         DrawRowNotes(held);
 
         if (held.Blocked != null)
-            ImGui.TextColored(Palette.Warning, held.Blocked);
+            ImGui.TextColored(Palette.For(ColourRole.Warning), held.Blocked);
 
         ImGui.Spacing();
-        ImGui.TextColored(Palette.Muted, "Right-click for options.");
+        ImGui.TextColored(Palette.For(ColourRole.Muted), "Right-click for options.");
     }
-
-    private static FontAwesomeIcon LocationGlyph(CarryLocation location) => location switch
-    {
-        CarryLocation.Bags => FontAwesomeIcon.Briefcase,
-        CarryLocation.Armoury => FontAwesomeIcon.Archive,
-        CarryLocation.Equipped => FontAwesomeIcon.User,
-        _ => FontAwesomeIcon.Horse,
-    };
 
     private static string Describe(CarryLocation location) => location switch
     {

@@ -7,6 +7,7 @@ using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
 using DungeonDrip.Core;
+using DungeonDrip.Presentation;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 
 namespace DungeonDrip.Windows;
@@ -44,6 +45,8 @@ public abstract unsafe class AddonPanelWindow : Window
 
     protected readonly Plugin Plugin;
 
+    private readonly HeaderState headers;
+
     private readonly string collapsePrefix;
     private readonly string toolbarId;
 
@@ -75,6 +78,7 @@ public abstract unsafe class AddonPanelWindow : Window
         : base(title, BaseFlags)
     {
         Plugin = plugin;
+        headers = new HeaderState(plugin.Configuration);
         this.collapsePrefix = collapsePrefix;
         this.toolbarId = toolbarId;
 
@@ -234,7 +238,8 @@ public abstract unsafe class AddonPanelWindow : Window
             SizeCondition = ImGuiCond.Appearing;
         }
 
-        Position = AddonAnchor.Beside(unit, Settings.Side, desired);
+        var placement = AddonPlacement.Of(unit);
+        Position = AddonAnchor.Beside(placement.Position, placement.Width, Settings.Side, desired, display);
         PositionCondition = ImGuiCond.Always;
     }
 
@@ -290,9 +295,9 @@ public abstract unsafe class AddonPanelWindow : Window
         if (groups.Count == 0)
         {
             if (hiddenByFilter > 0)
-                ImGui.TextColored(Palette.Muted, FilteredEmptyMessage);
+                ImGui.TextColored(Palette.For(ColourRole.Muted), FilteredEmptyMessage);
             else
-                ImGui.TextColored(EmptyIsGood ? Palette.Good : Palette.Muted, EmptyMessage);
+                ImGui.TextColored(EmptyIsGood ? Palette.For(ColourRole.Good) : Palette.For(ColourRole.Muted), EmptyMessage);
 
             return;
         }
@@ -307,24 +312,8 @@ public abstract unsafe class AddonPanelWindow : Window
     }
 
     /// <summary>How much to trust the list, said above it rather than instead of it.</summary>
-    private static void DrawSnapshotWarning(Game.OwnershipTracker ownership, bool stale)
-    {
-        if (!ownership.HasDresserData)
-        {
-            ImGui.TextColored(Palette.Warning, "No dresser data yet.");
-            ImGui.TextColored(Palette.Warning, "Open your Glamour Dresser.");
-            ImGui.Separator();
-            return;
-        }
-
-        if (!stale)
-            return;
-
-        var age = Format.Age(ownership.DresserUpdatedUtc!.Value);
-        ImGui.TextColored(Palette.Warning, $"Dresser last read {age} ago.");
-        ImGui.TextColored(Palette.Warning, "Open one to be sure.");
-        ImGui.Separator();
-    }
+    private void DrawSnapshotWarning(Game.OwnershipTracker ownership, bool stale) =>
+        ImGuiRenderer.Draw(Plugin, PanelPresenter.SnapshotWarning(ownership, stale));
 
     /// <summary>
     /// One row: the marker glyph, the icon, the name, its menu and its tooltip.
@@ -333,59 +322,8 @@ public abstract unsafe class AddonPanelWindow : Window
     /// Virtual because a panel whose rows are all the same marker by construction gets nothing from
     /// the glyph and would rather spend that column on something it does know.
     /// </remarks>
-    protected virtual void DrawRow(GearRow row, bool stale)
-    {
-        var uncertain = CollectionMarkers.IsUncertain(row.Marker, stale);
-
-        // The glyph carries the state; the name only says whether the thing is needed. Hence the
-        // untinted name - any colour on it would compete with the glyph for meaning.
-        var glyphColour = row.Marker switch
-        {
-            CollectionMarker.OutfitComplete => Palette.Good,
-            CollectionMarker.NotCollected => uncertain ? Palette.Warning : Palette.NotOwned,
-
-            // Warning rather than the missing red: the piece is in the box, the rule is what is
-            // unsatisfied, and the hover says by how much.
-            CollectionMarker.OutfitPartial => Palette.Warning,
-            CollectionMarker.Unknown => Palette.Warning,
-            _ => Palette.Muted,
-        };
-
-        ImGui.AlignTextToFramePadding();
-
-        // Fixed width so the names line up regardless of which glyph each row carries.
-        using (Plugin.PluginInterface.UiBuilder.IconFontFixedWidthHandle.Push())
-            ImGui.TextColored(glyphColour, Glyph(row.Marker).ToIconString());
-
-        ImGui.SameLine();
-        UiParts.ItemIcon(row.IconId, 20);
-
-        if (CollectionMarkers.IsMissing(row.Marker))
-            ImGui.Text(row.Name);
-        else if (row.Marker == CollectionMarker.Unknown)
-            ImGui.TextColored(Palette.Warning, row.Name);
-        else
-            ImGui.TextColored(Palette.Muted, row.Name);
-
-        // Both bind to the last item drawn, so the hover flag has to be taken against the name
-        // before the menu goes on this row.
-        var hovered = ImGui.IsItemHovered();
-
-        UiParts.ItemContextMenu(Plugin, row.ItemId, row.Name);
-
-        if (!hovered)
-            return;
-
-        using var tooltip = ImRaii.Tooltip();
-        ImGui.Text(row.Name);
-        ImGui.Text(CollectionMarkers.Describe(row.Marker, row.OutfitsStored, row.OutfitsTotal));
-
-        if (uncertain && UncertainNote != null)
-            ImGui.TextColored(Palette.Warning, UncertainNote);
-
-        ImGui.Spacing();
-        ImGui.TextColored(Palette.Muted, "Right-click for options.");
-    }
+    protected virtual void DrawRow(GearRow row, bool stale) =>
+        ImGuiRenderer.Draw(Plugin, PanelPresenter.Row(row, stale, UncertainNote));
 
     /// <summary>
     /// Keeps a value between two bounds, with the floor winning if the ceiling is below it.
@@ -544,22 +482,7 @@ public abstract unsafe class AddonPanelWindow : Window
                 ? $"{group.Label}  ({group.NotCollected})"
                 : group.Label;
 
-        var key = collapsePrefix + group.Label;
-        var collapsed = Plugin.Configuration.CollapsedGroups.Contains(key);
-        ImGui.SetNextItemOpen(!collapsed, ImGuiCond.Appearing);
-
-        var open = ImGui.CollapsingHeader($"{label}###{key}");
-        if (open == collapsed)
-        {
-            if (open)
-                Plugin.Configuration.CollapsedGroups.Remove(key);
-            else
-                Plugin.Configuration.CollapsedGroups.Add(key);
-
-            Plugin.Configuration.Save();
-        }
-
-        if (!open)
+        if (!UiParts.CollapsingHeader(headers, label, collapsePrefix + group.Label))
             return;
 
         foreach (var row in group.Rows)
@@ -593,29 +516,4 @@ public abstract unsafe class AddonPanelWindow : Window
         // at its drawn size, and the floor has to be a floor in the same pixels.
         contentWidth = Math.Max(FallbackWidth * ImGuiHelpers.GlobalScale, widest + furniture);
     }
-
-    /// <remarks>
-    /// The star marks a finished outfit and nothing else. A star is a reward everywhere else in the
-    /// game, so it must never land on the pieces still missing.
-    /// </remarks>
-    protected static FontAwesomeIcon Glyph(CollectionMarker marker) => marker switch
-    {
-        CollectionMarker.Dresser => FontAwesomeIcon.Check,
-        CollectionMarker.Outfit => FontAwesomeIcon.LayerGroup,
-        CollectionMarker.OutfitComplete => FontAwesomeIcon.Star,
-
-        // Half-filled, not a cross and not a star: the outfit-shaped states share the layered look
-        // and this one is the one that is partway there.
-        CollectionMarker.OutfitPartial => FontAwesomeIcon.Adjust,
-        CollectionMarker.Armoire => FontAwesomeIcon.Archive,
-        CollectionMarker.Inventory => FontAwesomeIcon.Briefcase,
-
-        // Not a second case. A retainer is somewhere to be travelled to, and the figure says so.
-        CollectionMarker.Retainer => FontAwesomeIcon.UserTag,
-
-        // The dressed figure, because this one is not in any bag: the retainer has it on.
-        CollectionMarker.RetainerEquipped => FontAwesomeIcon.UserTie,
-        CollectionMarker.NotCollected => FontAwesomeIcon.Times,
-        _ => FontAwesomeIcon.Question,
-    };
 }

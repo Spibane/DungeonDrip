@@ -4,7 +4,6 @@ using System.Linq;
 using Dalamud.Game.Player;
 using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Game.Text.SeStringHandling.Payloads;
-using Dalamud.Interface.Windowing;
 using Dalamud.IoC;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
@@ -163,7 +162,6 @@ public sealed class Plugin : IDalamudPlugin
     /// <summary>The gear the market board is currently browsing.</summary>
     public MarketBoardWatcher Market { get; }
 
-    private readonly WindowSystem windowSystem = new("DungeonDrip");
     private readonly ContentFinderIndex contentFinder;
     private readonly JobRoleIndex jobRoles;
     private readonly LootObserver lootObserver;
@@ -171,8 +169,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly ItemTooltipLine tooltipLine;
     private readonly HttpFetcher http = new();
 
-    private readonly MissingItemsWindow mainWindow;
-    private readonly ConfigWindow configWindow;
+    private readonly IPluginUi ui;
 
     private Core.Sources.ItemSources? itemSources;
     private DutyReportBuilder? reportBuilder;
@@ -229,17 +226,7 @@ public sealed class Plugin : IDalamudPlugin
         // returning user has data before the first frame and a first-time user gets it shortly after.
         LootData = new LootDataService(configDirectory, LearnedLoot, Wiki, contentFinder, Storage, http);
 
-        mainWindow = new MissingItemsWindow(this);
-        configWindow = new ConfigWindow(this);
-        windowSystem.AddWindow(mainWindow);
-        windowSystem.AddWindow(configWindow);
-
-        // Always open; each decides for itself whether the addon it rides on is up.
-        windowSystem.AddWindow(new LootCompanionWindow(this) { IsOpen = true });
-        windowSystem.AddWindow(new VendorPanelWindow(this) { IsOpen = true });
-        windowSystem.AddWindow(new DresserPanelWindow(this) { IsOpen = true });
-        windowSystem.AddWindow(new ArmoirePanelWindow(this) { IsOpen = true });
-        windowSystem.AddWindow(new MarketBoardPanelWindow(this) { IsOpen = true });
+        ui = new ImGuiUi(this);
 
         currentTerritory = ClientState.TerritoryType;
 
@@ -248,14 +235,17 @@ public sealed class Plugin : IDalamudPlugin
 
         ClientState.TerritoryChanged += OnTerritoryChanged;
         Framework.Update += OnFrameworkUpdate;
-        PluginInterface.UiBuilder.Draw += windowSystem.Draw;
         PluginInterface.UiBuilder.OpenConfigUi += ToggleConfigUi;
         PluginInterface.UiBuilder.OpenMainUi += ToggleMainUi;
     }
 
     public void Dispose()
     {
-        PluginInterface.UiBuilder.Draw -= windowSystem.Draw;
+        // First, and it has to stay first. Everything below is state the windows read while they
+        // draw, so a surface still subscribed while its sources are being torn down is a crash on
+        // reload rather than an untidy shutdown.
+        ui.Dispose();
+
         PluginInterface.UiBuilder.OpenConfigUi -= ToggleConfigUi;
         PluginInterface.UiBuilder.OpenMainUi -= ToggleMainUi;
         Framework.Update -= OnFrameworkUpdate;
@@ -264,7 +254,6 @@ public sealed class Plugin : IDalamudPlugin
         foreach (var itemId in referenceLinks.Keys)
             ChatGui.RemoveChatLinkHandler(ReferenceLinkBase + itemId);
 
-        windowSystem.RemoveAllWindows();
         lootObserver.Dispose();
         gameContextMenu.Dispose();
         tooltipLine.Dispose();
@@ -330,17 +319,17 @@ public sealed class Plugin : IDalamudPlugin
     public void ShowDuty(uint territoryId)
     {
         PinTerritory(territoryId);
-        mainWindow.IsOpen = true;
+        ui.MainOpen = true;
     }
 
     /// <summary>Opens the duty picker with a search already typed into it.</summary>
-    public void ShowDutyPicker(string filter) => mainWindow.OpenPicker(filter);
+    public void ShowDutyPicker(string filter) => ui.OpenDutyPicker(filter);
 
     public void InvalidateReport() => reportDirty = true;
 
-    public void ToggleConfigUi() => configWindow.Toggle();
+    public void ToggleConfigUi() => ui.ToggleConfig();
 
-    public void ToggleMainUi() => mainWindow.Toggle();
+    public void ToggleMainUi() => ui.ToggleMain();
 
     /// <summary>
     /// Follows the character between zones: stales the report and decides whether the window should
@@ -359,7 +348,7 @@ public sealed class Plugin : IDalamudPlugin
 
         // A pinned duty means the user is deliberately looking something up, so leave them to it.
         if (leftSupportedDuty && Configuration.CloseWhenLeavingDuty && !pinnedTerritory.HasValue)
-            mainWindow.IsOpen = false;
+            ui.MainOpen = false;
 
         // Tied to the territory rather than a bare flag so that a duty entered while the dataset is
         // still downloading still pops the window once the data lands - and nothing else does.
@@ -446,7 +435,7 @@ public sealed class Plugin : IDalamudPlugin
         // Zoning into a dungeon has to land on the duty, not on wherever the window was left. A
         // window that pops itself open to show dresser pressure as the gate drops is noise.
         SetMode(MainWindowMode.Duty);
-        mainWindow.IsOpen = true;
+        ui.MainOpen = true;
     }
 
     /// <summary>
@@ -489,12 +478,12 @@ public sealed class Plugin : IDalamudPlugin
         switch (args.ToLowerInvariant())
         {
             case "":
-                mainWindow.Toggle();
+                ui.ToggleMain();
                 return;
 
             case "config":
             case "settings":
-                configWindow.Toggle();
+                ui.ToggleConfig();
                 return;
 
             case "refresh":
@@ -540,7 +529,7 @@ public sealed class Plugin : IDalamudPlugin
 
             case 1:
                 PinTerritory(matches[0].TerritoryId);
-                mainWindow.IsOpen = true;
+                ui.MainOpen = true;
                 return;
 
             default:
@@ -550,11 +539,11 @@ public sealed class Plugin : IDalamudPlugin
                 if (exact != null)
                 {
                     PinTerritory(exact.TerritoryId);
-                    mainWindow.IsOpen = true;
+                    ui.MainOpen = true;
                     return;
                 }
 
-                mainWindow.OpenPicker(args);
+                ui.OpenDutyPicker(args);
                 return;
         }
     }
