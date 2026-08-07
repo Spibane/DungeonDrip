@@ -39,12 +39,6 @@ internal sealed unsafe class VendorPanelAddon : IDisposable
     /// </remarks>
     private static readonly Vector2 UnanchoredSize = new(260f, 400f);
 
-    /// <summary>How far the subtitle sits right of the title, and how far off its baseline.</summary>
-    private const float SubtitleGap = 12f;
-
-    /// <remarks>Negative: the subtitle sits high against the title, not low.</remarks>
-    private const float SubtitleRise = -2f;
-
     private readonly Plugin plugin;
     private readonly Panel addon;
 
@@ -56,6 +50,12 @@ internal sealed unsafe class VendorPanelAddon : IDisposable
     /// </remarks>
     private IReadOnlyList<GearRow>? builtFrom;
 
+    /// <summary>Reused between builds, since Regroup refills it in place.</summary>
+    private readonly List<SlotGroup> groups = [];
+
+    /// <summary>The filters the current rows were built through.</summary>
+    private ViewOptions builtWith;
+
     public VendorPanelAddon(Plugin plugin)
     {
         this.plugin = plugin;
@@ -64,7 +64,6 @@ internal sealed unsafe class VendorPanelAddon : IDisposable
         {
             InternalName = "DungeonDripVendor",
             Title = "Dungeon Drip",
-            Subtitle = "At this vendor",
             Size = UnanchoredSize,
 
             // The panel belongs beside its shop, so it is placed every frame and there is no
@@ -115,9 +114,15 @@ internal sealed unsafe class VendorPanelAddon : IDisposable
         if (addon.List is not { } list)
             return;
 
-        if (!ReferenceEquals(builtFrom, rows))
+        // The filters have to be part of what decides a rebuild. The watcher hands back the same
+        // list instance until the shop's stock changes, so keying on the list alone means a filter
+        // toggled in Settings does not reach the panel until the player walks to another vendor.
+        var options = PanelPresenter.Options(plugin.Configuration, plugin.Configuration.VendorPanel);
+
+        if (!ReferenceEquals(builtFrom, rows) || options != builtWith)
         {
             builtFrom = rows;
+            builtWith = options;
             Rebuild(list, rows);
         }
 
@@ -141,11 +146,20 @@ internal sealed unsafe class VendorPanelAddon : IDisposable
     {
         var stale = plugin.Ownership.IsDresserStale;
 
-        var built = new List<RowNode>(rows.Count);
-        foreach (var row in rows)
-            built.Add(PanelPresenter.Row(row, stale, UncertainNote));
+        // Through the same filters the ImGui panel and the duty list use. Rendering the resolved
+        // list straight was the first cut and was simply wrong: every filter in Settings appeared
+        // to do nothing here, because nothing here was reading them.
+        var options = PanelPresenter.Options(plugin.Configuration, plugin.Configuration.VendorPanel);
+        PanelGrouping.Regroup(rows, options, groups);
 
-        NativeRenderer.Fill(list, built, addon.ScrollBarWidth);
+        var built = new List<RowNode>();
+        foreach (var group in groups)
+        {
+            foreach (var row in group.Rows)
+                built.Add(PanelPresenter.Row(row, stale, UncertainNote));
+        }
+
+        NativeRenderer.Fill(plugin, list, built, addon.ScrollBarWidth);
 
         // The scroll area measures its content when it is sized, and filling it afterwards changes
         // that content - so without this the bar appears at whatever extent the list had when it
@@ -234,29 +248,8 @@ internal sealed unsafe class VendorPanelAddon : IDisposable
             scroller.Size = ContentSize;
 
             AddNode(scroller);
-            SpaceOutSubtitle();
         }
 
-        /// <summary>
-        /// Moves the subtitle off the title and onto its line.
-        /// </summary>
-        /// <remarks>
-        /// The window node sets the subtitle four pixels right of the title's bounds and leaves the
-        /// two on one baseline, which reads as one run of text broken in the middle rather than as a
-        /// name and a qualifier. The game's own windows give it more room than that.
-        ///
-        /// Done here rather than by supplying a whole custom window node, which is the other way and
-        /// is a great deal of chrome to reimplement for two numbers.
-        /// </remarks>
-        private void SpaceOutSubtitle()
-        {
-            if (WindowNode is not KamiToolKit.Nodes.WindowNode window)
-                return;
-
-            window.SubtitleNode.Position = new Vector2(
-                window.TitleNode.Bounds.Right + SubtitleGap,
-                window.SubtitleNode.Y + SubtitleRise);
-        }
 
         /// <remarks>
         /// Closing deallocates the whole tree, so the reference has to go with it. Keeping it would

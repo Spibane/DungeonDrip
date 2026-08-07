@@ -13,6 +13,22 @@ namespace DungeonDrip.Presentation;
 /// </remarks>
 internal static class PanelPresenter
 {
+    /// <summary>
+    /// The filters a panel's list is shown through, as both backends must read them.
+    /// </summary>
+    /// <remarks>
+    /// Built here rather than in a window because these are the same filters the duty list uses and
+    /// each has to mean one thing across the plugin. A backend assembling its own would be the
+    /// obvious way for "hide weapons" to start meaning something different at a vendor.
+    /// </remarks>
+    public static ViewOptions Options(Configuration configuration, PanelSettings settings) => new(
+        configuration.ShowOwnedItems,
+        configuration.OnlyCurrentJobEquippable,
+        configuration.OnlyCurrentGenderEquippable,
+        configuration.OnlyCurrentRaceEquippable,
+        configuration.HideWeapons,
+        settings.GroupBySlot);
+
     /// <summary>One gear row: the marker, the icon, the name, its menu and its tooltip.</summary>
     /// <param name="uncertainNote">
     /// What to add to the tooltip when the snapshot cannot be trusted about this piece. Null on a
