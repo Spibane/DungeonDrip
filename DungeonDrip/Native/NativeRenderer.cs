@@ -63,6 +63,18 @@ internal static class NativeRenderer
     /// <summary>Space between the marker, the icon and the name.</summary>
     private const float ColumnGap = 4f;
 
+    /// <summary>
+    /// How tall a line of a notice is, which is less than a row.
+    /// </summary>
+    /// <remarks>
+    /// A row is as tall as the item icon in it. A notice has no icon, so a row's height there would
+    /// space two sentences as though something were missing between them.
+    /// </remarks>
+    private const float NoticeLineHeight = 20f;
+
+    /// <summary>How thick the game draws a dividing rule.</summary>
+    private const float RuleHeight = 4f;
+
     /// <summary>How big a game item icon actually is, as opposed to how big it is drawn.</summary>
     private const float GameIconSize = 40f;
 
@@ -92,6 +104,44 @@ internal static class NativeRenderer
         foreach (var node in nodes)
         {
             var built = Build(menu, glyphs, headers, node, width, onFoldChanged);
+            if (built != null)
+                list.AddNode(built);
+        }
+
+        list.RecalculateLayout();
+    }
+
+    /// <summary>
+    /// Fills a list with what a panel says above its rows: lines of text, and rules between them.
+    /// </summary>
+    /// <remarks>
+    /// Separate from <see cref="Fill"/> because the two go to different places rather than because
+    /// they draw different things. This is the part that must not scroll - a caveat about how far
+    /// the list can be trusted is worth nothing if it scrolls off the top of the list it is about -
+    /// so it hangs above the scroll area and the rows hang inside it.
+    ///
+    /// The list is expected to fit itself to its contents, since what is in it is the difference
+    /// between a full-strength warning, a milder one and nothing at all, and everything below has to
+    /// move to suit.
+    /// </remarks>
+    public static void Notice(VerticalListNode list, IReadOnlyList<Node> nodes, float width)
+    {
+        list.Clear();
+
+        foreach (var node in nodes)
+        {
+            NodeBase? built = node switch
+            {
+                TextNode text => Text(text.Text, text.Colour, width, height: NoticeLineHeight),
+                RuleNode => new HorizontalLineNode
+                {
+                    Size = new System.Numerics.Vector2(width, RuleHeight),
+                    IsVisible = true,
+                },
+
+                _ => null,
+            };
+
             if (built != null)
                 list.AddNode(built);
         }
@@ -288,7 +338,8 @@ internal static class NativeRenderer
     /// edge.
     /// </remarks>
     private static GameText Text(
-        string content, ColourRole role, float width, AlignmentType alignment = AlignmentType.Left)
+        string content, ColourRole role, float width, AlignmentType alignment = AlignmentType.Left,
+        float? height = null)
     {
         var (fill, outline) = NativePalette.For(role);
 
@@ -303,7 +354,7 @@ internal static class NativeRenderer
             TextFlags = TextFlags.Edge | TextFlags.Ellipsis,
             FontSize = FontSize,
             AlignmentType = alignment,
-            Size = new System.Numerics.Vector2(width, RowHeight),
+            Size = new System.Numerics.Vector2(width, height ?? RowHeight),
             IsVisible = true,
         };
     }

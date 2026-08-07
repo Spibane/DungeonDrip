@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using DungeonDrip.Core;
 using DungeonDrip.Presentation;
@@ -66,6 +67,25 @@ internal sealed unsafe class VendorPanelAddon : IDisposable
 
     /// <summary>The filters the current rows were built through.</summary>
     private ViewOptions builtWith;
+
+    /// <summary>
+    /// How often the snapshot warning is worked out again, in milliseconds.
+    /// </summary>
+    /// <remarks>
+    /// The warning is the one thing on the panel that goes out of date on its own: it says how long
+    /// ago the dresser was read, and it appears when that crosses the staleness threshold with
+    /// nothing else having moved. The ImGui panel gets this for nothing by redrawing every frame.
+    ///
+    /// Two seconds because the wording is never finer than a minute, so anything quicker would be
+    /// working out the same sentence to throw it away - and rebuilding nodes to say what they
+    /// already say is churn a redraw would not have been.
+    /// </remarks>
+    private const long NoticeRecheckMs = 2000;
+
+    /// <summary>What the notice currently says, so it is only rebuilt when it would differ.</summary>
+    private string? noticeShown;
+
+    private long noticeCheckedAt;
 
     public VendorPanelAddon(Plugin plugin, GlyphTextures glyphs)
     {
@@ -153,6 +173,7 @@ internal sealed unsafe class VendorPanelAddon : IDisposable
             Rebuild(list, rows);
         }
 
+        ShowNotice(force: false);
         Anchor();
     }
 
@@ -186,6 +207,36 @@ internal sealed unsafe class VendorPanelAddon : IDisposable
         plugin.InvalidateReport();
     }
 
+    /// <summary>
+    /// Puts how far the dresser snapshot can be trusted above the list, when there is anything to say.
+    /// </summary>
+    /// <remarks>
+    /// Unlike a loot roll, what a vendor panel shows is a decision that can be come back to - so it
+    /// says how much to trust itself and shows the list anyway rather than refusing to draw.
+    ///
+    /// Always asked here, because a shop is answered against the dresser. The Armoire panel is the
+    /// one place that is not true, and when that panel goes native this becomes a question the panel
+    /// answers rather than an assumption made here.
+    /// </remarks>
+    private void ShowNotice(bool force)
+    {
+        var now = Environment.TickCount64;
+
+        if (!force && now - noticeCheckedAt < NoticeRecheckMs)
+            return;
+
+        noticeCheckedAt = now;
+
+        var nodes = PanelPresenter.SnapshotWarning(plugin.Ownership, plugin.Ownership.IsDresserStale);
+        var says = string.Join('\n', nodes.OfType<Presentation.TextNode>().Select(node => node.Text));
+
+        if (!force && says == noticeShown)
+            return;
+
+        noticeShown = says;
+        addon.SetNotice(nodes);
+    }
+
     /// <summary>The list to draw, or null when the panel should not be up at all.</summary>
     private IReadOnlyList<GearRow>? Resolve()
     {
@@ -212,6 +263,10 @@ internal sealed unsafe class VendorPanelAddon : IDisposable
         var stale = plugin.Ownership.IsDresserStale;
 
         addon.Toolbar?.Fill(PanelPresenter.Filters(plugin.Configuration, hasOwnedRows: true, FiltersChanged));
+
+        // Forced, because a rebuild follows the addon being set up afresh and the nodes the notice
+        // was last written into no longer exist - so what it says now is not what is on screen.
+        ShowNotice(force: true);
 
         // Through the same filters the ImGui panel and the duty list use. Rendering the resolved
         // list straight was the first cut and was simply wrong: every filter in Settings appeared
@@ -303,12 +358,20 @@ internal sealed unsafe class VendorPanelAddon : IDisposable
         /// </remarks>
         private const float ToolbarBandHeight = NativeToolbar.ButtonSize + 10f;
 
+        /// <summary>Breathing room under a notice, and none at all when there is not one.</summary>
+        /// <remarks>
+        /// Added conditionally rather than built into the notice, so that a panel with nothing to
+        /// say starts its list exactly where it did before there was anywhere to say it.
+        /// </remarks>
+        private const float NoticeGap = 4f;
+
         private ScrollingNode<VerticalListNode>? scroller;
         private HorizontalListNode? buttons;
         private HorizontalLineNode? rule;
+        private VerticalListNode? notice;
 
-        /// <summary>The window size the content was last laid out against.</summary>
-        private Vector2 laidOutFor;
+        /// <summary>The window size and notice height the content was last laid out against.</summary>
+        private (Vector2 Size, float Notice) laidOutFor;
 
         /// <summary>Set before the addon is opened, since there is nothing to attach to until then.</summary>
         public required GlyphTextures Glyphs { private get; init; }
@@ -336,6 +399,12 @@ internal sealed unsafe class VendorPanelAddon : IDisposable
             // for the same reason: without it the topmost row reads as another button.
             rule = new HorizontalLineNode { IsVisible = true };
             AddNode(rule);
+
+            // Fitted to its contents, because how tall it is is the difference between a warning,
+            // a milder warning and nothing at all - and the list below has to start under whichever
+            // it turns out to be.
+            notice = new VerticalListNode { FitContents = true, IsVisible = true };
+            AddNode(notice);
 
             scroller = new ScrollingNode<VerticalListNode> { IsVisible = true };
 
@@ -369,10 +438,14 @@ internal sealed unsafe class VendorPanelAddon : IDisposable
         /// </remarks>
         public void Relayout()
         {
-            if (buttons == null || rule == null || scroller == null || laidOutFor == Size)
+            if (buttons == null || rule == null || notice == null || scroller == null)
                 return;
 
-            laidOutFor = Size;
+            var key = (Size, notice.Height);
+            if (laidOutFor == key)
+                return;
+
+            laidOutFor = key;
 
             buttons.Position = ContentStartPosition;
             buttons.Size = new Vector2(ContentSize.X, NativeToolbar.ButtonSize);
@@ -380,9 +453,33 @@ internal sealed unsafe class VendorPanelAddon : IDisposable
             rule.Position = ContentStartPosition + new Vector2(0f, NativeToolbar.ButtonSize + 4f);
             rule.Size = new Vector2(ContentSize.X, 4f);
 
-            scroller.Position = ContentStartPosition + new Vector2(0f, ToolbarBandHeight);
-            scroller.Size = ContentSize - new Vector2(0f, ToolbarBandHeight);
+            notice.Position = ContentStartPosition + new Vector2(0f, ToolbarBandHeight);
+            notice.Width = ContentSize.X;
+
+            // The band the list gets is what is left after the toolbar and whatever the notice took.
+            // Moving the top without taking the same off the height is what runs a scroll area off
+            // the bottom of the window, where nothing clips it back.
+            var taken = ToolbarBandHeight + notice.Height + (notice.Height > 0f ? NoticeGap : 0f);
+
+            scroller.Position = ContentStartPosition + new Vector2(0f, taken);
+            scroller.Size = ContentSize - new Vector2(0f, taken);
             scroller.RecalculateSizes();
+        }
+
+        /// <summary>
+        /// Puts what the panel has to say about its own list above that list.
+        /// </summary>
+        /// <remarks>
+        /// Laying out again afterwards is the point of it being here rather than in a renderer: the
+        /// notice appearing or growing moves the list under it, and nothing else would notice.
+        /// </remarks>
+        public void SetNotice(IReadOnlyList<Node> nodes)
+        {
+            if (notice == null)
+                return;
+
+            NativeRenderer.Notice(notice, nodes, ContentSize.X);
+            Relayout();
         }
 
 
@@ -401,9 +498,10 @@ internal sealed unsafe class VendorPanelAddon : IDisposable
             scroller = null;
             buttons = null;
             rule = null;
+            notice = null;
 
             // So the next setup lays out rather than recognising the size it happens to reopen at.
-            laidOutFor = Vector2.Zero;
+            laidOutFor = default;
         }
     }
 }
