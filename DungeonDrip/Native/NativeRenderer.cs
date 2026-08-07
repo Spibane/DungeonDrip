@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Text;
 using DungeonDrip.Presentation;
@@ -78,7 +79,7 @@ internal static class NativeRenderer
     /// </param>
     public static void Fill(
         NativeContextMenu menu, HeaderState headers, VerticalListNode list,
-        IReadOnlyList<Node> nodes, float reservedRight)
+        IReadOnlyList<Node> nodes, float reservedRight, Action onFoldChanged)
     {
         var width = list.Width - reservedRight;
 
@@ -86,7 +87,7 @@ internal static class NativeRenderer
 
         foreach (var node in nodes)
         {
-            var built = Build(menu, headers, node, width);
+            var built = Build(menu, headers, node, width, onFoldChanged);
             if (built != null)
                 list.AddNode(built);
         }
@@ -95,10 +96,11 @@ internal static class NativeRenderer
     }
 
     private static NodeBase? Build(
-        NativeContextMenu menu, HeaderState headers, Node node, float width) => node switch
+        NativeContextMenu menu, HeaderState headers, Node node, float width,
+        Action onFoldChanged) => node switch
     {
         RowNode row => Row(menu, row, width),
-        CollapsibleNode group => Collapsible(menu, headers, group, width),
+        CollapsibleNode group => Collapsible(menu, headers, group, width, onFoldChanged),
         _ => null,
     };
 
@@ -114,7 +116,8 @@ internal static class NativeRenderer
     /// so this attaches every row up front and lets the header do the hiding.
     /// </remarks>
     private static NodeBase Collapsible(
-        NativeContextMenu menu, HeaderState headers, CollapsibleNode group, float width)
+        NativeContextMenu menu, HeaderState headers, CollapsibleNode group, float width,
+        Action onFoldChanged)
     {
         var header = new CollapsingHeaderNode
         {
@@ -125,12 +128,24 @@ internal static class NativeRenderer
             IsVisible = true,
         };
 
-        header.OnCollapse = () => headers.Record(group.Key, false);
-        header.OnUncollapse = () => headers.Record(group.Key, true);
+        // Folding changes this header's height but nothing tells the list holding it, so without
+        // the callback the rows below stay where they were: a collapsed group leaves a hole, and
+        // reopening it draws over the group beneath. The scroll extent moves with it.
+        header.OnCollapse = () =>
+        {
+            headers.Record(group.Key, false);
+            onFoldChanged();
+        };
+
+        header.OnUncollapse = () =>
+        {
+            headers.Record(group.Key, true);
+            onFoldChanged();
+        };
 
         foreach (var child in group.Children)
         {
-            var built = Build(menu, headers, child, width);
+            var built = Build(menu, headers, child, width, onFoldChanged);
             if (built != null)
                 header.AddNode(built);
         }

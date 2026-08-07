@@ -139,6 +139,19 @@ internal sealed unsafe class VendorPanelAddon : IDisposable
         Anchor();
     }
 
+    /// <summary>
+    /// Re-stacks the list and tells the scroll bar how far it now goes.
+    /// </summary>
+    /// <remarks>
+    /// After filling, and again whenever a heading is folded. Both change how tall the contents
+    /// are, and neither the list nor the scroll area notices on its own.
+    /// </remarks>
+    private void Reflow()
+    {
+        addon.List?.RecalculateLayout();
+        addon.RemeasureScroll();
+    }
+
     /// <summary>The list to draw, or null when the panel should not be up at all.</summary>
     private IReadOnlyList<GearRow>? Resolve()
     {
@@ -164,12 +177,9 @@ internal sealed unsafe class VendorPanelAddon : IDisposable
 
         var built = PanelPresenter.List(groups, stale, PanelText.VendorUncertain, CollapsePrefix);
 
-        NativeRenderer.Fill(menu, headers, list, built, addon.ScrollBarWidth);
+        NativeRenderer.Fill(menu, headers, list, built, addon.ScrollBarWidth, Reflow);
 
-        // The scroll area measures its content when it is sized, and filling it afterwards changes
-        // that content - so without this the bar appears at whatever extent the list had when it
-        // was empty, which is a bar that renders and does not scroll.
-        addon.RemeasureScroll();
+        Reflow();
     }
 
     /// <summary>
@@ -257,7 +267,12 @@ internal sealed unsafe class VendorPanelAddon : IDisposable
             // what tells it how far there is to scroll, since a list that never reports growing
             // gives a scroll area nothing to scroll.
             scroller.ContentNode.FitContents = true;
-            scroller.ContentNode.FitWidth = true;
+
+            // Not FitWidth. That stretches every child to the list's full width, which is the width
+            // the scroll bar is drawn over - so a heading came out underneath it. The rows survived
+            // it only because their columns are sized individually. Widths are set per node
+            // instead, against a width that already has the bar taken off.
+            scroller.ContentNode.FitWidth = false;
             scroller.Size = ContentSize;
 
             AddNode(scroller);
