@@ -35,6 +35,7 @@ public sealed class CollectionView(Plugin plugin)
     private const string CollapsePrefix = "collection:";
 
     private readonly CollectionSnapshot snapshot = new(plugin);
+    private readonly HeaderState headers = new(plugin.Configuration);
 
     /// <summary>Above this share of the box, the count is worth colouring.</summary>
     private const float CrowdedAt = 0.9f;
@@ -321,7 +322,7 @@ public sealed class CollectionView(Plugin plugin)
         // Uncoloured. The heading used to go blue when something was affordable, which was a third copy
         // of what the label already says in words and what the rows already say on the price. Tinting a
         // heading now reads as "this is a section", which the tabs say instead.
-        if (!RememberedHeader(label, key, defaultOpen: !gil))
+        if (!UiParts.CollapsingHeader(headers, label, key, defaultOpen: !gil))
             return;
 
         var all = showAllOffers.Contains(group.CurrencyItemId);
@@ -690,9 +691,9 @@ public sealed class CollectionView(Plugin plugin)
         // Amber only, and only when the snapshot behind it is old. The blue this used to carry otherwise
         // was there to tell one section from the next while they were all stacked in one column; the tabs
         // do that now, so a coloured heading would only be competing with the warning that means something.
-        if (!RememberedHeader(
-                $"{label} ({listed.Count})", CollapsePrefix + label,
-                stale ? Palette.For(ColourRole.Warning) : null))
+        if (!UiParts.CollapsingHeader(
+                headers, $"{label} ({listed.Count})", CollapsePrefix + label,
+                colour: stale ? ColourRole.Warning : null))
         {
             return;
         }
@@ -781,52 +782,5 @@ public sealed class CollectionView(Plugin plugin)
         // empty one on the list itself.
         if (plugin.Ownership.Retainers.Count == 0)
             ImGui.TextColored(Palette.For(ColourRole.Muted), "No retainer has been read - open one at a bell to include it.");
-    }
-
-    /// <summary>
-    /// A collapsing header whose state survives a restart, as the duty list's headings do.
-    /// </summary>
-    /// <remarks>
-    /// The remembered state is applied on <see cref="ImGuiCond.Appearing"/> only, so a click wins for
-    /// the rest of the session rather than being overruled on the next frame, and whatever it settles
-    /// on is written back.
-    ///
-    /// <paramref name="key"/> is separate from <paramref name="label"/> because a label carrying a
-    /// count changes as gear moves, and the state has to outlive that.
-    /// </remarks>
-    /// <returns>Whether the section's contents should be drawn.</returns>
-    private bool RememberedHeader(
-        string label, string key, Vector4? colour = null, bool defaultOpen = true)
-    {
-        var configuration = plugin.Configuration;
-
-        // A parameter rather than seeding the collapsed list at startup. Seeding writes the config as a
-        // side effect of drawing, and worse, it cannot tell a heading nobody has touched from one the
-        // user deliberately opened - so the next launch would close it again.
-        var collapsed = defaultOpen
-            ? configuration.CollapsedGroups.Contains(key)
-            : !configuration.OpenedGroups.Contains(key);
-
-        ImGui.SetNextItemOpen(!collapsed, ImGuiCond.Appearing);
-
-        bool open;
-        using (ImRaii.PushColor(ImGuiCol.Text, colour ?? default, colour != null))
-            open = ImGui.CollapsingHeader($"{label}###{key}");
-
-        if (open == collapsed)
-        {
-            // Which list records the deviation depends on which way the default points, so a heading
-            // that starts shut remembers being opened rather than remembering not being shut.
-            var remembering = defaultOpen ? configuration.CollapsedGroups : configuration.OpenedGroups;
-
-            if (open == defaultOpen)
-                remembering.Remove(key);
-            else
-                remembering.Add(key);
-
-            configuration.Save();
-        }
-
-        return open;
     }
 }

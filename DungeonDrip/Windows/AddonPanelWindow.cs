@@ -45,6 +45,8 @@ public abstract unsafe class AddonPanelWindow : Window
 
     protected readonly Plugin Plugin;
 
+    private readonly HeaderState headers;
+
     private readonly string collapsePrefix;
     private readonly string toolbarId;
 
@@ -76,6 +78,7 @@ public abstract unsafe class AddonPanelWindow : Window
         : base(title, BaseFlags)
     {
         Plugin = plugin;
+        headers = new HeaderState(plugin.Configuration);
         this.collapsePrefix = collapsePrefix;
         this.toolbarId = toolbarId;
 
@@ -531,22 +534,7 @@ public abstract unsafe class AddonPanelWindow : Window
                 ? $"{group.Label}  ({group.NotCollected})"
                 : group.Label;
 
-        var key = collapsePrefix + group.Label;
-        var collapsed = Plugin.Configuration.CollapsedGroups.Contains(key);
-        ImGui.SetNextItemOpen(!collapsed, ImGuiCond.Appearing);
-
-        var open = ImGui.CollapsingHeader($"{label}###{key}");
-        if (open == collapsed)
-        {
-            if (open)
-                Plugin.Configuration.CollapsedGroups.Remove(key);
-            else
-                Plugin.Configuration.CollapsedGroups.Add(key);
-
-            Plugin.Configuration.Save();
-        }
-
-        if (!open)
+        if (!UiParts.CollapsingHeader(headers, label, collapsePrefix + group.Label))
             return;
 
         foreach (var row in group.Rows)

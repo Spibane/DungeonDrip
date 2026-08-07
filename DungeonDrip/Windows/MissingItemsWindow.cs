@@ -31,6 +31,7 @@ namespace DungeonDrip.Windows;
 public class MissingItemsWindow : Window
 {
     private readonly Plugin plugin;
+    private readonly HeaderState headers;
     private readonly CollectionView collection;
 
     private string dutyFilter = string.Empty;
@@ -40,6 +41,7 @@ public class MissingItemsWindow : Window
         : base("Dungeon Drip###DungeonDripMain")
     {
         this.plugin = plugin;
+        headers = new HeaderState(plugin.Configuration);
         collection = new CollectionView(plugin);
         SizeConstraints = new WindowSizeConstraints
         {
@@ -514,24 +516,11 @@ public class MissingItemsWindow : Window
             var missing = group.MissingCount;
             var label = missing > 0 ? $"{group.Group.Label}  ({missing})" : group.Group.Label;
 
-            // Restore the remembered state when the window appears, then let clicks win and write
-            // whatever the user settles on back to the config.
-            var collapsed = configuration.CollapsedGroups.Contains(group.Group.Label);
-            ImGui.SetNextItemOpen(!collapsed, ImGuiCond.Appearing);
-
-            var open = ImGui.CollapsingHeader($"{label}###group{group.Group.Label}");
-            if (open == collapsed)
+            if (!UiParts.CollapsingHeader(
+                    headers, label, group.Group.Label, $"group{group.Group.Label}"))
             {
-                if (open)
-                    configuration.CollapsedGroups.Remove(group.Group.Label);
-                else
-                    configuration.CollapsedGroups.Add(group.Group.Label);
-
-                configuration.Save();
-            }
-
-            if (!open)
                 continue;
+            }
 
             foreach (var item in group.Items)
                 DrawItemRow(item);

@@ -112,6 +112,34 @@ internal static class UiParts
     }
 
     /// <summary>
+    /// A collapsing header whose folded state survives a restart.
+    /// </summary>
+    /// <remarks>
+    /// The remembered state is applied on <see cref="ImGuiCond.Appearing"/> only, so a click wins
+    /// for the rest of the session rather than being overruled on the next frame, and whatever it
+    /// settles on is written back.
+    ///
+    /// <paramref name="id"/> is separate from <paramref name="key"/> because the duty list's
+    /// headings are keyed on the bare group label but carry a prefixed ImGui id. Folding them
+    /// together would be tidier and would silently unfold every heading anyone has folded, since the
+    /// key is what is already written in their config.
+    /// </remarks>
+    /// <returns>Whether the section's contents should be drawn.</returns>
+    public static bool CollapsingHeader(
+        HeaderState state, string label, string key, string? id = null, ColourRole? colour = null,
+        bool defaultOpen = true)
+    {
+        ImGui.SetNextItemOpen(state.IsOpen(key, defaultOpen), ImGuiCond.Appearing);
+
+        bool open;
+        using (ImRaii.PushColor(ImGuiCol.Text, Palette.For(colour ?? ColourRole.Default), colour != null))
+            open = ImGui.CollapsingHeader($"{label}###{id ?? key}");
+
+        state.Record(key, open, defaultOpen);
+        return open;
+    }
+
+    /// <summary>
     /// Draws an item's icon and leaves the cursor on the same line, ready for its name. Falls back
     /// to blank space of the same size, so a texture still loading does not shunt the row leftwards.
     /// </summary>
