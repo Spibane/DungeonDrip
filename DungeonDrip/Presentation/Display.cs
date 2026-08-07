@@ -47,3 +47,20 @@ internal sealed record RowNode(
     IReadOnlyList<Node> Parts,
     IReadOnlyList<Node>? Tooltip = null,
     ItemContext? Context = null) : Node;
+
+/// <summary>
+/// A heading with rows folded under it, remembering whether it is open.
+/// </summary>
+/// <remarks>
+/// <paramref name="Key"/> is separate from <paramref name="Label"/> for the same reason it is in
+/// <see cref="HeaderState"/>: a label carrying a count changes as gear moves, and the folded state
+/// has to outlive that.
+///
+/// The two backends draw this very differently - an ImGui <c>CollapsingHeader</c> re-decides
+/// whether to draw its contents every frame, where a native header holds its children and hides
+/// them - so what is described is the nesting and the key, not either of those mechanisms.
+/// </remarks>
+internal sealed record CollapsibleNode(
+    string Key,
+    string Label,
+    IReadOnlyList<Node> Children) : Node;

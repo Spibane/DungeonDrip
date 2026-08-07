@@ -29,6 +29,48 @@ internal static class PanelPresenter
         configuration.HideWeapons,
         settings.GroupBySlot);
 
+    /// <summary>
+    /// A panel's whole list: the rows, under headings when the panel is grouping by slot.
+    /// </summary>
+    /// <remarks>
+    /// One heading per slot, or one unlabelled group holding everything when it is not grouping -
+    /// which is what <see cref="PanelGrouping"/> already produces, so the flat case needs no second
+    /// path here. An unlabelled group is emitted as bare rows rather than as a heading with no
+    /// name.
+    ///
+    /// The heading counts what is missing rather than what is listed, and says both when the
+    /// filters have hidden some of the group, because a heading reading "(2)" over eight rows is
+    /// only puzzling until it says what the two are.
+    /// </remarks>
+    public static IReadOnlyList<Node> List(
+        IReadOnlyList<SlotGroup> groups, bool stale, string? uncertainNote, string collapsePrefix)
+    {
+        var built = new List<Node>();
+
+        foreach (var group in groups)
+        {
+            var rows = new List<Node>(group.Rows.Count);
+            foreach (var row in group.Rows)
+                rows.Add(Row(row, stale, uncertainNote));
+
+            if (group.Label.Length == 0)
+            {
+                built.AddRange(rows);
+                continue;
+            }
+
+            built.Add(new CollapsibleNode(collapsePrefix + group.Label, Heading(group), rows));
+        }
+
+        return built;
+    }
+
+    private static string Heading(SlotGroup group) => group.Hidden > 0
+        ? $"{group.Label}  ({group.NotCollected} of {group.Rows.Count + group.Hidden})"
+        : group.NotCollected > 0
+            ? $"{group.Label}  ({group.NotCollected})"
+            : group.Label;
+
     /// <summary>One gear row: the marker, the icon, the name, its menu and its tooltip.</summary>
     /// <param name="uncertainNote">
     /// What to add to the tooltip when the snapshot cannot be trusted about this piece. Null on a

@@ -77,17 +77,65 @@ internal static class NativeRenderer
     /// few pixels - so nothing about the list's own size keeps a long name out from under it.
     /// </param>
     public static void Fill(
-        NativeContextMenu menu, VerticalListNode list, IReadOnlyList<RowNode> rows,
-        float reservedRight)
+        NativeContextMenu menu, HeaderState headers, VerticalListNode list,
+        IReadOnlyList<Node> nodes, float reservedRight)
     {
         var width = list.Width - reservedRight;
 
         list.Clear();
 
-        foreach (var row in rows)
-            list.AddNode(Row(menu, row, width));
+        foreach (var node in nodes)
+        {
+            var built = Build(menu, headers, node, width);
+            if (built != null)
+                list.AddNode(built);
+        }
 
         list.RecalculateLayout();
+    }
+
+    private static NodeBase? Build(
+        NativeContextMenu menu, HeaderState headers, Node node, float width) => node switch
+    {
+        RowNode row => Row(menu, row, width),
+        CollapsibleNode group => Collapsible(menu, headers, group, width),
+        _ => null,
+    };
+
+    /// <summary>
+    /// A heading with its rows folded under it, opening as the user last left it.
+    /// </summary>
+    /// <remarks>
+    /// The folded state is read and written through the same <see cref="HeaderState"/> the ImGui
+    /// panels use, so a heading folded in one look is folded in the other. Which config list the
+    /// deviation goes in is the subtle part and neither backend should be deciding it twice.
+    ///
+    /// A native header keeps its children and hides them, where ImGui simply stops drawing them -
+    /// so this attaches every row up front and lets the header do the hiding.
+    /// </remarks>
+    private static NodeBase Collapsible(
+        NativeContextMenu menu, HeaderState headers, CollapsibleNode group, float width)
+    {
+        var header = new CollapsingHeaderNode
+        {
+            String = group.Label,
+            Width = width,
+            FitWidth = true,
+            IsCollapsed = !headers.IsOpen(group.Key),
+            IsVisible = true,
+        };
+
+        header.OnCollapse = () => headers.Record(group.Key, false);
+        header.OnUncollapse = () => headers.Record(group.Key, true);
+
+        foreach (var child in group.Children)
+        {
+            var built = Build(menu, headers, child, width);
+            if (built != null)
+                header.AddNode(built);
+        }
+
+        return header;
     }
 
     private static NodeBase Row(NativeContextMenu menu, RowNode row, float width)

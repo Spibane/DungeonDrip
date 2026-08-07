@@ -45,6 +45,11 @@ internal sealed unsafe class VendorPanelAddon : IDisposable
     /// <summary>One menu for every row. See <see cref="NativeContextMenu"/> on why not one each.</summary>
     private readonly NativeContextMenu menu;
 
+    /// <summary>
+    /// Shared with the ImGui panels, so a heading folded in one look is folded in the other.
+    /// </summary>
+    private readonly HeaderState headers;
+
     /// <summary>The row list this panel was last built from, so an unchanged list is not rebuilt.</summary>
     /// <remarks>
     /// Reference equality against the watcher's cached list, which is the same instance frame to
@@ -63,6 +68,7 @@ internal sealed unsafe class VendorPanelAddon : IDisposable
     {
         this.plugin = plugin;
         menu = new NativeContextMenu(plugin);
+        headers = new HeaderState(plugin.Configuration);
 
         addon = new Panel
         {
@@ -156,14 +162,9 @@ internal sealed unsafe class VendorPanelAddon : IDisposable
         var options = PanelPresenter.Options(plugin.Configuration, plugin.Configuration.VendorPanel);
         PanelGrouping.Regroup(rows, options, groups);
 
-        var built = new List<RowNode>();
-        foreach (var group in groups)
-        {
-            foreach (var row in group.Rows)
-                built.Add(PanelPresenter.Row(row, stale, UncertainNote));
-        }
+        var built = PanelPresenter.List(groups, stale, PanelText.VendorUncertain, CollapsePrefix);
 
-        NativeRenderer.Fill(menu, list, built, addon.ScrollBarWidth);
+        NativeRenderer.Fill(menu, headers, list, built, addon.ScrollBarWidth);
 
         // The scroll area measures its content when it is sized, and filling it afterwards changes
         // that content - so without this the bar appears at whatever extent the list had when it
@@ -171,8 +172,15 @@ internal sealed unsafe class VendorPanelAddon : IDisposable
         addon.RemeasureScroll();
     }
 
-    /// <summary>Why a stale snapshot makes a "not collected" claim here worth checking.</summary>
-    private const string UncertainNote = "Your dresser data is old - you may already own this.";
+    /// <summary>
+    /// Prefix on the remembered heading state, matching the ImGui vendor panel's.
+    /// </summary>
+    /// <remarks>
+    /// The same string that panel passes, and it has to stay so: it is what makes a slot folded in
+    /// one look folded in the other, and what keeps these headings from colliding with the duty
+    /// list's, which share the store.
+    /// </remarks>
+    private const string CollapsePrefix = "vendor:";
 
     /// <remarks>
     /// The same arithmetic the ImGui panels use, through the shared

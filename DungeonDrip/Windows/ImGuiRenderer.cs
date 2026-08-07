@@ -14,16 +14,31 @@ namespace DungeonDrip.Windows;
 /// </remarks>
 internal static class ImGuiRenderer
 {
-    public static void Draw(Plugin plugin, IReadOnlyList<Node> nodes)
+    public static void Draw(Plugin plugin, IReadOnlyList<Node> nodes, HeaderState? headers = null)
     {
         foreach (var node in nodes)
-            Draw(plugin, node);
+            Draw(plugin, node, headers);
     }
 
-    public static void Draw(Plugin plugin, Node node)
+    public static void Draw(Plugin plugin, Node node, HeaderState? headers = null)
     {
         switch (node)
         {
+            // Without somewhere to remember the folded state there is nothing to draw a heading
+            // against, so the rows are drawn plainly rather than silently dropped.
+            case CollapsibleNode group when headers == null:
+                Draw(plugin, group.Children);
+                break;
+
+            case CollapsibleNode group:
+                if (UiParts.CollapsingHeader(headers, group.Label, group.Key))
+                {
+                    Draw(plugin, group.Children, headers);
+                    ImGui.Spacing();
+                }
+
+                break;
+
             case RowNode row:
                 DrawRow(plugin, row);
                 break;
