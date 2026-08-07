@@ -9,4 +9,13 @@
     <IsPackable>false</IsPackable>
     <Nullable>enable</Nullable>
   </PropertyGroup>
+
+  <!--
+    KamiToolKit builds the plugin's native game windows. A submodule pinned by commit, because it
+    publishes no releases and no package; see the readme on why that is the accepted arrangement and
+    what happens if it stops being maintained. MIT, so its notice ships in THIRD-PARTY-NOTICES.md.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\external\KamiToolKit\KamiToolKit.csproj" />
+  </ItemGroup>
 </Project>
