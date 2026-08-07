@@ -47,6 +47,9 @@ internal static class NativeRenderer
     /// <summary>Space between the marker, the icon and the name.</summary>
     private const float ColumnGap = 4f;
 
+    /// <summary>How big a game item icon actually is, as opposed to how big it is drawn.</summary>
+    private const float GameIconSize = 40f;
+
     /// <summary>
     /// Builds a list of rows into a vertical list, replacing whatever was there.
     /// </summary>
@@ -56,8 +59,13 @@ internal static class NativeRenderer
     /// filters change, so index N is not the same piece between two builds, and a reused row that
     /// kept its tooltip would describe the piece that used to be there.
     /// </remarks>
-    public static void Fill(VerticalListNode list, IReadOnlyList<RowNode> rows, float width)
+    public static void Fill(VerticalListNode list, IReadOnlyList<RowNode> rows)
     {
+        // The list's own width, not the window's. The two differ by the window's padding and by
+        // whatever the scrollbar takes, and sizing a row to the window is how a name ends up
+        // running under the bar.
+        var width = list.Width;
+
         list.Clear();
 
         foreach (var row in rows)
@@ -102,19 +110,34 @@ internal static class NativeRenderer
         // carries, which is the same reason the ImGui panels push the fixed-width icon font.
         GlyphNode glyph => Text(NativeGlyphs.For(glyph.Token), glyph.Colour, GlyphWidth),
 
-        // Centred against the row rather than sat on its top edge, since the icon is shorter than
-        // the line and the eye reads the two as one row.
-        IconNode icon => new GameIcon
-        {
-            IconId = icon.IconId,
-            Size = new System.Numerics.Vector2(IconSize, IconSize),
-            Y = (RowHeight - IconSize) / 2f,
-            IsVisible = true,
-        },
+        IconNode icon => Icon(icon.IconId),
 
         TextNode text => Text(text.Text, text.Colour, textWidth),
 
         _ => null,
+    };
+
+    /// <summary>An item icon, scaled down to the row rather than cropped to it.</summary>
+    /// <remarks>
+    /// Both halves of this are needed and neither is obvious. A node's Size is how much of the
+    /// texture is shown, not how big it is drawn, so a 24px node over a 40px icon shows the icon's
+    /// top-left corner - <see cref="GameIcon.FitTexture"/> is what makes it scale instead.
+    ///
+    /// And <see cref="SimpleImageNode.TextureSize"/> has to say how big the icon really is. It
+    /// defaults to 32, game item icons are 40, and the eight pixels of difference are the sliver
+    /// that was being cut off every icon.
+    /// </remarks>
+    private static GameIcon Icon(ushort iconId) => new()
+    {
+        IconId = iconId,
+        TextureSize = new System.Numerics.Vector2(GameIconSize, GameIconSize),
+        FitTexture = true,
+        Size = new System.Numerics.Vector2(IconSize, IconSize),
+
+        // Centred against the row rather than sat on its top edge, since the icon is shorter than
+        // the line and the eye reads the two as one row.
+        Y = (RowHeight - IconSize) / 2f,
+        IsVisible = true,
     };
 
     /// <remarks>

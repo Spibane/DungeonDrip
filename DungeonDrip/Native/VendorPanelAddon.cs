@@ -139,7 +139,12 @@ internal sealed unsafe class VendorPanelAddon : IDisposable
         foreach (var row in rows)
             built.Add(PanelPresenter.Row(row, stale, UncertainNote));
 
-        NativeRenderer.Fill(list, built, addon.Size.X);
+        NativeRenderer.Fill(list, built);
+
+        // The scroll area measures its content when it is sized, and filling it afterwards changes
+        // that content - so without this the bar appears at whatever extent the list had when it
+        // was empty, which is a bar that renders and does not scroll.
+        addon.RemeasureScroll();
     }
 
     /// <summary>Why a stale snapshot makes a "not collected" claim here worth checking.</summary>
@@ -200,6 +205,9 @@ internal sealed unsafe class VendorPanelAddon : IDisposable
 
         /// <summary>The list to put rows in, or null while the addon is not allocated.</summary>
         public VerticalListNode? List => scroller?.ContentNode;
+
+        /// <summary>Tells the scroll area its contents changed size. Call after filling the list.</summary>
+        public void RemeasureScroll() => scroller?.RecalculateSizes();
 
         protected override unsafe void OnSetup(AtkUnitBase* addon, Span<AtkValue> values)
         {
