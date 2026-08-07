@@ -114,6 +114,16 @@ internal static class NativeRenderer
     ///
     /// A native header keeps its children and hides them, where ImGui simply stops drawing them -
     /// so this attaches every row up front and lets the header do the hiding.
+    ///
+    /// <b>Its label is unreadable on the light themes and cannot be fixed from here.</b> The header
+    /// bar is a dark texture under every theme, but KamiToolKit colours the label from holder id 1,
+    /// which is white on the dark themes and dark brown on the light ones - so on those it is dark
+    /// text on a dark bar. Header text wants to be pale in all four, which is the one place the
+    /// themed pair is the wrong answer and a fixed colour is the right one.
+    ///
+    /// The label lives on a private node inside the header, so this needs either a change upstream
+    /// or a heading built by hand out of a text node and a collision node. The second costs the
+    /// game's own header look, which is most of why a native panel is worth having.
     /// </remarks>
     private static NodeBase Collapsible(
         NativeContextMenu menu, HeaderState headers, CollapsibleNode group, float width,
