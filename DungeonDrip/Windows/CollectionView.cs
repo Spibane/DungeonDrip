@@ -17,10 +17,10 @@ namespace DungeonDrip.Windows;
 /// already long and its spine is entirely duty-shaped - pinning, auto-open, a title taken from the
 /// report - so this keeps the two apart without adding a second thing to open and find.
 ///
-/// Every tab here sweeps the whole collection, which is far too much to do per frame, so all of it is
-/// computed in <see cref="Recompute"/> and cached until something it depends on moves - and computed for
-/// every tab rather than only the visible one, so switching tabs costs nothing and the counts on the
-/// strip cannot go stale behind it.
+/// Every tab here sweeps the whole collection, which is far too much to do per frame, so none of it
+/// is computed here at all: <see cref="CollectionSnapshot"/> holds the reports and rebuilds them
+/// only when something behind them has moved. It builds every tab rather than only the visible one,
+/// so switching tabs costs nothing and the counts on the strip cannot go stale behind it.
 /// </remarks>
 public sealed class CollectionView(Plugin plugin)
 {
@@ -34,13 +34,10 @@ public sealed class CollectionView(Plugin plugin)
     /// </summary>
     private const string CollapsePrefix = "collection:";
 
+    private readonly CollectionSnapshot snapshot = new(plugin);
+
     /// <summary>Above this share of the box, the count is worth colouring.</summary>
     private const float CrowdedAt = 0.9f;
-
-    private int seenOwnershipRevision = -1;
-    private Inputs seenInputs;
-    private ulong seenInventory;
-    private ulong seenCurrency;
 
     /// <summary>Sets listed before the "show all" toggle earns its place.</summary>
     private const int InitialSetsShown = 25;
@@ -54,11 +51,6 @@ public sealed class CollectionView(Plugin plugin)
     /// with a toggle is the established answer to a long list rather than a new mechanism.
     /// </remarks>
     private const int InitialOffersShown = 10;
-
-    private DresserPressureReport? pressure;
-    private CarriedGearReport? carried;
-    private ShoppingListReport? shopping;
-    private IReadOnlyList<SetStanding> sets = [];
 
     /// <summary>
     /// Per-session, not a setting. The config file is documentation of what the user chose, and
@@ -98,7 +90,7 @@ public sealed class CollectionView(Plugin plugin)
     /// </remarks>
     public void Draw()
     {
-        Recompute();
+        snapshot.Refresh();
 
         using var tabs = ImRaii.TabBar("##collectionTabs");
         if (!tabs.Success)
@@ -193,102 +185,6 @@ public sealed class CollectionView(Plugin plugin)
     }
 
     /// <summary>
-    /// Rebuilds the tabs' contents when, and only when, something they are derived from has changed.
-    /// </summary>
-    /// <remarks>
-    /// Three keys, because the tabs do not read the same things and only one of those things
-    /// announces when it moves.
-    ///
-    /// The carried list needs its own. The ownership tracker only bumps its revision for inventory
-    /// changes while "also count bags" is on, since that setting is the only reason it reads the
-    /// bags at all - but that list reads them regardless, on purpose, because it asks the
-    /// opposite question. With the setting off, which is the default, throwing a piece away left it
-    /// on the list with nothing that could ever clear it.
-    ///
-    /// The shopping list needs a third for the same reason again: nothing bumps the ownership revision
-    /// when a balance moves, so spending a currency would leave the list quoting the old total.
-    ///
-    /// Staleness of the snapshot is deliberately in none of them, matching the tracker's own rule:
-    /// an ageing snapshot changes how the answer should be worded, not what it is.
-    /// </remarks>
-    private void Recompute()
-    {
-        var inputs = Capture();
-        var ownershipMoved = plugin.Ownership.Revision != seenOwnershipRevision || inputs != seenInputs;
-
-        // One pass over the containers, no allocation, and the only thing that notices a piece
-        // leaving the bags when the tracker has no reason to look.
-        var inventory = Game.InventoryReader.Fingerprint();
-        var inventoryMoved = inventory != seenInventory;
-
-        // A third key, for the same reason as the second: nothing bumps the ownership revision when a
-        // balance moves, so spending a currency would otherwise leave the list claiming the old total.
-        var currency = Game.CurrencyReader.Fingerprint();
-        var currencyMoved = currency != seenCurrency;
-
-        if (!ownershipMoved && !inventoryMoved && !currencyMoved)
-            return;
-
-        seenOwnershipRevision = plugin.Ownership.Revision;
-        seenInputs = inputs;
-        seenInventory = inventory;
-        seenCurrency = currency;
-
-        var ownership = plugin.Ownership.Current;
-
-        // Held gear is the collection compared against everywhere something is merely held, so
-        // either side moving rebuilds it. The retainers go in regardless of whether they are being
-        // counted as owning a piece, for the same reason the bags do: that setting decides what makes
-        // a piece collected, and this section is about the holdings themselves either way.
-        carried = CarriedGear.Build(
-            Game.InventoryReader.ReadDetailed(), plugin.Ownership.Retainers,
-            ownership, plugin.Outfits, plugin.Storage, plugin.Configuration.OutfitOwnership);
-
-        // Rebuilt when the balances move as well as when the collection does, since either changes what
-        // is worth buying. Asking for ItemSources is what triggers its 170ms sheet sweep, but only ever
-        // once, and it answers null by itself while the setting is off - so this is the first frame the
-        // section is looked at and no earlier.
-        if (ownershipMoved || currencyMoved)
-        {
-            var sources = plugin.ItemSources;
-
-            shopping = sources == null
-                ? null
-                : ShoppingList.Build(
-                    Game.CurrencyReader.Read(), sources, ownership, plugin.Outfits, plugin.Storage,
-                    plugin.Configuration, plugin.JobFilter, plugin.EquipLocks);
-        }
-
-        if (!ownershipMoved)
-            return;
-
-        pressure = DresserPressure.Build(
-            ownership, plugin.Outfits, plugin.Storage, plugin.Ownership.ArmoireUpdatedUtc != null);
-
-        sets = plugin.Ownership.HasDresserData
-            ? SetCompletion.InProgress(plugin.Outfits, ownership, plugin.Configuration, plugin.EquipLocks)
-            : [];
-    }
-
-    private Inputs Capture()
-    {
-        var configuration = plugin.Configuration;
-        return new Inputs(
-            configuration.Scope,
-            configuration.OutfitOwnership,
-            configuration.CountInventoryAndEquipped,
-            configuration.CountRetainers,
-            configuration.CountRetainerEquipped,
-            configuration.HideWeapons,
-            configuration.OnlyCurrentJobEquippable,
-            configuration.OnlyCurrentGenderEquippable,
-            configuration.OnlyCurrentRaceEquippable,
-            configuration.ShowAcquisitionSources,
-            configuration.ReadyToBuyOutfitsOnly,
-            configuration.ExcludeSellBackVendors);
-    }
-
-    /// <summary>
     /// Outfit sets part way through, closest to done first.
     /// </summary>
     /// <remarks>
@@ -319,7 +215,7 @@ public sealed class CollectionView(Plugin plugin)
             return;
         }
 
-        if (shopping == null)
+        if (snapshot.Shopping == null)
         {
             ImGui.TextColored(Palette.For(ColourRole.Muted), "Reading what the shops sell...");
             return;
@@ -328,7 +224,7 @@ public sealed class CollectionView(Plugin plugin)
         DrawOutfitsOnlyToggle();
         DrawSnapshotCaveats();
 
-        if (shopping.IsEmpty)
+        if (snapshot.Shopping.IsEmpty)
         {
             ImGui.TextColored(Palette.For(ColourRole.Muted), plugin.Configuration.ReadyToBuyOutfitsOnly
                 ? "Nothing your currencies buy towards an outfit set is still missing."
@@ -336,7 +232,7 @@ public sealed class CollectionView(Plugin plugin)
             return;
         }
 
-        foreach (var group in shopping.Groups)
+        foreach (var group in snapshot.Shopping.Groups)
             DrawCurrencyGroup(group);
     }
 
@@ -475,25 +371,25 @@ public sealed class CollectionView(Plugin plugin)
             return;
         }
 
-        if (sets.Count == 0)
+        if (snapshot.Sets.Count == 0)
         {
             ImGui.TextColored(Palette.For(ColourRole.Muted),
                 "No outfit set is part way done - every set is either finished or untouched.");
             return;
         }
 
-        var shown = showAllSets ? sets.Count : System.Math.Min(sets.Count, InitialSetsShown);
+        var shown = showAllSets ? snapshot.Sets.Count : System.Math.Min(snapshot.Sets.Count, InitialSetsShown);
 
         for (var i = 0; i < shown; i++)
-            DrawSetRow(sets[i]);
+            DrawSetRow(snapshot.Sets[i]);
 
-        if (sets.Count <= InitialSetsShown)
+        if (snapshot.Sets.Count <= InitialSetsShown)
             return;
 
         ImGui.Spacing();
         if (ImGui.SmallButton(showAllSets
                 ? $"Show the closest {InitialSetsShown}###setsAll"
-                : $"Show all {sets.Count}###setsAll"))
+                : $"Show all {snapshot.Sets.Count}###setsAll"))
         {
             showAllSets = !showAllSets;
         }
@@ -550,22 +446,22 @@ public sealed class CollectionView(Plugin plugin)
 
     private void DrawDresserPressure()
     {
-        if (pressure is not { HasData: true })
+        if (snapshot.Pressure is not { HasData: true })
         {
             ImGui.TextColored(Palette.For(ColourRole.Muted), "No dresser snapshot to measure.");
             return;
         }
 
-        DrawOccupancy(pressure);
+        DrawOccupancy(snapshot.Pressure);
 
-        if (pressure.Reclaimable > 0)
+        if (snapshot.Pressure.Reclaimable > 0)
         {
             ImGui.Spacing();
-            ImGui.TextColored(Palette.For(ColourRole.Focus), $"Up to {pressure.Reclaimable} slots could be freed:");
+            ImGui.TextColored(Palette.For(ColourRole.Focus), $"Up to {snapshot.Pressure.Reclaimable} slots could be freed:");
         }
 
-        DrawCollapsible(pressure);
-        DrawArmoireLevers(pressure);
+        DrawCollapsible(snapshot.Pressure);
+        DrawArmoireLevers(snapshot.Pressure);
     }
 
     /// <summary>
@@ -711,7 +607,7 @@ public sealed class CollectionView(Plugin plugin)
             return;
         }
 
-        if (carried == null)
+        if (snapshot.Carried == null)
             return;
 
         var stale = plugin.Ownership.IsDresserStale;
@@ -726,47 +622,25 @@ public sealed class CollectionView(Plugin plugin)
             ? "one in your bags, armoury chest, saddlebag or with a retainer, and one the collection has."
             : "one in your bags, armoury chest or saddlebag, and one the collection has.");
 
-        if (carried.AlreadyStored.Count == 0 && carried.OnlyInsideAnOutfit.Count == 0)
+        if (snapshot.Carried.AlreadyStored.Count == 0 && snapshot.Carried.OnlyInsideAnOutfit.Count == 0)
         {
             ImGui.TextColored(Palette.For(ColourRole.Good), "Nothing held has a second copy in the collection.");
             DrawCaveats(stale);
             return;
         }
 
-        DrawCarriedGroup("In your bags", HeldIn(CarryLocation.Bags), null, stale);
+        DrawCarriedGroup("In your bags", snapshot.HeldIn(CarryLocation.Bags), null, stale);
 
         DrawCarriedGroup(
-            "In your armoury chest", HeldIn(CarryLocation.Armoury),
+            "In your armoury chest", snapshot.HeldIn(CarryLocation.Armoury),
             "A gearset may be using these.", stale);
 
-        DrawCarriedGroup("In your saddlebag", HeldIn(CarryLocation.Saddlebag), null, stale);
+        DrawCarriedGroup("In your saddlebag", snapshot.HeldIn(CarryLocation.Saddlebag), null, stale);
 
         DrawRetainerGroups(stale);
 
         DrawCaveats(stale);
     }
-
-    /// <summary>
-    /// Everything held in one place that the collection accounts for, however it accounts for it.
-    /// </summary>
-    /// <remarks>
-    /// The two halves of the report are merged here rather than drawn as two tiers, which is how this
-    /// section used to work and was the one confusing thing in it. Every heading answers "where is
-    /// this" - bags, armoury chest, saddlebag, one per retainer - except that the outfit tier answered
-    /// "how is this accounted for" instead, so a piece in the armoury chest held only inside a stored
-    /// outfit appeared under a heading that never said armoury, below the other headings, reading like
-    /// one more place to look.
-    ///
-    /// One axis, then: the heading is the place, and how the collection accounts for a piece is said on
-    /// the row. Nothing is lost, because the row already carried that sentence - it is now the only
-    /// thing saying it, and the outfit case is coloured because its second copy is a conditional one.
-    /// </remarks>
-    private IEnumerable<CarriedPiece> HeldIn(CarryLocation location) =>
-        carried!.AlreadyStored
-            .Concat(carried.OnlyInsideAnOutfit)
-            .Where(piece => piece.Location == location)
-            .OrderBy(piece => piece.SlotOrder)
-            .ThenBy(piece => piece.Name, System.StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     /// A heading per retainer holding something the collection accounts for.
@@ -779,57 +653,23 @@ public sealed class CollectionView(Plugin plugin)
     /// </remarks>
     private void DrawRetainerGroups(bool stale)
     {
-        foreach (var group in ByRetainer(CarryLocation.Retainer))
+        foreach (var group in snapshot.ByRetainer(CarryLocation.Retainer))
         {
             DrawCarriedGroup(
-                $"In {Possessive(group.Key)} bags", group,
+                $"In {CollectionSnapshot.Possessive(group.Key)} bags", group,
                 "Only reachable at a bell, and only as fresh as your last visit.", stale);
         }
 
         // Separate headings, and this is the whole point of the split. "With Ysayle" for a coat Ysayle
         // is wearing is a true sentence that leads to seven pages of her bags being searched for it.
-        foreach (var group in ByRetainer(CarryLocation.RetainerEquipped))
+        foreach (var group in snapshot.ByRetainer(CarryLocation.RetainerEquipped))
         {
             DrawCarriedGroup(
-                $"Worn by {Name(group.Key)}", group,
+                $"Worn by {CollectionSnapshot.Name(group.Key)}", group,
                 "On the retainer, not in their bags - and their gear decides what ventures bring back.",
                 stale);
         }
     }
-
-    private IEnumerable<IGrouping<string, CarriedPiece>> ByRetainer(CarryLocation location) =>
-        HeldIn(location)
-            .GroupBy(piece => piece.Holder)
-            .OrderBy(group => group.Key, System.StringComparer.OrdinalIgnoreCase);
-
-    /// <summary>
-    /// A retainer's name, with somewhere to fall back to.
-    /// </summary>
-    /// <remarks>
-    /// The name comes from the client and is never blank in practice, but a heading reading "Worn by"
-    /// would be a puzzle rather than a row.
-    /// </remarks>
-    private static string Name(string holder) => holder.Length > 0 ? holder : "a retainer";
-
-    /// <summary>The same as a possessive, since "In Ysayle's bags" is the heading that reads.</summary>
-    private static string Possessive(string holder) =>
-        holder.Length == 0 ? "a retainer's" : holder.EndsWith('s') ? $"{holder}'" : $"{holder}'s";
-
-    /// <summary>
-    /// Where the collection's copy is, as the other half of a sentence about two of them.
-    /// </summary>
-    /// <remarks>
-    /// Not <see cref="MissingItems.Describe"/>, which is written for a surface asking "do I have this"
-    /// and answers in one place. Here both copies are being named at once, so each needs to say the
-    /// Glamour Dresser out loud - "part of a stored outfit set" on its own never mentions the box the
-    /// set is sitting in, which is the thing a reader is trying to place.
-    /// </remarks>
-    private static string SecondCopy(OwnershipSource source) => source switch
-    {
-        OwnershipSource.Armoire => "There is a second in your Armoire.",
-        OwnershipSource.Outfit => "There is a second in your Glamour Dresser, inside a stored outfit set.",
-        _ => "There is a second in your Glamour Dresser.",
-    };
 
     private void DrawCarriedGroup(
         string label, IEnumerable<CarriedPiece> pieces, string? note, bool stale)
@@ -890,7 +730,7 @@ public sealed class CollectionView(Plugin plugin)
             // repeated only the collection half never said what the row is actually reporting - two
             // copies, and here is each one.
             ImGui.TextColored(Palette.For(ColourRole.Muted), $"{label}.");
-            ImGui.TextColored(Palette.For(ColourRole.Muted), SecondCopy(piece.StoredIn));
+            ImGui.TextColored(Palette.For(ColourRole.Muted), CollectionSnapshot.SecondCopy(piece.StoredIn));
 
             if (insideOutfit)
             {
@@ -928,13 +768,13 @@ public sealed class CollectionView(Plugin plugin)
         // What the amber rows mean, said only when there are some. The row itself says which pieces
         // they are and the hover says what to do about it; this is here so the colour is not a thing
         // to work out.
-        if (carried!.OnlyInsideAnOutfit.Count > 0)
+        if (snapshot.Carried!.OnlyInsideAnOutfit.Count > 0)
         {
             ImGui.TextColored(Palette.For(ColourRole.Muted),
                 "Amber: the second copy is a slot of a stored outfit set rather than a piece of its own.");
         }
 
-        if (!carried.SaddlebagReadable)
+        if (!snapshot.Carried.SaddlebagReadable)
             ImGui.TextColored(Palette.For(ColourRole.Muted), "Saddlebag unreadable away from a bell.");
 
         // Which retainers this could not look at, since an unvisited one is indistinguishable from an
@@ -989,19 +829,4 @@ public sealed class CollectionView(Plugin plugin)
 
         return open;
     }
-
-    /// <summary>The settings any section reads, folded into one value so a change is one compare.</summary>
-    private readonly record struct Inputs(
-        CollectionScope Scope,
-        OutfitOwnershipMode Outfits,
-        bool CountInventory,
-        bool CountRetainers,
-        bool CountRetainerEquipped,
-        bool HideWeapons,
-        bool JobOnly,
-        bool GenderOnly,
-        bool RaceOnly,
-        bool AcquisitionSources,
-        bool OutfitsOnly,
-        bool ExcludeSellBack);
 }
