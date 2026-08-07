@@ -24,9 +24,6 @@ internal interface IPluginUi : IDisposable
 
     /// <summary>Brings up the main window with the duty picker open and typed into.</summary>
     void OpenDutyPicker(string filter);
-
-    /// <summary>Temporary. See <c>ColourProbeWindow</c>; goes when the native colours are settled.</summary>
-    void ToggleColourProbe();
 }
 
 /// <summary>Which surfaces a backend has taken over.</summary>

@@ -18,9 +18,6 @@ internal sealed class ImGuiUi : IPluginUi
     private readonly MissingItemsWindow mainWindow;
     private readonly ConfigWindow configWindow;
 
-    /// <summary>Temporary. See <see cref="ColourProbeWindow"/>; goes when the ids are known.</summary>
-    private readonly ColourProbeWindow colourProbe = new();
-
     /// <param name="without">
     /// Surfaces another backend has taken over, which must not also be drawn here. Two panels
     /// beside one shop is the failure mode this exists to prevent, and it is not hypothetical -
@@ -35,7 +32,6 @@ internal sealed class ImGuiUi : IPluginUi
         configWindow = new ConfigWindow(plugin);
         windowSystem.AddWindow(mainWindow);
         windowSystem.AddWindow(configWindow);
-        windowSystem.AddWindow(colourProbe);
 
         // Always open; each decides for itself whether the addon it rides on is up.
         windowSystem.AddWindow(new LootCompanionWindow(plugin) { IsOpen = true });
@@ -60,9 +56,6 @@ internal sealed class ImGuiUi : IPluginUi
     public void ToggleConfig() => configWindow.Toggle();
 
     public void OpenDutyPicker(string filter) => mainWindow.OpenPicker(filter);
-
-    /// <summary>Temporary. See <see cref="ColourProbeWindow"/>.</summary>
-    public void ToggleColourProbe() => colourProbe.Toggle();
 
     public void Dispose()
     {

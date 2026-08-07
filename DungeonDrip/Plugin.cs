@@ -499,13 +499,6 @@ public sealed class Plugin : IDalamudPlugin
                 ChatGui.Print(Shop.Describe());
                 return;
 
-            // Temporary, undocumented on purpose: it exists to settle the native panels' colours
-            // and goes with the answer. See ColourProbeWindow.
-            case "colours":
-            case "colors":
-                ui.ToggleColourProbe();
-                return;
-
             case "update":
                 LootData.CheckForUpdates(force: true);
                 RefetchWikiForSelection();
