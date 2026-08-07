@@ -76,6 +76,8 @@ internal sealed class NativeUi : IPluginUi
 
     public void OpenDutyPicker(string filter) => fallback.OpenDutyPicker(filter);
 
+    public void ToggleColourProbe() => fallback.ToggleColourProbe();
+
     /// <remarks>
     /// Native surfaces first, then the ImGui ones, then the library. Any other order leaves
     /// allocated nodes behind for the library's leak check to complain about at best, and hands the
