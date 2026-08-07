@@ -39,6 +39,11 @@ internal sealed unsafe class VendorPanelAddon : IDisposable
     /// </remarks>
     private static readonly Vector2 UnanchoredSize = new(260f, 400f);
 
+    /// <summary>How far the subtitle sits right of the title, and how far below its baseline.</summary>
+    private const float SubtitleGap = 12f;
+
+    private const float SubtitleDrop = 2f;
+
     private readonly Plugin plugin;
     private readonly Panel addon;
 
@@ -225,6 +230,28 @@ internal sealed unsafe class VendorPanelAddon : IDisposable
             scroller.Size = ContentSize;
 
             AddNode(scroller);
+            SpaceOutSubtitle();
+        }
+
+        /// <summary>
+        /// Moves the subtitle off the title and onto its line.
+        /// </summary>
+        /// <remarks>
+        /// The window node sets the subtitle four pixels right of the title's bounds and leaves the
+        /// two on one baseline, which reads as one run of text broken in the middle rather than as a
+        /// name and a qualifier. The game's own windows give it more room than that.
+        ///
+        /// Done here rather than by supplying a whole custom window node, which is the other way and
+        /// is a great deal of chrome to reimplement for two numbers.
+        /// </remarks>
+        private void SpaceOutSubtitle()
+        {
+            if (WindowNode is not KamiToolKit.Nodes.WindowNode window)
+                return;
+
+            window.SubtitleNode.Position = new Vector2(
+                window.TitleNode.Bounds.Right + SubtitleGap,
+                window.SubtitleNode.Y + SubtitleDrop);
         }
 
         /// <remarks>

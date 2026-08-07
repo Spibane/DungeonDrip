@@ -41,8 +41,20 @@ internal static class NativeRenderer
     /// </remarks>
     private const float RowHeight = 28f;
 
-    private const float GlyphWidth = 16f;
+    private const float GlyphWidth = 20f;
     private const float IconSize = 24f;
+
+    /// <summary>
+    /// The size the game sets its own list rows in.
+    /// </summary>
+    /// <remarks>
+    /// A text node defaults to 12, and the shop window beside this one is 14 - so the default made
+    /// the panel read as a smaller, separate thing rather than as a column of the same list.
+    /// </remarks>
+    private const uint FontSize = 14;
+
+    /// <summary>Indent before the marker, so it is not against the window's inside edge.</summary>
+    private const float RowIndent = 6f;
 
     /// <summary>Space between the marker, the icon and the name.</summary>
     private const float ColumnGap = 4f;
@@ -80,13 +92,14 @@ internal static class NativeRenderer
         {
             Size = new System.Numerics.Vector2(width, RowHeight),
             ItemSpacing = ColumnGap,
+            FirstItemSpacing = RowIndent,
             IsVisible = true,
         };
 
         // What the name has left after the fixed columns and the gaps between them. A text node
         // given no width does not shrink to fit - it reports zero, the row lays the next part out
         // on top of it, and the name ends up over the icon.
-        var remaining = width - GlyphWidth - IconSize - (ColumnGap * 3f);
+        var remaining = width - RowIndent - GlyphWidth - IconSize - (ColumnGap * 3f);
 
         foreach (var part in row.Parts)
         {
@@ -108,7 +121,10 @@ internal static class NativeRenderer
         // A text mark rather than an icon, for now - see NativeGlyphs on why a guessed icon id is
         // worse than a visible placeholder. Fixed width so the names line up whichever mark a row
         // carries, which is the same reason the ImGui panels push the fixed-width icon font.
-        GlyphNode glyph => Text(NativeGlyphs.For(glyph.Token), glyph.Colour, GlyphWidth),
+        // Centred in its column rather than left-aligned in it, so a one-character mark sits under
+        // the marks above and below it instead of hugging the window's edge.
+        GlyphNode glyph => Text(
+            NativeGlyphs.For(glyph.Token), glyph.Colour, GlyphWidth, AlignmentType.Center),
 
         IconNode icon => Icon(icon.IconId),
 
@@ -145,7 +161,8 @@ internal static class NativeRenderer
     /// what makes the text sit on the same line as the icon beside it rather than on the row's top
     /// edge.
     /// </remarks>
-    private static GameText Text(string content, ColourRole role, float width)
+    private static GameText Text(
+        string content, ColourRole role, float width, AlignmentType alignment = AlignmentType.Left)
     {
         var (fill, outline) = NativePalette.For(role);
 
@@ -155,7 +172,8 @@ internal static class NativeRenderer
             TextColor = fill,
             TextOutlineColor = outline,
             TextFlags = TextFlags.Edge,
-            AlignmentType = AlignmentType.Left,
+            FontSize = FontSize,
+            AlignmentType = alignment,
             Size = new System.Numerics.Vector2(width, RowHeight),
             IsVisible = true,
         };
