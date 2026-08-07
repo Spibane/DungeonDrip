@@ -1,7 +1,8 @@
 using System;
 using System.Collections.Generic;
-using System.Text;
 using DungeonDrip.Presentation;
+using Lumina.Text;
+using Lumina.Text.ReadOnly;
 using KamiToolKit.BaseTypes;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 using KamiToolKit.Nodes;
@@ -265,37 +266,49 @@ internal static class NativeRenderer
     }
 
     /// <summary>
-    /// Flattens a tooltip's lines into the one string the game's tooltip takes.
+    /// Flattens a tooltip's lines into the one string the game's tooltip takes, colours and all.
     /// </summary>
     /// <remarks>
-    /// <b>The colours are dropped, and this is the honest limit of the arrangement.</b> The game's
-    /// text tooltip is a single string, and colouring runs inside it means UIForeground payloads
-    /// keyed on UIColor rows rather than the RGBA the rest of the plugin speaks - so the amber on
-    /// an uncertain note reads as plain text here. Every tooltip in the plugin puts its caveat on
-    /// its own line and words it as a caveat, so nothing is unsayable, but the eye no longer finds
-    /// it first.
+    /// The colours are macros inside the string rather than anything set on a node, which is why
+    /// they come from <see cref="NativePalette.TooltipFor"/> - the same values a row is drawn in,
+    /// resolved for a place that cannot be handed a colour. A role that resolves to nothing is
+    /// written plainly and keeps whatever the game writes tooltips in.
     ///
-    /// Worth fixing with a role-to-UIColor mapping once those row ids are known, which is the same
-    /// missing piece <see cref="NativePalette"/> is waiting on.
+    /// The newline goes before each line rather than after it, so there is no trailing one to trim
+    /// off a tooltip the game would otherwise leave a blank row at the bottom of. A
+    /// <see cref="SpacingNode"/> contributes its newline and nothing else, which is what makes it a
+    /// blank line.
+    ///
+    /// Anything that is not text or a gap is skipped rather than described. A rule or an icon has
+    /// no meaning in a string, and the presenters do not put one in a tooltip.
     /// </remarks>
-    private static string Tooltip(IReadOnlyList<Node> lines)
+    private static ReadOnlySeString Tooltip(IReadOnlyList<Node> lines)
     {
-        var text = new StringBuilder();
+        var builder = new SeStringBuilder();
+        var written = 0;
 
         foreach (var line in lines)
         {
-            switch (line)
-            {
-                case TextNode entry:
-                    text.AppendLine(entry.Text);
-                    break;
+            if (line is not (TextNode or SpacingNode))
+                continue;
 
-                case SpacingNode:
-                    text.AppendLine();
-                    break;
+            if (written++ > 0)
+                builder.AppendNewLine();
+
+            if (line is not TextNode entry)
+                continue;
+
+            if (NativePalette.TooltipFor(entry.Colour) is not { } colour)
+            {
+                builder.Append(entry.Text);
+                continue;
             }
+
+            builder.PushColorRgba(colour);
+            builder.Append(entry.Text);
+            builder.PopColor();
         }
 
-        return text.ToString().TrimEnd();
+        return builder.ToReadOnlySeString();
     }
 }
