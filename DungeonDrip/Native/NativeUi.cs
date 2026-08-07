@@ -21,6 +21,9 @@ internal sealed class NativeUi : IPluginUi
     private readonly ImGuiUi fallback;
     private readonly VendorPanelAddon? vendorPanel;
 
+    /// <summary>One per plugin, because it holds a draw callback and every panel's icons go through it.</summary>
+    private readonly GlyphTextures? glyphs;
+
     /// <summary>Whether anything is actually being drawn natively.</summary>
     /// <remarks>
     /// False after a failed start, when this is an <see cref="ImGuiUi"/> in all but name. Worth
@@ -28,8 +31,9 @@ internal sealed class NativeUi : IPluginUi
     /// </remarks>
     public bool Active => vendorPanel != null;
 
-    private NativeUi(Plugin plugin, VendorPanelAddon? vendorPanel)
+    private NativeUi(Plugin plugin, GlyphTextures? glyphs, VendorPanelAddon? vendorPanel)
     {
+        this.glyphs = glyphs;
         this.vendorPanel = vendorPanel;
 
         fallback = new ImGuiUi(
@@ -46,15 +50,24 @@ internal sealed class NativeUi : IPluginUi
     /// </remarks>
     public static IPluginUi Start(Plugin plugin)
     {
+        GlyphTextures? glyphs = null;
+
         try
         {
             // No default subtitle: the panels set their own titles, and a default would print twice in
             // the header beside a title that already says the same thing.
             KamiToolKitLibrary.Initialize(Plugin.PluginInterface);
-            return new NativeUi(plugin, new VendorPanelAddon(plugin));
+
+            glyphs = new GlyphTextures();
+
+            return new NativeUi(plugin, glyphs, new VendorPanelAddon(plugin, glyphs));
         }
         catch (System.Exception exception)
         {
+            // Before the library's own teardown, and unconditionally: it holds a draw callback, and
+            // one left subscribed by a failed start would go on firing against a dead backend.
+            glyphs?.Dispose();
+
             Plugin.Log.Error(exception, "Native windows could not start; falling back to the plugin overlays.");
 
             // Cleanup, not Dispose-on-a-half-built-thing: Initialize may have got far enough to
@@ -76,16 +89,21 @@ internal sealed class NativeUi : IPluginUi
 
     public void OpenDutyPicker(string filter) => fallback.OpenDutyPicker(filter);
 
+    /// <summary>Temporary. See <see cref="ColourProbeWindow"/>.</summary>
     public void ToggleColourProbe() => fallback.ToggleColourProbe();
 
     /// <remarks>
     /// Native surfaces first, then the ImGui ones, then the library. Any other order leaves
     /// allocated nodes behind for the library's leak check to complain about at best, and hands the
     /// game a freed node at worst.
+    ///
+    /// The glyph textures go after the panels that asked for them, so nothing is still waiting on a
+    /// texture that will now never be rendered.
     /// </remarks>
     public void Dispose()
     {
         vendorPanel?.Dispose();
+        glyphs?.Dispose();
         fallback.Dispose();
         TryCleanup();
     }

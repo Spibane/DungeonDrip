@@ -14,6 +14,33 @@ namespace DungeonDrip.Windows;
 /// </remarks>
 internal static class ImGuiRenderer
 {
+    /// <summary>
+    /// A row of toolbar buttons, with the rule that has always followed them.
+    /// </summary>
+    /// <remarks>
+    /// <paramref name="id"/> prefixes each button's ImGui id, which has to be unique across every
+    /// window drawn in a frame - two panels open beside two game windows is the ordinary case, not
+    /// an unusual one, and buttons sharing an id share their pressed state.
+    ///
+    /// A pressed button runs its own action and reports nothing back. What saving or rebuilding the
+    /// press needs is the presenter's to know - see <see cref="ToolButtonModel"/>.
+    /// </remarks>
+    public static void Toolbar(string id, IReadOnlyList<ToolButtonModel> buttons)
+    {
+        for (var index = 0; index < buttons.Count; index++)
+        {
+            if (index > 0)
+                ImGui.SameLine();
+
+            var button = buttons[index];
+
+            if (UiParts.ToolButton($"##{id}{index}", ToolGlyphs.For(button.Icon), button.Tooltip))
+                button.Press();
+        }
+
+        ImGui.Separator();
+    }
+
     public static void Draw(Plugin plugin, IReadOnlyList<Node> nodes, HeaderState? headers = null)
     {
         foreach (var node in nodes)

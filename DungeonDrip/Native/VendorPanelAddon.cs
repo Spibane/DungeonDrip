@@ -42,6 +42,9 @@ internal sealed unsafe class VendorPanelAddon : IDisposable
     private readonly Plugin plugin;
     private readonly Panel addon;
 
+    /// <summary>Where the marks and the toolbar icons come from. Shared, not this panel's.</summary>
+    private readonly GlyphTextures glyphs;
+
     /// <summary>One menu for every row. See <see cref="NativeContextMenu"/> on why not one each.</summary>
     private readonly NativeContextMenu menu;
 
@@ -64,14 +67,16 @@ internal sealed unsafe class VendorPanelAddon : IDisposable
     /// <summary>The filters the current rows were built through.</summary>
     private ViewOptions builtWith;
 
-    public VendorPanelAddon(Plugin plugin)
+    public VendorPanelAddon(Plugin plugin, GlyphTextures glyphs)
     {
         this.plugin = plugin;
+        this.glyphs = glyphs;
         menu = new NativeContextMenu(plugin);
         headers = new HeaderState(plugin.Configuration);
 
         addon = new Panel
         {
+            Glyphs = glyphs,
             InternalName = "DungeonDripVendor",
             Title = "Dungeon Drip",
             Size = UnanchoredSize,
@@ -89,7 +94,19 @@ internal sealed unsafe class VendorPanelAddon : IDisposable
         };
 
         Plugin.Framework.Update += OnUpdate;
+        glyphs.Ready += OnGlyphsReady;
     }
+
+    /// <summary>
+    /// Rebuilds once a mark that was missing has been drawn.
+    /// </summary>
+    /// <remarks>
+    /// A glyph is drawn the first time anything asks for it and is kept for the session, so this
+    /// fires a handful of times in a session and never again. Forgetting what the panel was built
+    /// from is the whole of it - the next tick sees a list it has not built and does the work, on
+    /// the framework tick where every other build happens.
+    /// </remarks>
+    private void OnGlyphsReady() => builtFrom = null;
 
     /// <summary>
     /// Opens, closes and repositions the panel against whichever shop is up.
@@ -152,6 +169,23 @@ internal sealed unsafe class VendorPanelAddon : IDisposable
         addon.RemeasureScroll();
     }
 
+    /// <summary>
+    /// What a filter press has to do beyond writing the setting.
+    /// </summary>
+    /// <remarks>
+    /// The same pair the ImGui panels run, and it has to stay the same pair: these are the settings
+    /// the duty list reads, so a filter flipped at a shop that did not rebuild the report would show
+    /// as one thing here and another in the main window.
+    ///
+    /// Nothing rebuilds the panel here. The press only writes; the next tick notices the options
+    /// have moved and rebuilds, which keeps every path that builds nodes on the framework tick.
+    /// </remarks>
+    private void FiltersChanged()
+    {
+        plugin.Configuration.Save();
+        plugin.InvalidateReport();
+    }
+
     /// <summary>The list to draw, or null when the panel should not be up at all.</summary>
     private IReadOnlyList<GearRow>? Resolve()
     {
@@ -165,9 +199,19 @@ internal sealed unsafe class VendorPanelAddon : IDisposable
         return rows is { Count: > 0 } ? rows : null;
     }
 
+    /// <remarks>
+    /// The toolbar is refilled alongside the list because the two go out of date together: what
+    /// rebuilds the list is a filter moving, and a filter moving is exactly what changes the glyph
+    /// and the tooltip on the button that flipped it.
+    ///
+    /// The reset-size button the plugin overlays carry is not here and is not missing. There is no
+    /// resize handle on a game window, so there is never a dragged size to undo.
+    /// </remarks>
     private void Rebuild(VerticalListNode list, IReadOnlyList<GearRow> rows)
     {
         var stale = plugin.Ownership.IsDresserStale;
+
+        addon.Toolbar?.Fill(PanelPresenter.Filters(plugin.Configuration, hasOwnedRows: true, FiltersChanged));
 
         // Through the same filters the ImGui panel and the duty list use. Rendering the resolved
         // list straight was the first cut and was simply wrong: every filter in Settings appeared
@@ -177,7 +221,7 @@ internal sealed unsafe class VendorPanelAddon : IDisposable
 
         var built = PanelPresenter.List(groups, stale, PanelText.VendorUncertain, CollapsePrefix);
 
-        NativeRenderer.Fill(menu, headers, list, built, addon.ScrollBarWidth, Reflow);
+        NativeRenderer.Fill(menu, glyphs, headers, list, built, addon.ScrollBarWidth, Reflow);
 
         Reflow();
     }
@@ -216,6 +260,10 @@ internal sealed unsafe class VendorPanelAddon : IDisposable
         var size = new Vector2(addon.Size.X, unit->GetScaledHeight(true));
         addon.SetWindowSize(size.X, size.Y);
 
+        // After the resize, because the toolbar and the list are placed against the size the window
+        // now is. Sizing the addon without this leaves the content laid out for the size it was.
+        addon.Relayout();
+
         addon.SetWindowPosition(AddonAnchor.Beside(
             new Vector2(unit->X, unit->Y), unit->GetScaledWidth(true),
             plugin.Configuration.VendorPanel.Side, size, display));
@@ -224,6 +272,7 @@ internal sealed unsafe class VendorPanelAddon : IDisposable
     public void Dispose()
     {
         Plugin.Framework.Update -= OnUpdate;
+        glyphs.Ready -= OnGlyphsReady;
 
         if (addon.IsOpen)
             addon.Close();
@@ -244,7 +293,28 @@ internal sealed unsafe class VendorPanelAddon : IDisposable
     /// </remarks>
     private sealed class Panel : NativeAddon
     {
+        /// <summary>
+        /// How much of the content area the toolbar and its rule take off the top of the list.
+        /// </summary>
+        /// <remarks>
+        /// The buttons, the gap under them and the rule. Taken off the scroll area's height as well
+        /// as added to its top: a scroll area told to start lower without being told to end at the
+        /// same place runs off the bottom of the window, and nothing clips it back.
+        /// </remarks>
+        private const float ToolbarBandHeight = NativeToolbar.ButtonSize + 10f;
+
         private ScrollingNode<VerticalListNode>? scroller;
+        private HorizontalListNode? buttons;
+        private HorizontalLineNode? rule;
+
+        /// <summary>The window size the content was last laid out against.</summary>
+        private Vector2 laidOutFor;
+
+        /// <summary>Set before the addon is opened, since there is nothing to attach to until then.</summary>
+        public required GlyphTextures Glyphs { private get; init; }
+
+        /// <summary>The filter buttons, or null while the addon is not allocated.</summary>
+        public NativeToolbar? Toolbar { get; private set; }
 
         /// <summary>The list to put rows in, or null while the addon is not allocated.</summary>
         public VerticalListNode? List => scroller?.ContentNode;
@@ -257,15 +327,20 @@ internal sealed unsafe class VendorPanelAddon : IDisposable
 
         protected override unsafe void OnSetup(AtkUnitBase* addon, Span<AtkValue> values)
         {
-            scroller = new ScrollingNode<VerticalListNode>
-            {
-                Position = ContentStartPosition,
-                IsVisible = true,
-            };
+            buttons = new HorizontalListNode { IsVisible = true };
 
-            // Before Size, which is what the scrolling node measures against - and FitContents is
-            // what tells it how far there is to scroll, since a list that never reports growing
-            // gives a scroll area nothing to scroll.
+            AddNode(buttons);
+            Toolbar = new NativeToolbar(Glyphs, buttons);
+
+            // The same rule the ImGui panels draw under their toolbar, and it earns its line here
+            // for the same reason: without it the topmost row reads as another button.
+            rule = new HorizontalLineNode { IsVisible = true };
+            AddNode(rule);
+
+            scroller = new ScrollingNode<VerticalListNode> { IsVisible = true };
+
+            // FitContents is what tells the scroll area how far there is to scroll, since a list
+            // that never reports growing gives it nothing to scroll.
             scroller.ContentNode.FitContents = true;
 
             // Not FitWidth. That stretches every child to the list's full width, which is the width
@@ -273,18 +348,62 @@ internal sealed unsafe class VendorPanelAddon : IDisposable
             // it only because their columns are sized individually. Widths are set per node
             // instead, against a width that already has the bar taken off.
             scroller.ContentNode.FitWidth = false;
-            scroller.Size = ContentSize;
 
             AddNode(scroller);
+
+            Relayout();
+        }
+
+        /// <summary>
+        /// Puts the toolbar, its rule and the list where the window's current size puts them.
+        /// </summary>
+        /// <remarks>
+        /// Needed after every resize and not only after setup, which the first cut got wrong.
+        /// Setup runs while the addon is still whatever size it was left at, and the panel is only
+        /// matched to the shop a tick later - so a reload with a shop already open laid the content
+        /// out against the wrong height and left a band of empty window under the list. Walking away
+        /// and back appeared to fix it because by then the remembered size happened to be right.
+        ///
+        /// A no-op unless the size actually moved. It runs on every framework tick, and re-measuring
+        /// the scroll area each time would fight whatever the player has scrolled to.
+        /// </remarks>
+        public void Relayout()
+        {
+            if (buttons == null || rule == null || scroller == null || laidOutFor == Size)
+                return;
+
+            laidOutFor = Size;
+
+            buttons.Position = ContentStartPosition;
+            buttons.Size = new Vector2(ContentSize.X, NativeToolbar.ButtonSize);
+
+            rule.Position = ContentStartPosition + new Vector2(0f, NativeToolbar.ButtonSize + 4f);
+            rule.Size = new Vector2(ContentSize.X, 4f);
+
+            scroller.Position = ContentStartPosition + new Vector2(0f, ToolbarBandHeight);
+            scroller.Size = ContentSize - new Vector2(0f, ToolbarBandHeight);
+            scroller.RecalculateSizes();
         }
 
 
         /// <remarks>
-        /// Closing deallocates the whole tree, so the reference has to go with it. Keeping it would
-        /// leave the next visit writing rows into a node the game has already freed, which is the
-        /// quiet version of the same bug as the open flag.
+        /// Closing deallocates the whole tree, so the references have to go with it. Keeping one
+        /// would leave the next visit writing rows into a node the game has already freed, which is
+        /// the quiet version of the same bug as the open flag.
+        ///
+        /// The toolbar is told rather than only dropped, because a glyph texture may still be being
+        /// rendered for a button that has just stopped existing.
         /// </remarks>
         protected override unsafe void OnFinalize(AtkUnitBase* addon)
-            => scroller = null;
+        {
+            Toolbar?.Invalidate();
+            Toolbar = null;
+            scroller = null;
+            buttons = null;
+            rule = null;
+
+            // So the next setup lays out rather than recognising the size it happens to reopen at.
+            laidOutFor = Vector2.Zero;
+        }
     }
 }

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using DungeonDrip.Core;
 using DungeonDrip.Game;
@@ -28,6 +29,117 @@ internal static class PanelPresenter
         configuration.OnlyCurrentRaceEquippable,
         configuration.HideWeapons,
         settings.GroupBySlot);
+
+    /// <summary>What a filter button adds to its own tooltip, because it is not only this panel's.</summary>
+    private const string SharedNote = "Also applies to the duty list.";
+
+    /// <summary>
+    /// The shared filter buttons, in the order every panel shows them.
+    /// </summary>
+    /// <remarks>
+    /// Each button shows the state it is in rather than the state it would move to, which makes it
+    /// an indicator that can also be pressed - and puts the burden of saying so on the tooltip,
+    /// which is why every one of these is two sentences and not a label.
+    ///
+    /// They write the settings the duty list also reads, not per-panel copies, so
+    /// <paramref name="changed"/> has to rebuild that as well as save. Standing at a vendor is where
+    /// the wrong filter gets noticed, and it would be a poor answer for it to be the wrong filter
+    /// only there.
+    /// </remarks>
+    /// <param name="hasOwnedRows">
+    /// False on a panel whose rows are all one state by construction, where the show-owned button
+    /// would sit there doing nothing on either setting. It is left out rather than disabled.
+    /// </param>
+    public static IReadOnlyList<ToolButtonModel> Filters(
+        Configuration configuration, bool hasOwnedRows, Action changed)
+    {
+        var buttons = new List<ToolButtonModel>(3);
+
+        if (hasOwnedRows)
+        {
+            buttons.Add(Toggle(
+                configuration.ShowOwnedItems,
+                ToolGlyph.ShowingOwned, ToolGlyph.HidingOwned,
+                "Showing pieces you already have. Click to list only what you are missing.",
+                "Hiding pieces you already have. Click to list them too.",
+                value => configuration.ShowOwnedItems = value,
+                changed));
+        }
+
+        buttons.Add(Toggle(
+            configuration.OnlyCurrentJobEquippable,
+            ToolGlyph.CurrentJobOnly, ToolGlyph.EveryJob,
+            "Showing only what your current job can wear. Click to show every job.",
+            "Showing gear for every job. Click to show only your current job.",
+            value => configuration.OnlyCurrentJobEquippable = value,
+            changed));
+
+        buttons.Add(Toggle(
+            configuration.HideWeapons,
+            ToolGlyph.WeaponsHidden, ToolGlyph.WeaponsListed,
+            "Hiding weapons and off-hands. Click to list them.",
+            "Listing weapons and off-hands. Click to hide them.",
+            value => configuration.HideWeapons = value,
+            changed));
+
+        return buttons;
+    }
+
+    /// <summary>
+    /// The two extra filters a panel beside a storage box carries, for gear already spoken for.
+    /// </summary>
+    /// <remarks>
+    /// Written to the settings both store panels read, not to a pair of their own: armoury gear is a
+    /// gearset's and worn gear has to come off whichever box is being stood at, so switching one at
+    /// the dresser and finding it switched at the Armoire is the behaviour that needs no explaining.
+    ///
+    /// Neither carries the shared note, because unlike the three above them these two mean nothing
+    /// to the duty list.
+    /// </remarks>
+    public static IReadOnlyList<ToolButtonModel> StoreFilters(Configuration configuration, Action changed) =>
+    [
+        Toggle(
+            configuration.DresserPanelIncludesArmoury,
+            ToolGlyph.ArmouryListed, ToolGlyph.ArmouryHidden,
+            "Listing armoury chest gear. Click to hide it.",
+            "Hiding armoury chest gear. Click to list it.",
+            value => configuration.DresserPanelIncludesArmoury = value,
+            changed,
+            shared: false),
+
+        Toggle(
+            configuration.DresserPanelIncludesEquipped,
+            ToolGlyph.EquippedListed, ToolGlyph.EquippedHidden,
+            "Listing gear you are wearing. Click to hide it.",
+            "Hiding gear you are wearing. Click to list it.",
+            value => configuration.DresserPanelIncludesEquipped = value,
+            changed,
+            shared: false),
+    ];
+
+    /// <summary>
+    /// One filter button, described from the setting it flips rather than from either of its states.
+    /// </summary>
+    /// <remarks>
+    /// The setting is named once, in the pair of arguments that read it and write it, because every
+    /// one of these was previously a local, a button, a write-back and a flag - and four lines with
+    /// the setting spelled out twice is a place to mistype which one is being written.
+    /// </remarks>
+    private static ToolButtonModel Toggle(
+        bool state, ToolGlyph onGlyph, ToolGlyph offGlyph, string onTooltip, string offTooltip,
+        Action<bool> write, Action changed, bool shared = true)
+    {
+        var note = shared ? "\n" + SharedNote : string.Empty;
+
+        return new ToolButtonModel(
+            state ? onGlyph : offGlyph,
+            (state ? onTooltip : offTooltip) + note,
+            () =>
+            {
+                write(!state);
+                changed();
+            });
+    }
 
     /// <summary>
     /// A panel's whole list: the rows, under headings when the panel is grouping by slot.

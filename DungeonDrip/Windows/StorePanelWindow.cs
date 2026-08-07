@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
 using Dalamud.Interface.Utility.Raii;
@@ -23,12 +24,9 @@ namespace DungeonDrip.Windows;
 /// </remarks>
 public abstract class StorePanelWindow : AddonPanelWindow
 {
-    private readonly string toolbarId;
-
     protected StorePanelWindow(Plugin plugin, string title, string collapsePrefix, string toolbarId)
         : base(plugin, title, collapsePrefix, toolbarId)
     {
-        this.toolbarId = toolbarId;
     }
 
     /// <summary>Every row here is one the box has not got, so the filter has nothing to act on.</summary>
@@ -40,49 +38,9 @@ public abstract class StorePanelWindow : AddonPanelWindow
     /// <summary>Anything this box wants to add to a row's tooltip.</summary>
     protected virtual void DrawRowNotes(HeldGearRow row) { }
 
-    /// <summary>
-    /// The two filters for gear that is already spoken for.
-    /// </summary>
-    /// <remarks>
-    /// Written to the settings both store panels read, not to a pair of their own: armoury gear is a
-    /// gearset's and worn gear has to come off whichever box is being stood at, so switching one at the
-    /// dresser and finding it switched at the Armoire is the behaviour that needs no explaining.
-    /// </remarks>
-    protected sealed override bool DrawExtraToolbarButtons()
-    {
-        var configuration = Plugin.Configuration;
-        var changed = false;
-
-        ImGui.SameLine();
-
-        var armoury = configuration.DresserPanelIncludesArmoury;
-        if (UiParts.ToolButton(
-                $"##{toolbarId}Armoury",
-                armoury ? FontAwesomeIcon.Archive : FontAwesomeIcon.BoxOpen,
-                armoury
-                    ? "Listing armoury chest gear. Click to hide it."
-                    : "Hiding armoury chest gear. Click to list it."))
-        {
-            configuration.DresserPanelIncludesArmoury = !armoury;
-            changed = true;
-        }
-
-        ImGui.SameLine();
-
-        var equipped = configuration.DresserPanelIncludesEquipped;
-        if (UiParts.ToolButton(
-                $"##{toolbarId}Equipped",
-                equipped ? FontAwesomeIcon.Tshirt : FontAwesomeIcon.UserSlash,
-                equipped
-                    ? "Listing gear you are wearing. Click to hide it."
-                    : "Hiding gear you are wearing. Click to list it."))
-        {
-            configuration.DresserPanelIncludesEquipped = !equipped;
-            changed = true;
-        }
-
-        return changed;
-    }
+    /// <summary>The two filters for gear that is already spoken for.</summary>
+    private protected sealed override IReadOnlyList<ToolButtonModel> ExtraToolButtons() =>
+        PanelPresenter.StoreFilters(Plugin.Configuration, FiltersChanged);
 
     /// <summary>
     /// Every row here is one the box has not got by construction, so the ownership glyph would say

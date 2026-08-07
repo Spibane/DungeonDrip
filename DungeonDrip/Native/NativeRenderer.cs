@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using DungeonDrip.Presentation;
+using DungeonDrip.Windows;
 using Lumina.Text;
 using Lumina.Text.ReadOnly;
 using KamiToolKit.BaseTypes;
@@ -13,6 +14,7 @@ using TextNode = DungeonDrip.Presentation.TextNode;
 using IconNode = DungeonDrip.Presentation.IconNode;
 using GameText = KamiToolKit.Nodes.TextNode;
 using GameIcon = KamiToolKit.Nodes.IconImageNode;
+using GameImage = KamiToolKit.Nodes.ImGuiImageNode;
 
 namespace DungeonDrip.Native;
 
@@ -80,7 +82,7 @@ internal static class NativeRenderer
     /// few pixels - so nothing about the list's own size keeps a long name out from under it.
     /// </param>
     public static void Fill(
-        NativeContextMenu menu, HeaderState headers, VerticalListNode list,
+        NativeContextMenu menu, GlyphTextures glyphs, HeaderState headers, VerticalListNode list,
         IReadOnlyList<Node> nodes, float reservedRight, Action onFoldChanged)
     {
         var width = list.Width - reservedRight;
@@ -89,7 +91,7 @@ internal static class NativeRenderer
 
         foreach (var node in nodes)
         {
-            var built = Build(menu, headers, node, width, onFoldChanged);
+            var built = Build(menu, glyphs, headers, node, width, onFoldChanged);
             if (built != null)
                 list.AddNode(built);
         }
@@ -98,11 +100,11 @@ internal static class NativeRenderer
     }
 
     private static NodeBase? Build(
-        NativeContextMenu menu, HeaderState headers, Node node, float width,
+        NativeContextMenu menu, GlyphTextures glyphs, HeaderState headers, Node node, float width,
         Action onFoldChanged) => node switch
     {
-        RowNode row => Row(menu, row, width),
-        CollapsibleNode group => Collapsible(menu, headers, group, width, onFoldChanged),
+        RowNode row => Row(menu, glyphs, row, width),
+        CollapsibleNode group => Collapsible(menu, glyphs, headers, group, width, onFoldChanged),
         _ => null,
     };
 
@@ -129,8 +131,8 @@ internal static class NativeRenderer
     /// submodule to a commit no clone can fetch, which trades a colour for a build.
     /// </remarks>
     private static NodeBase Collapsible(
-        NativeContextMenu menu, HeaderState headers, CollapsibleNode group, float width,
-        Action onFoldChanged)
+        NativeContextMenu menu, GlyphTextures glyphs, HeaderState headers, CollapsibleNode group,
+        float width, Action onFoldChanged)
     {
         var header = new CollapsingHeaderNode
         {
@@ -158,7 +160,7 @@ internal static class NativeRenderer
 
         foreach (var child in group.Children)
         {
-            var built = Build(menu, headers, child, width, onFoldChanged);
+            var built = Build(menu, glyphs, headers, child, width, onFoldChanged);
             if (built != null)
                 header.AddNode(built);
         }
@@ -166,7 +168,8 @@ internal static class NativeRenderer
         return header;
     }
 
-    private static NodeBase Row(NativeContextMenu menu, RowNode row, float width)
+    private static NodeBase Row(
+        NativeContextMenu menu, GlyphTextures glyphs, RowNode row, float width)
     {
         var line = new HorizontalListNode
         {
@@ -183,7 +186,7 @@ internal static class NativeRenderer
 
         foreach (var part in row.Parts)
         {
-            var node = Part(part, remaining);
+            var node = Part(glyphs, part, remaining);
             if (node != null)
                 line.AddNode(node);
         }
@@ -199,15 +202,9 @@ internal static class NativeRenderer
         return line;
     }
 
-    private static NodeBase? Part(Node part, float textWidth) => part switch
+    private static NodeBase? Part(GlyphTextures glyphs, Node part, float textWidth) => part switch
     {
-        // A text mark rather than an icon, for now - see NativeGlyphs on why a guessed icon id is
-        // worse than a visible placeholder. Fixed width so the names line up whichever mark a row
-        // carries, which is the same reason the ImGui panels push the fixed-width icon font.
-        // Centred in its column rather than left-aligned in it, so a one-character mark sits under
-        // the marks above and below it instead of hugging the window's edge.
-        GlyphNode glyph => Text(
-            NativeGlyphs.For(glyph.Token), glyph.Colour, GlyphWidth, AlignmentType.Center),
+        GlyphNode glyph => Marker(glyphs, glyph),
 
         IconNode icon => Icon(icon.IconId),
 
@@ -215,6 +212,52 @@ internal static class NativeRenderer
 
         _ => null,
     };
+
+    /// <summary>
+    /// The mark at the head of a row: the same FontAwesome glyph the plugin overlays draw.
+    /// </summary>
+    /// <remarks>
+    /// A picture of a font glyph rather than a game icon, and that is a decision rather than an
+    /// expedient - see <see cref="GlyphTextures"/> on why a table of curated icon ids would have
+    /// been guesses. It also keeps the readme's marker table true of both looks, since there is only
+    /// one set of shapes to describe.
+    ///
+    /// Square and fixed width, so the names line up down the list whichever mark each row carries.
+    /// That is the same reason the ImGui panels push the fixed-width icon font, and it is why the
+    /// texture behind this is square too: a node stretches a texture to fill it, so an oblong one
+    /// would come out leaning.
+    ///
+    /// <b>The colour is drawn into the texture rather than tinted onto the node.</b> Tinting was the
+    /// first cut and came out wrong in a way worth recording: the green star rendered purple and the
+    /// red cross blue, so a node's colour multiply is neither the scale nor the channel order it
+    /// looks like. Drawing each mark in the colour it needs costs a texture per colour a mark is
+    /// ever shown in - a handful, cached for the session - and takes the guessing out.
+    ///
+    /// The colour is <see cref="NativePalette.Solid"/> rather than the pair a text node is given,
+    /// for the same reason a tooltip's is: a texture cannot carry a muted alpha to be composited
+    /// later, so what goes in has to be faded already.
+    /// </remarks>
+    private static NodeBase Marker(GlyphTextures glyphs, GlyphNode glyph)
+    {
+        var node = new GameImage
+        {
+            FitTexture = true,
+            Size = new System.Numerics.Vector2(GlyphWidth, GlyphWidth),
+
+            // Centred against the row rather than sat on its top edge, as the item icon is.
+            Y = (RowHeight - GlyphWidth) / 2f,
+            IsVisible = true,
+        };
+
+        // Nothing is remembered about this node. A mark not yet drawn stays invisible for as long
+        // as it takes to draw, and the panel rebuilds when it lands - which is why there is no
+        // callback here holding a row that may not survive the frame.
+        node.Alpha = glyphs.TryLoad(node, Glyphs.For(glyph.Token), NativePalette.Solid(glyph.Colour))
+            ? 1f
+            : 0f;
+
+        return node;
+    }
 
     /// <summary>An item icon, scaled down to the row rather than cropped to it.</summary>
     /// <remarks>

@@ -2,10 +2,11 @@ namespace DungeonDrip.Presentation;
 
 /// <summary>The small mark at the head of a gear row, named by what it claims.</summary>
 /// <remarks>
-/// A backend renders these however it can - FontAwesome in the ImGui windows, game icons in the
-/// native ones - and the two will not agree on shapes. So nothing above a backend may name one. A
-/// presenter that said "briefcase" would be describing the ImGui rendering of a fact rather than
-/// the fact, and the native backend would have to honour a shape it has no icon for.
+/// Nothing above a backend may name a shape. Both backends happen to draw the same FontAwesome
+/// glyphs today - the native one renders them into textures rather than picking game icons, so the
+/// readme's marker table stays true of either look - but that is a decision either could revisit,
+/// and a presenter that said "briefcase" would be describing one rendering of a fact rather than
+/// the fact.
 ///
 /// Two pairs look interchangeable and are not. <see cref="InArmoire"/> is the Armoire, a place
 /// pieces are put away for good; <see cref="InArmoury"/> is the armoury chest, where a gearset is
