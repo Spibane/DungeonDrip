@@ -7,6 +7,7 @@ using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
 using DungeonDrip.Core;
+using DungeonDrip.Presentation;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 
 namespace DungeonDrip.Windows;
@@ -290,9 +291,9 @@ public abstract unsafe class AddonPanelWindow : Window
         if (groups.Count == 0)
         {
             if (hiddenByFilter > 0)
-                ImGui.TextColored(Palette.Muted, FilteredEmptyMessage);
+                ImGui.TextColored(Palette.For(ColourRole.Muted), FilteredEmptyMessage);
             else
-                ImGui.TextColored(EmptyIsGood ? Palette.Good : Palette.Muted, EmptyMessage);
+                ImGui.TextColored(EmptyIsGood ? Palette.For(ColourRole.Good) : Palette.For(ColourRole.Muted), EmptyMessage);
 
             return;
         }
@@ -311,8 +312,8 @@ public abstract unsafe class AddonPanelWindow : Window
     {
         if (!ownership.HasDresserData)
         {
-            ImGui.TextColored(Palette.Warning, "No dresser data yet.");
-            ImGui.TextColored(Palette.Warning, "Open your Glamour Dresser.");
+            ImGui.TextColored(Palette.For(ColourRole.Warning), "No dresser data yet.");
+            ImGui.TextColored(Palette.For(ColourRole.Warning), "Open your Glamour Dresser.");
             ImGui.Separator();
             return;
         }
@@ -321,8 +322,8 @@ public abstract unsafe class AddonPanelWindow : Window
             return;
 
         var age = Format.Age(ownership.DresserUpdatedUtc!.Value);
-        ImGui.TextColored(Palette.Warning, $"Dresser last read {age} ago.");
-        ImGui.TextColored(Palette.Warning, "Open one to be sure.");
+        ImGui.TextColored(Palette.For(ColourRole.Warning), $"Dresser last read {age} ago.");
+        ImGui.TextColored(Palette.For(ColourRole.Warning), "Open one to be sure.");
         ImGui.Separator();
     }
 
@@ -341,14 +342,14 @@ public abstract unsafe class AddonPanelWindow : Window
         // untinted name - any colour on it would compete with the glyph for meaning.
         var glyphColour = row.Marker switch
         {
-            CollectionMarker.OutfitComplete => Palette.Good,
-            CollectionMarker.NotCollected => uncertain ? Palette.Warning : Palette.NotOwned,
+            CollectionMarker.OutfitComplete => Palette.For(ColourRole.Good),
+            CollectionMarker.NotCollected => uncertain ? Palette.For(ColourRole.Warning) : Palette.For(ColourRole.NotOwned),
 
             // Warning rather than the missing red: the piece is in the box, the rule is what is
             // unsatisfied, and the hover says by how much.
-            CollectionMarker.OutfitPartial => Palette.Warning,
-            CollectionMarker.Unknown => Palette.Warning,
-            _ => Palette.Muted,
+            CollectionMarker.OutfitPartial => Palette.For(ColourRole.Warning),
+            CollectionMarker.Unknown => Palette.For(ColourRole.Warning),
+            _ => Palette.For(ColourRole.Muted),
         };
 
         ImGui.AlignTextToFramePadding();
@@ -363,9 +364,9 @@ public abstract unsafe class AddonPanelWindow : Window
         if (CollectionMarkers.IsMissing(row.Marker))
             ImGui.Text(row.Name);
         else if (row.Marker == CollectionMarker.Unknown)
-            ImGui.TextColored(Palette.Warning, row.Name);
+            ImGui.TextColored(Palette.For(ColourRole.Warning), row.Name);
         else
-            ImGui.TextColored(Palette.Muted, row.Name);
+            ImGui.TextColored(Palette.For(ColourRole.Muted), row.Name);
 
         // Both bind to the last item drawn, so the hover flag has to be taken against the name
         // before the menu goes on this row.
@@ -381,10 +382,10 @@ public abstract unsafe class AddonPanelWindow : Window
         ImGui.Text(CollectionMarkers.Describe(row.Marker, row.OutfitsStored, row.OutfitsTotal));
 
         if (uncertain && UncertainNote != null)
-            ImGui.TextColored(Palette.Warning, UncertainNote);
+            ImGui.TextColored(Palette.For(ColourRole.Warning), UncertainNote);
 
         ImGui.Spacing();
-        ImGui.TextColored(Palette.Muted, "Right-click for options.");
+        ImGui.TextColored(Palette.For(ColourRole.Muted), "Right-click for options.");
     }
 
     /// <summary>

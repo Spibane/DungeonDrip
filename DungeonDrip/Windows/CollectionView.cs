@@ -5,6 +5,7 @@ using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using DungeonDrip.Core;
+using DungeonDrip.Presentation;
 
 namespace DungeonDrip.Windows;
 
@@ -177,7 +178,7 @@ public sealed class CollectionView(Plugin plugin)
         DrawDresserPressure();
 
         Rule();
-        ImGui.TextColored(Palette.Muted, "Already in your collection");
+        ImGui.TextColored(Palette.For(ColourRole.Muted), "Already in your collection");
         ImGui.Spacing();
 
         DrawAlreadyStored();
@@ -313,14 +314,14 @@ public sealed class CollectionView(Plugin plugin)
         if (!plugin.Configuration.ShowAcquisitionSources)
         {
             // Named as the setting reads, since that is what has to be found and switched on.
-            ImGui.TextColored(Palette.Muted,
+            ImGui.TextColored(Palette.For(ColourRole.Muted),
                 "Needs \"Say how gear is obtained besides dropping\", under Settings - Data.");
             return;
         }
 
         if (shopping == null)
         {
-            ImGui.TextColored(Palette.Muted, "Reading what the shops sell...");
+            ImGui.TextColored(Palette.For(ColourRole.Muted), "Reading what the shops sell...");
             return;
         }
 
@@ -329,7 +330,7 @@ public sealed class CollectionView(Plugin plugin)
 
         if (shopping.IsEmpty)
         {
-            ImGui.TextColored(Palette.Muted, plugin.Configuration.ReadyToBuyOutfitsOnly
+            ImGui.TextColored(Palette.For(ColourRole.Muted), plugin.Configuration.ReadyToBuyOutfitsOnly
                 ? "Nothing your currencies buy towards an outfit set is still missing."
                 : "Nothing your currencies buy is still missing - or there is nothing in the Currency tab yet.");
             return;
@@ -384,12 +385,12 @@ public sealed class CollectionView(Plugin plugin)
 
         if (!tracker.HasDresserData)
         {
-            ImGui.TextColored(Palette.Warning,
+            ImGui.TextColored(Palette.For(ColourRole.Warning),
                 "No Glamour Dresser data yet - open one once, or everything here is listed as missing.");
         }
         else if (tracker.IsDresserStale)
         {
-            ImGui.TextColored(Palette.Warning,
+            ImGui.TextColored(Palette.For(ColourRole.Warning),
                 $"Dresser snapshot {Format.Age(tracker.DresserUpdatedUtc!.Value)} old - " +
                 "anything collected since is still listed.");
         }
@@ -398,12 +399,12 @@ public sealed class CollectionView(Plugin plugin)
         // occasion and can be the stale one on its own.
         if (tracker.ArmoireUpdatedUtc == null)
         {
-            ImGui.TextColored(Palette.Warning,
+            ImGui.TextColored(Palette.For(ColourRole.Warning),
                 "Armoire never read - anything stored there is still listed. Open it once.");
         }
         else if (plugin.Configuration.Scope != CollectionScope.DresserOnly)
         {
-            ImGui.TextColored(Palette.Muted,
+            ImGui.TextColored(Palette.For(ColourRole.Muted),
                 $"Armoire read {Format.Age(tracker.ArmoireUpdatedUtc.Value)} ago. " +
                 "Open it again if something here is already in it.");
         }
@@ -462,21 +463,21 @@ public sealed class CollectionView(Plugin plugin)
 
         ImGui.SameLine();
         ImGui.TextColored(
-            piece.Affordable ? Palette.Focus : Palette.Muted, $"- {piece.Cost:N0}");
+            piece.Affordable ? Palette.For(ColourRole.Focus) : Palette.For(ColourRole.Muted), $"- {piece.Cost:N0}");
     }
 
     private void DrawSetsInProgress()
     {
         if (!plugin.Ownership.HasDresserData)
         {
-            ImGui.TextColored(Palette.Muted,
+            ImGui.TextColored(Palette.For(ColourRole.Muted),
                 "No Glamour Dresser data yet - open a dresser once so this can be answered.");
             return;
         }
 
         if (sets.Count == 0)
         {
-            ImGui.TextColored(Palette.Muted,
+            ImGui.TextColored(Palette.For(ColourRole.Muted),
                 "No outfit set is part way done - every set is either finished or untouched.");
             return;
         }
@@ -506,7 +507,7 @@ public sealed class CollectionView(Plugin plugin)
             $"{standing.Name}###set{standing.SetId}", ImGuiTreeNodeFlags.SpanAvailWidth);
 
         ImGui.SameLine();
-        ImGui.TextColored(Palette.Muted, $"{standing.Owned} of {standing.Total}");
+        ImGui.TextColored(Palette.For(ColourRole.Muted), $"{standing.Owned} of {standing.Total}");
 
         if (!open)
             return;
@@ -533,7 +534,7 @@ public sealed class CollectionView(Plugin plugin)
         {
             var best = drops[0];
             ImGui.SameLine();
-            ImGui.TextColored(Palette.Muted, best.Level > 0
+            ImGui.TextColored(Palette.For(ColourRole.Muted), best.Level > 0
                 ? $"- {best.DutyName} (Lv. {best.Level})"
                 : $"- {best.DutyName}");
             return;
@@ -544,14 +545,14 @@ public sealed class CollectionView(Plugin plugin)
             return;
 
         ImGui.SameLine();
-        ImGui.TextColored(Palette.Muted, $"- {acquisitions[0].Describe()}");
+        ImGui.TextColored(Palette.For(ColourRole.Muted), $"- {acquisitions[0].Describe()}");
     }
 
     private void DrawDresserPressure()
     {
         if (pressure is not { HasData: true })
         {
-            ImGui.TextColored(Palette.Muted, "No dresser snapshot to measure.");
+            ImGui.TextColored(Palette.For(ColourRole.Muted), "No dresser snapshot to measure.");
             return;
         }
 
@@ -560,7 +561,7 @@ public sealed class CollectionView(Plugin plugin)
         if (pressure.Reclaimable > 0)
         {
             ImGui.Spacing();
-            ImGui.TextColored(Palette.Focus, $"Up to {pressure.Reclaimable} slots could be freed:");
+            ImGui.TextColored(Palette.For(ColourRole.Focus), $"Up to {pressure.Reclaimable} slots could be freed:");
         }
 
         DrawCollapsible(pressure);
@@ -588,7 +589,7 @@ public sealed class CollectionView(Plugin plugin)
         if (report.Capacity > 0)
         {
             ImGui.TextColored(
-                crowded ? Palette.Warning : Palette.Muted,
+                crowded ? Palette.For(ColourRole.Warning) : Palette.For(ColourRole.Muted),
                 $"{prefix}{report.Used} slots used, of the {report.Capacity} the box holds.");
 
             ImGui.ProgressBar(
@@ -598,7 +599,7 @@ public sealed class CollectionView(Plugin plugin)
         }
         else
         {
-            ImGui.TextColored(Palette.Muted, $"{prefix}{report.Used} slots used.");
+            ImGui.TextColored(Palette.For(ColourRole.Muted), $"{prefix}{report.Used} slots used.");
         }
     }
 
@@ -608,7 +609,7 @@ public sealed class CollectionView(Plugin plugin)
             return;
 
         ImGui.Spacing();
-        ImGui.TextColored(Palette.Muted, report.Collapsible.Count == 1
+        ImGui.TextColored(Palette.For(ColourRole.Muted), report.Collapsible.Count == 1
             ? "1 outfit is stored a piece at a time:"
             : $"{report.Collapsible.Count} outfits are stored a piece at a time:");
 
@@ -624,10 +625,10 @@ public sealed class CollectionView(Plugin plugin)
                 : $"   {set.Name} - if you have the outfit item, storing it instead of these " +
                   $"{set.Pieces.Count} pieces frees {set.SlotsReclaimed} slots";
 
-            ImGui.TextColored(set.HoldingOutfitItem ? Palette.Good : Palette.Muted, line);
+            ImGui.TextColored(set.HoldingOutfitItem ? Palette.For(ColourRole.Good) : Palette.For(ColourRole.Muted), line);
         }
 
-        ImGui.TextColored(Palette.Muted,
+        ImGui.TextColored(Palette.For(ColourRole.Muted),
             "   The loose copies come back to your bags, so the space appears once you clear them.");
     }
 
@@ -636,7 +637,7 @@ public sealed class CollectionView(Plugin plugin)
         if (!report.ArmoireKnown)
         {
             ImGui.Spacing();
-            ImGui.TextColored(Palette.Muted,
+            ImGui.TextColored(Palette.For(ColourRole.Muted),
                 "Open your Armoire once and this can also say what it would take off your hands.");
             return;
         }
@@ -645,13 +646,13 @@ public sealed class CollectionView(Plugin plugin)
             report.DuplicateInArmoire,
             "In your Armoire as well as the dresser",
             "The dresser copy is doing nothing the Armoire is not already doing.",
-            Palette.Focus);
+            Palette.For(ColourRole.Focus));
 
         DrawResidents(
             report.ArmoireWouldTake,
             "The Armoire would take these, at no dresser slot",
             "Each has to be taken out of the dresser and deposited, so this one is work.",
-            Palette.Muted);
+            Palette.For(ColourRole.Muted));
     }
 
     /// <summary>
@@ -672,11 +673,11 @@ public sealed class CollectionView(Plugin plugin)
 
         if (!ImGui.TreeNodeEx($"{heading} ({residents.Count})###{heading}"))
         {
-            ImGui.TextColored(Palette.Muted, $"   {note}");
+            ImGui.TextColored(Palette.For(ColourRole.Muted), $"   {note}");
             return;
         }
 
-        ImGui.TextColored(Palette.Muted, note);
+        ImGui.TextColored(Palette.For(ColourRole.Muted), note);
 
         foreach (var resident in residents)
         {
@@ -705,7 +706,7 @@ public sealed class CollectionView(Plugin plugin)
     {
         if (!plugin.Ownership.HasDresserData)
         {
-            ImGui.TextColored(Palette.Muted,
+            ImGui.TextColored(Palette.For(ColourRole.Muted),
                 "No Glamour Dresser data yet - open a dresser once so this can be answered.");
             return;
         }
@@ -719,15 +720,15 @@ public sealed class CollectionView(Plugin plugin)
         // row is reporting and was being left for the reader to infer from a location heading and a
         // trailing clause, and where it reads from is not guessable from the contents and changes what
         // an empty list means.
-        ImGui.TextColored(Palette.Muted, "Every row is two copies of one piece:");
+        ImGui.TextColored(Palette.For(ColourRole.Muted), "Every row is two copies of one piece:");
 
-        ImGui.TextColored(Palette.Muted, plugin.Ownership.Retainers.Count > 0
+        ImGui.TextColored(Palette.For(ColourRole.Muted), plugin.Ownership.Retainers.Count > 0
             ? "one in your bags, armoury chest, saddlebag or with a retainer, and one the collection has."
             : "one in your bags, armoury chest or saddlebag, and one the collection has.");
 
         if (carried.AlreadyStored.Count == 0 && carried.OnlyInsideAnOutfit.Count == 0)
         {
-            ImGui.TextColored(Palette.Good, "Nothing held has a second copy in the collection.");
+            ImGui.TextColored(Palette.For(ColourRole.Good), "Nothing held has a second copy in the collection.");
             DrawCaveats(stale);
             return;
         }
@@ -851,13 +852,13 @@ public sealed class CollectionView(Plugin plugin)
         // do that now, so a coloured heading would only be competing with the warning that means something.
         if (!RememberedHeader(
                 $"{label} ({listed.Count})", CollapsePrefix + label,
-                stale ? Palette.Warning : null))
+                stale ? Palette.For(ColourRole.Warning) : null))
         {
             return;
         }
 
         if (note != null)
-            ImGui.TextColored(Palette.Muted, $"   {note}");
+            ImGui.TextColored(Palette.For(ColourRole.Muted), $"   {note}");
 
         foreach (var piece in listed)
         {
@@ -876,7 +877,7 @@ public sealed class CollectionView(Plugin plugin)
 
             ImGui.SameLine();
             ImGui.TextColored(
-                insideOutfit ? Palette.Warning : Palette.Muted,
+                insideOutfit ? Palette.For(ColourRole.Warning) : Palette.For(ColourRole.Muted),
                 $"- also {MissingItems.Describe(piece.StoredIn).ToLowerInvariant()}");
 
             if (!hovered)
@@ -888,20 +889,20 @@ public sealed class CollectionView(Plugin plugin)
             // Both places, in the hover, even though the heading has one of them. A tooltip that
             // repeated only the collection half never said what the row is actually reporting - two
             // copies, and here is each one.
-            ImGui.TextColored(Palette.Muted, $"{label}.");
-            ImGui.TextColored(Palette.Muted, SecondCopy(piece.StoredIn));
+            ImGui.TextColored(Palette.For(ColourRole.Muted), $"{label}.");
+            ImGui.TextColored(Palette.For(ColourRole.Muted), SecondCopy(piece.StoredIn));
 
             if (insideOutfit)
             {
                 // Why this one is amber rather than grey. The dresser's copy is not a piece sitting in
                 // the box, it is a slot of a whole set sitting in the box, so it is only there for as
                 // long as the set is - which the two flat statements above cannot say on their own.
-                ImGui.TextColored(Palette.Warning,
+                ImGui.TextColored(Palette.For(ColourRole.Warning),
                     "That second copy belongs to the set, so taking the set out takes it too.");
             }
 
             if (piece.ArmoireWouldTake)
-                ImGui.TextColored(Palette.Muted, "The Armoire would take this too.");
+                ImGui.TextColored(Palette.For(ColourRole.Muted), "The Armoire would take this too.");
         }
     }
 
@@ -920,7 +921,7 @@ public sealed class CollectionView(Plugin plugin)
 
         if (stale)
         {
-            ImGui.TextColored(Palette.Warning,
+            ImGui.TextColored(Palette.For(ColourRole.Warning),
                 $"Dresser snapshot {Format.Age(plugin.Ownership.DresserUpdatedUtc!.Value)} old.");
         }
 
@@ -929,17 +930,17 @@ public sealed class CollectionView(Plugin plugin)
         // to work out.
         if (carried!.OnlyInsideAnOutfit.Count > 0)
         {
-            ImGui.TextColored(Palette.Muted,
+            ImGui.TextColored(Palette.For(ColourRole.Muted),
                 "Amber: the second copy is a slot of a stored outfit set rather than a piece of its own.");
         }
 
         if (!carried.SaddlebagReadable)
-            ImGui.TextColored(Palette.Muted, "Saddlebag unreadable away from a bell.");
+            ImGui.TextColored(Palette.For(ColourRole.Muted), "Saddlebag unreadable away from a bell.");
 
         // Which retainers this could not look at, since an unvisited one is indistinguishable from an
         // empty one on the list itself.
         if (plugin.Ownership.Retainers.Count == 0)
-            ImGui.TextColored(Palette.Muted, "No retainer has been read - open one at a bell to include it.");
+            ImGui.TextColored(Palette.For(ColourRole.Muted), "No retainer has been read - open one at a bell to include it.");
     }
 
     /// <summary>

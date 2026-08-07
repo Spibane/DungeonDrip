@@ -3,8 +3,9 @@ using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Windowing;
 using Dalamud.Utility;
-using FFXIVClientStructs.FFXIV.Client.UI;
 using DungeonDrip.Core;
+using DungeonDrip.Presentation;
+using FFXIVClientStructs.FFXIV.Client.UI;
 using Lumina.Excel.Sheets;
 
 namespace DungeonDrip.Windows;
@@ -97,15 +98,15 @@ public sealed unsafe class LootCompanionWindow : Window
         // presented as fact - say so instead of showing a confident guess.
         if (!ownership.HasDresserData)
         {
-            ImGui.TextColored(Palette.Warning, "No dresser data.");
-            ImGui.TextColored(Palette.Warning, "Open your Glamour Dresser.");
+            ImGui.TextColored(Palette.For(ColourRole.Warning), "No dresser data.");
+            ImGui.TextColored(Palette.For(ColourRole.Warning), "Open your Glamour Dresser.");
             return;
         }
 
         if (ownership.IsDresserStale)
         {
-            ImGui.TextColored(Palette.Warning, "Dresser data is stale -");
-            ImGui.TextColored(Palette.Warning, "these may be wrong.");
+            ImGui.TextColored(Palette.For(ColourRole.Warning), "Dresser data is stale -");
+            ImGui.TextColored(Palette.For(ColourRole.Warning), "these may be wrong.");
             ImGui.Separator();
         }
 
@@ -143,7 +144,7 @@ public sealed unsafe class LootCompanionWindow : Window
         }
 
         if (!anyMissing)
-            ImGui.TextColored(Palette.Muted, "Nothing new here.");
+            ImGui.TextColored(Palette.For(ColourRole.Muted), "Nothing new here.");
     }
 
     private void DrawRow(Item item, bool owned)
@@ -153,9 +154,9 @@ public sealed unsafe class LootCompanionWindow : Window
         UiParts.ItemIcon(item.Icon, 20);
 
         if (owned)
-            ImGui.TextColored(Palette.Muted, name);
+            ImGui.TextColored(Palette.For(ColourRole.Muted), name);
         else
-            ImGui.TextColored(Palette.Missing, $"{name}  ←");
+            ImGui.TextColored(Palette.For(ColourRole.Missing), $"{name}  ←");
 
         UiParts.ItemContextMenu(plugin, item.RowId, name);
     }

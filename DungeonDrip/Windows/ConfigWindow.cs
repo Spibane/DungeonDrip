@@ -4,6 +4,7 @@ using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
+using DungeonDrip.Presentation;
 
 namespace DungeonDrip.Windows;
 
@@ -164,10 +165,10 @@ public class ConfigWindow : Window
     private static void TabHeading(string label, params string[] notes)
     {
         ImGui.Spacing();
-        ImGui.TextColored(Palette.Muted, label);
+        ImGui.TextColored(Palette.For(ColourRole.Muted), label);
 
         foreach (var note in notes)
-            ImGui.TextColored(Palette.Muted, note);
+            ImGui.TextColored(Palette.For(ColourRole.Muted), note);
 
         ImGui.Spacing();
     }
@@ -219,7 +220,7 @@ public class ConfigWindow : Window
         // The two locks are one idea with two switches, so they sit together under one line rather
         // than as two unrelated toggles in the run of filters above.
         ImGui.Spacing();
-        ImGui.TextColored(Palette.Muted, "Leave out gear this character can never wear:");
+        ImGui.TextColored(Palette.For(ColourRole.Muted), "Leave out gear this character can never wear:");
 
         var genderOnly = configuration.OnlyCurrentGenderEquippable;
         if (UiParts.Toggle("Locked to the other gender", ref genderOnly,
@@ -298,8 +299,8 @@ public class ConfigWindow : Window
         // store: nothing outside the Dresser and the Armoire can be worn as a glamour, so both of
         // these change the lists from "can I wear this" to "do I own one anywhere".
         ImGui.Spacing();
-        ImGui.TextColored(Palette.Muted, "Also count gear you are only holding, which cannot be");
-        ImGui.TextColored(Palette.Muted, "worn as a glamour until it goes in a box:");
+        ImGui.TextColored(Palette.For(ColourRole.Muted), "Also count gear you are only holding, which cannot be");
+        ImGui.TextColored(Palette.For(ColourRole.Muted), "worn as a glamour until it goes in a box:");
 
         var countInventory = configuration.CountInventoryAndEquipped;
         if (UiParts.Toggle("Bags, armoury chest, equipped gear and saddlebags", ref countInventory))
@@ -369,7 +370,7 @@ public class ConfigWindow : Window
 
         // Worth showing: a short alias is skipped when another plugin already owns it, and silently
         // missing commands would otherwise look like a bug here.
-        ImGui.TextColored(Palette.Muted, $"Commands: {string.Join("  ", plugin.Commands.Registered)}");
+        ImGui.TextColored(Palette.For(ColourRole.Muted), $"Commands: {string.Join("  ", plugin.Commands.Registered)}");
 
         ImGui.Spacing();
         return changed;
@@ -543,7 +544,7 @@ public class ConfigWindow : Window
 
         if (note != null)
         {
-            ImGui.TextColored(Palette.Muted, note);
+            ImGui.TextColored(Palette.For(ColourRole.Muted), note);
             ImGui.Spacing();
         }
 
@@ -637,7 +638,7 @@ public class ConfigWindow : Window
         {
             // The one thing here worth the space: a toggle that cannot work should not be offered
             // as though it can.
-            ImGui.TextColored(Palette.Warning, "Item tooltip marking is unavailable on this game version.");
+            ImGui.TextColored(Palette.For(ColourRole.Warning), "Item tooltip marking is unavailable on this game version.");
             ImGui.Spacing();
             return changed;
         }
@@ -668,8 +669,8 @@ public class ConfigWindow : Window
     {
         ImGui.Spacing();
         ImGui.Separator();
-        ImGui.TextColored(Palette.Muted, "What to list and what counts as owned are on the General tab,");
-        ImGui.TextColored(Palette.Muted, "and apply here too.");
+        ImGui.TextColored(Palette.For(ColourRole.Muted), "What to list and what counts as owned are on the General tab,");
+        ImGui.TextColored(Palette.For(ColourRole.Muted), "and apply here too.");
         ImGui.Spacing();
     }
 
@@ -696,11 +697,11 @@ public class ConfigWindow : Window
             ? $"{ownership.DresserSlotsUsed} of {ownership.DresserSlotCapacity} slots"
             : $"{ownership.DresserSlotsUsed} slots";
 
-        ImGui.TextColored(Palette.Muted, ownership.HasDresserData
+        ImGui.TextColored(Palette.For(ColourRole.Muted), ownership.HasDresserData
             ? $"Dresser: {slots}, read {ownership.DresserUpdatedUtc:yyyy-MM-dd HH:mm} UTC."
             : "Dresser: never read.");
 
-        ImGui.TextColored(Palette.Muted, ownership.ArmoireUpdatedUtc == null
+        ImGui.TextColored(Palette.For(ColourRole.Muted), ownership.ArmoireUpdatedUtc == null
             ? "Armoire: never read."
             : $"Armoire: read {ownership.ArmoireUpdatedUtc:yyyy-MM-dd HH:mm} UTC.");
 
@@ -735,7 +736,7 @@ public class ConfigWindow : Window
 
         var data = plugin.LootData.Data;
         if (data != null)
-            ImGui.TextColored(Palette.Muted, $"{data.DutyCount} duties, downloaded {data.FetchedUtc:yyyy-MM-dd HH:mm} UTC.");
+            ImGui.TextColored(Palette.For(ColourRole.Muted), $"{data.DutyCount} duties, downloaded {data.FetchedUtc:yyyy-MM-dd HH:mm} UTC.");
 
         ImGui.TextWrapped(
             "The list is downloaded from FFXIV Teamcraft's public data every time the plugin loads, " +
@@ -772,7 +773,7 @@ public class ConfigWindow : Window
         if (useWiki)
         {
             var wiki = plugin.Wiki;
-            ImGui.TextColored(Palette.Muted, wiki.TotalItems == 0
+            ImGui.TextColored(Palette.For(ColourRole.Muted), wiki.TotalItems == 0
                 ? "No wiki lookups cached yet."
                 : $"{wiki.TotalItems} items cached across {wiki.DutiesWithData} duties.");
 
@@ -787,11 +788,11 @@ public class ConfigWindow : Window
                           : ", none attributed to a boss") +
                       (entry.UnmatchedNames > 0 ? $", {entry.UnmatchedNames} names unrecognised" : string.Empty);
 
-                ImGui.TextColored(Palette.Muted, $"This duty: {detail}");
+                ImGui.TextColored(Palette.For(ColourRole.Muted), $"This duty: {detail}");
             }
             else if (wiki.IsBusy)
             {
-                ImGui.TextColored(Palette.Muted, "Looking this duty up...");
+                ImGui.TextColored(Palette.For(ColourRole.Muted), "Looking this duty up...");
             }
 
             if (ImGui.Button("Re-fetch this duty"))
@@ -889,7 +890,7 @@ public class ConfigWindow : Window
         }
 
         var learned = plugin.LearnedLoot;
-        ImGui.TextColored(Palette.Muted, learned.ItemCount == 0
+        ImGui.TextColored(Palette.For(ColourRole.Muted), learned.ItemCount == 0
             ? "Nothing learned yet."
             : $"{learned.ItemCount} pieces learned across {learned.TerritoryCount} duties.");
 
@@ -936,7 +937,7 @@ public class ConfigWindow : Window
         // Shown as text as well as a button: under Wine the shell handler usually cannot open a
         // folder, and on Linux this path is the easiest way to inspect the caches by hand.
         var configPath = Plugin.PluginInterface.GetPluginConfigDirectory();
-        ImGui.TextColored(Palette.Muted, configPath);
+        ImGui.TextColored(Palette.For(ColourRole.Muted), configPath);
 
         if (ImGui.Button("Open config folder"))
             OpenConfigFolder(configPath);
@@ -954,7 +955,7 @@ public class ConfigWindow : Window
 
         // Said plainly, because "reset everything" is exactly the phrase somebody reaches for when they
         // want their settings back to defaults, and this button does not do that.
-        ImGui.TextColored(Palette.Muted, "Your settings are not touched.");
+        ImGui.TextColored(Palette.For(ColourRole.Muted), "Your settings are not touched.");
 
         // "on the Data tab" rather than "above", now that they are not above. The wording matters more
         // than it looks: this button is destructive and the tooltip is where its scope is stated.
@@ -1006,12 +1007,12 @@ public class ConfigWindow : Window
         var retainers = plugin.Ownership.Retainers;
         if (retainers.Count == 0)
         {
-            ImGui.TextColored(Palette.Muted,
+            ImGui.TextColored(Palette.For(ColourRole.Muted),
                 "Retainers: none read - open one at a bell to include what it is holding.");
             return;
         }
 
-        ImGui.TextColored(Palette.Muted, retainers.Count == 1
+        ImGui.TextColored(Palette.For(ColourRole.Muted), retainers.Count == 1
             ? "Retainers: 1 read."
             : $"Retainers: {retainers.Count} read.");
 
@@ -1023,7 +1024,7 @@ public class ConfigWindow : Window
                 ? $", {retainer.Equipped.Count} worn"
                 : string.Empty;
 
-            ImGui.TextColored(Palette.Muted,
+            ImGui.TextColored(Palette.For(ColourRole.Muted),
                 $"    {retainer.Name}: {retainer.Items.Count} in bags{worn}, " +
                 $"read {Core.Format.Age(retainer.UpdatedUtc)} ago.");
 
@@ -1087,7 +1088,7 @@ public class ConfigWindow : Window
             return false;
         }
 
-        ImGui.TextColored(Palette.Warning, "Sure?");
+        ImGui.TextColored(Palette.For(ColourRole.Warning), "Sure?");
         ImGui.SameLine();
 
         var confirmed = small
