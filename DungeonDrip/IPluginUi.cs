@@ -25,3 +25,15 @@ internal interface IPluginUi : IDisposable
     /// <summary>Brings up the main window with the duty picker open and typed into.</summary>
     void OpenDutyPicker(string filter);
 }
+
+/// <summary>Which surfaces a backend has taken over.</summary>
+/// <remarks>
+/// Flags rather than a bool per surface, because the list only grows as the native port proceeds
+/// and every addition would otherwise be another constructor parameter to thread through.
+/// </remarks>
+[System.Flags]
+internal enum Surfaces
+{
+    None = 0,
+    VendorPanel = 1 << 0,
+}

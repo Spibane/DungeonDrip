@@ -336,6 +336,21 @@ public class Configuration : IPluginConfiguration
     public bool ShowGameContextMenu { get; set; } = true;
 
     /// <summary>
+    /// Draw the plugin's windows as the game's own windows rather than as plugin overlays.
+    /// </summary>
+    /// <remarks>
+    /// On by default, because it is what the plugin is for: every other surface it owns - the
+    /// right-click menus, the item tooltip line - already speaks in the game's voice, and the
+    /// windows were the exception.
+    ///
+    /// The settings window is not covered and never will be, so a mixed look is the destination
+    /// rather than a stage of getting there. Off falls back to the plugin overlays, and so does a
+    /// native surface that fails to start: see <c>NativeUi</c>, which would rather be the old look
+    /// for a session than be nothing.
+    /// </remarks>
+    public bool UseNativeUi { get; set; } = true;
+
+    /// <summary>
     /// Append a line to the game's own item tooltip saying where the piece is in the collection.
     /// </summary>
     /// <remarks>

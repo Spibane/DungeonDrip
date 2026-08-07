@@ -226,7 +226,9 @@ public sealed class Plugin : IDalamudPlugin
         // returning user has data before the first frame and a first-time user gets it shortly after.
         LootData = new LootDataService(configDirectory, LearnedLoot, Wiki, contentFinder, Storage, http);
 
-        ui = new ImGuiUi(this);
+        ui = Configuration.UseNativeUi
+            ? Native.NativeUi.Start(this)
+            : new ImGuiUi(this);
 
         currentTerritory = ClientState.TerritoryType;
 

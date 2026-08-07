@@ -18,7 +18,13 @@ internal sealed class ImGuiUi : IPluginUi
     private readonly MissingItemsWindow mainWindow;
     private readonly ConfigWindow configWindow;
 
-    public ImGuiUi(Plugin plugin)
+    /// <param name="without">
+    /// Surfaces another backend has taken over, which must not also be drawn here. Two panels
+    /// beside one shop is the failure mode this exists to prevent, and it is not hypothetical -
+    /// native mode is arriving one surface at a time, so for most of that time some of these are
+    /// native and the rest are not.
+    /// </param>
+    public ImGuiUi(Plugin plugin, Surfaces without = Surfaces.None)
     {
         this.plugin = plugin;
 
@@ -29,10 +35,12 @@ internal sealed class ImGuiUi : IPluginUi
 
         // Always open; each decides for itself whether the addon it rides on is up.
         windowSystem.AddWindow(new LootCompanionWindow(plugin) { IsOpen = true });
-        windowSystem.AddWindow(new VendorPanelWindow(plugin) { IsOpen = true });
         windowSystem.AddWindow(new DresserPanelWindow(plugin) { IsOpen = true });
         windowSystem.AddWindow(new ArmoirePanelWindow(plugin) { IsOpen = true });
         windowSystem.AddWindow(new MarketBoardPanelWindow(plugin) { IsOpen = true });
+
+        if (!without.HasFlag(Surfaces.VendorPanel))
+            windowSystem.AddWindow(new VendorPanelWindow(plugin) { IsOpen = true });
 
         Plugin.PluginInterface.UiBuilder.Draw += windowSystem.Draw;
     }
