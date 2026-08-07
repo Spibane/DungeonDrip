@@ -325,6 +325,7 @@ public sealed class CollectionView(Plugin plugin)
         }
 
         DrawOutfitsOnlyToggle();
+        DrawSnapshotCaveats();
 
         if (shopping.IsEmpty)
         {
@@ -360,6 +361,51 @@ public sealed class CollectionView(Plugin plugin)
         {
             plugin.Configuration.ReadyToBuyOutfitsOnly = outfitsOnly;
             plugin.Configuration.Save();
+        }
+    }
+
+    /// <summary>
+    /// Says when the collection behind this list cannot be trusted, before the list rather than after.
+    /// </summary>
+    /// <remarks>
+    /// <b>Every row here is a "not owned" claim, which is the half of a snapshot that goes wrong.</b> The
+    /// plugin says so elsewhere and ambers a red x rather than a grey tick for exactly this reason:
+    /// glamours are added far more often than removed, so an old snapshot's "owned" almost always still
+    /// holds while its "not owned" is what has drifted. This section is nothing but that claim, so it
+    /// carries the caveat above the list where the other sections carry theirs below.
+    ///
+    /// The Armoire line earns its place on a real report: a piece sitting in the Armoire was offered for
+    /// sale because the cached read predated it, with a timestamp recent enough to look trustworthy.
+    /// Opening the Armoire fixed it, which is what this line asks for.
+    /// </remarks>
+    private void DrawSnapshotCaveats()
+    {
+        var tracker = plugin.Ownership;
+
+        if (!tracker.HasDresserData)
+        {
+            ImGui.TextColored(Palette.Warning,
+                "No Glamour Dresser data yet - open one once, or everything here is listed as missing.");
+        }
+        else if (tracker.IsDresserStale)
+        {
+            ImGui.TextColored(Palette.Warning,
+                $"Dresser snapshot {Format.Age(tracker.DresserUpdatedUtc!.Value)} old - " +
+                "anything collected since is still listed.");
+        }
+
+        // Its own line rather than folded into the dresser's, because the Armoire is read on a different
+        // occasion and can be the stale one on its own.
+        if (tracker.ArmoireUpdatedUtc == null)
+        {
+            ImGui.TextColored(Palette.Warning,
+                "Armoire never read - anything stored there is still listed. Open it once.");
+        }
+        else if (plugin.Configuration.Scope != CollectionScope.DresserOnly)
+        {
+            ImGui.TextColored(Palette.Muted,
+                $"Armoire read {Format.Age(tracker.ArmoireUpdatedUtc.Value)} ago. " +
+                "Open it again if something here is already in it.");
         }
     }
 
