@@ -57,6 +57,12 @@ internal sealed class ImGuiUi : IPluginUi
         set => mainWindow.IsOpen = value;
     }
 
+    public bool ConfigOpen
+    {
+        get => configWindow.IsOpen;
+        set => configWindow.IsOpen = value;
+    }
+
     public void ToggleMain() => mainWindow.Toggle();
 
     public void ToggleConfig() => configWindow.Toggle();

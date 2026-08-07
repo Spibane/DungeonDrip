@@ -93,6 +93,12 @@ internal sealed class NativeUi : IPluginUi
         set => fallback.MainOpen = value;
     }
 
+    public bool ConfigOpen
+    {
+        get => fallback.ConfigOpen;
+        set => fallback.ConfigOpen = value;
+    }
+
     public void ToggleMain() => fallback.ToggleMain();
 
     public void ToggleConfig() => fallback.ToggleConfig();

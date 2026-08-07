@@ -22,6 +22,16 @@ internal interface IPluginUi : IDisposable
 
     void ToggleConfig();
 
+    /// <summary>
+    /// Whether the settings window is up.
+    /// </summary>
+    /// <remarks>
+    /// Here rather than left to <see cref="ToggleConfig"/> alone because the look can be switched
+    /// while it is open - and it is switched from inside it, so a backend swap that dropped this
+    /// would close the window the player was working in.
+    /// </remarks>
+    bool ConfigOpen { get; set; }
+
     /// <summary>Brings up the main window with the duty picker open and typed into.</summary>
     void OpenDutyPicker(string filter);
 }
