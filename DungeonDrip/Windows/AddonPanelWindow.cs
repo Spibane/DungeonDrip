@@ -312,24 +312,8 @@ public abstract unsafe class AddonPanelWindow : Window
     }
 
     /// <summary>How much to trust the list, said above it rather than instead of it.</summary>
-    private static void DrawSnapshotWarning(Game.OwnershipTracker ownership, bool stale)
-    {
-        if (!ownership.HasDresserData)
-        {
-            ImGui.TextColored(Palette.For(ColourRole.Warning), "No dresser data yet.");
-            ImGui.TextColored(Palette.For(ColourRole.Warning), "Open your Glamour Dresser.");
-            ImGui.Separator();
-            return;
-        }
-
-        if (!stale)
-            return;
-
-        var age = Format.Age(ownership.DresserUpdatedUtc!.Value);
-        ImGui.TextColored(Palette.For(ColourRole.Warning), $"Dresser last read {age} ago.");
-        ImGui.TextColored(Palette.For(ColourRole.Warning), "Open one to be sure.");
-        ImGui.Separator();
-    }
+    private void DrawSnapshotWarning(Game.OwnershipTracker ownership, bool stale) =>
+        ImGuiRenderer.Draw(Plugin, PanelPresenter.SnapshotWarning(ownership, stale));
 
     /// <summary>
     /// One row: the marker glyph, the icon, the name, its menu and its tooltip.
@@ -338,44 +322,8 @@ public abstract unsafe class AddonPanelWindow : Window
     /// Virtual because a panel whose rows are all the same marker by construction gets nothing from
     /// the glyph and would rather spend that column on something it does know.
     /// </remarks>
-    protected virtual void DrawRow(GearRow row, bool stale)
-    {
-        var uncertain = CollectionMarkers.IsUncertain(row.Marker, stale);
-
-        ImGui.AlignTextToFramePadding();
-
-        // Fixed width so the names line up regardless of which glyph each row carries.
-        using (Plugin.PluginInterface.UiBuilder.IconFontFixedWidthHandle.Push())
-        {
-            ImGui.TextColored(
-                Palette.For(MarkerGlyph.ColourFor(row.Marker, uncertain)),
-                Glyphs.For(MarkerGlyph.For(row.Marker)).ToIconString());
-        }
-
-        ImGui.SameLine();
-        UiParts.ItemIcon(row.IconId, 20);
-
-        ImGui.TextColored(Palette.For(MarkerGlyph.NameColourFor(row.Marker)), row.Name);
-
-        // Both bind to the last item drawn, so the hover flag has to be taken against the name
-        // before the menu goes on this row.
-        var hovered = ImGui.IsItemHovered();
-
-        UiParts.ItemContextMenu(Plugin, row.ItemId, row.Name);
-
-        if (!hovered)
-            return;
-
-        using var tooltip = ImRaii.Tooltip();
-        ImGui.Text(row.Name);
-        ImGui.Text(CollectionMarkers.Describe(row.Marker, row.OutfitsStored, row.OutfitsTotal));
-
-        if (uncertain && UncertainNote != null)
-            ImGui.TextColored(Palette.For(ColourRole.Warning), UncertainNote);
-
-        ImGui.Spacing();
-        ImGui.TextColored(Palette.For(ColourRole.Muted), "Right-click for options.");
-    }
+    protected virtual void DrawRow(GearRow row, bool stale) =>
+        ImGuiRenderer.Draw(Plugin, PanelPresenter.Row(row, stale, UncertainNote));
 
     /// <summary>
     /// Keeps a value between two bounds, with the floor winning if the ceiling is below it.
