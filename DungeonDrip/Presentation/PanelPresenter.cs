@@ -154,16 +154,20 @@ internal static class PanelPresenter
     /// filters have hidden some of the group, because a heading reading "(2)" over eight rows is
     /// only puzzling until it says what the two are.
     /// </remarks>
+    /// <param name="row">
+    /// How a single row is described, which is the one thing the two kinds of panel disagree about -
+    /// see <see cref="StorePanelPresenter.Row"/> for the other answer.
+    /// </param>
     public static IReadOnlyList<Node> List(
-        IReadOnlyList<SlotGroup> groups, bool stale, string? uncertainNote, string collapsePrefix)
+        IReadOnlyList<SlotGroup> groups, string collapsePrefix, Func<GearRow, Node> row)
     {
         var built = new List<Node>();
 
         foreach (var group in groups)
         {
             var rows = new List<Node>(group.Rows.Count);
-            foreach (var row in group.Rows)
-                rows.Add(Row(row, stale, uncertainNote));
+            foreach (var entry in group.Rows)
+                rows.Add(row(entry));
 
             if (group.Label.Length == 0)
             {
@@ -176,6 +180,19 @@ internal static class PanelPresenter
 
         return built;
     }
+
+    /// <summary>
+    /// What a panel says when its list comes out empty, which is two different things.
+    /// </summary>
+    /// <remarks>
+    /// A list emptied by the filters is the player's own doing and says so; a list that was empty to
+    /// begin with is news about the gear. Only the second can be good news, and only on the panels
+    /// where having nothing left to store is the point.
+    /// </remarks>
+    public static IReadOnlyList<Node> Empty(
+        bool filtered, string message, string filteredMessage, bool emptyIsGood) => filtered
+        ? [new TextNode(filteredMessage, ColourRole.Muted)]
+        : [new TextNode(message, emptyIsGood ? ColourRole.Good : ColourRole.Muted)];
 
     private static string Heading(SlotGroup group) => group.Hidden > 0
         ? $"{group.Label}  ({group.NotCollected} of {group.Rows.Count + group.Hidden})"

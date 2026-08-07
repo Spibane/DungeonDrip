@@ -111,8 +111,8 @@ public abstract unsafe class AddonPanelWindow : Window
     /// </remarks>
     protected abstract IReadOnlyList<GearRow>? ResolveRows();
 
-    /// <summary>Drawn above the toolbar, for anything the panel wants to say about itself.</summary>
-    protected virtual void DrawHeader() { }
+    /// <summary>Shown above the toolbar, for anything the panel wants to say about itself.</summary>
+    private protected virtual IReadOnlyList<Node> Header() => [];
 
     /// <summary>Extra buttons after the shared filters, described rather than drawn.</summary>
     private protected virtual IReadOnlyList<ToolButtonModel> ExtraToolButtons() => [];
@@ -198,11 +198,16 @@ public abstract unsafe class AddonPanelWindow : Window
         var display = ImGui.GetIO().DisplaySize;
         var scale = ImGuiHelpers.GlobalScale;
 
+        // Against the window rather than the rectangle the game reports for it - see
+        // <see cref="AddonFrame"/> on why those are not always the same thing.
+        var frame = AddonFrame.For(name);
+
         // Matching the addon's height keeps a long list on screen, and lines the two windows up.
         // A size the user dragged to wins.
         var desired = Settings is { Width: > 0, Height: > 0 }
             ? new Vector2(Settings.Width, Settings.Height)
-            : new Vector2(contentWidth, unit->GetScaledHeight(true));
+            : new Vector2(
+                contentWidth, unit->GetScaledHeight(true) - frame.Top - frame.Bottom);
 
         // Against the constraints as ImGui will enforce them, not as they were written: a floor the
         // window then overrides is a size asked for and not got, which reads as a drag below.
@@ -236,7 +241,13 @@ public abstract unsafe class AddonPanelWindow : Window
         }
 
         var placement = AddonPlacement.Of(unit);
-        Position = AddonAnchor.Beside(placement.Position, placement.Width, Settings.Side, desired, display);
+
+        Position = AddonAnchor.Beside(
+            placement.Position + new Vector2(frame.Left, frame.Top),
+            placement.Width - frame.Left - frame.Right,
+            Settings.Side,
+            desired,
+            display);
         PositionCondition = ImGuiCond.Always;
     }
 
@@ -257,7 +268,7 @@ public abstract unsafe class AddonPanelWindow : Window
         if (rows == null)
             return;
 
-        DrawHeader();
+        ImGuiRenderer.Draw(Plugin, Header());
 
         ImGuiRenderer.Toolbar(toolbarId, ToolButtons());
 
@@ -270,7 +281,7 @@ public abstract unsafe class AddonPanelWindow : Window
         // Unlike a loot roll, these are decisions that can be come back to, so this says how much to
         // trust itself and shows the list anyway rather than refusing.
         if (DependsOnDresserSnapshot)
-            DrawSnapshotWarning(ownership, stale);
+            ImGuiRenderer.Draw(Plugin, PanelPresenter.SnapshotWarning(ownership, stale));
 
         // The same filters the duty window uses, so each means one thing across the plugin.
         var options = new ViewOptions(
@@ -285,10 +296,9 @@ public abstract unsafe class AddonPanelWindow : Window
 
         if (groups.Count == 0)
         {
-            if (hiddenByFilter > 0)
-                ImGui.TextColored(Palette.For(ColourRole.Muted), FilteredEmptyMessage);
-            else
-                ImGui.TextColored(EmptyIsGood ? Palette.For(ColourRole.Good) : Palette.For(ColourRole.Muted), EmptyMessage);
+            ImGuiRenderer.Draw(
+                Plugin,
+                PanelPresenter.Empty(hiddenByFilter > 0, EmptyMessage, FilteredEmptyMessage, EmptyIsGood));
 
             return;
         }
@@ -298,13 +308,8 @@ public abstract unsafe class AddonPanelWindow : Window
         if (!list.Success)
             return;
 
-        foreach (var group in groups)
-            DrawGroup(group, options.GroupBySlot, stale);
+        ImGuiRenderer.Draw(Plugin, PanelPresenter.List(groups, collapsePrefix, row => Row(row, stale)), headers);
     }
-
-    /// <summary>How much to trust the list, said above it rather than instead of it.</summary>
-    private void DrawSnapshotWarning(Game.OwnershipTracker ownership, bool stale) =>
-        ImGuiRenderer.Draw(Plugin, PanelPresenter.SnapshotWarning(ownership, stale));
 
     /// <summary>
     /// One row: the marker glyph, the icon, the name, its menu and its tooltip.
@@ -313,8 +318,8 @@ public abstract unsafe class AddonPanelWindow : Window
     /// Virtual because a panel whose rows are all the same marker by construction gets nothing from
     /// the glyph and would rather spend that column on something it does know.
     /// </remarks>
-    protected virtual void DrawRow(GearRow row, bool stale) =>
-        ImGuiRenderer.Draw(Plugin, PanelPresenter.Row(row, stale, UncertainNote));
+    private protected virtual Node Row(GearRow row, bool stale) =>
+        PanelPresenter.Row(row, stale, UncertainNote);
 
     /// <summary>
     /// Keeps a value between two bounds, with the floor winning if the ceiling is below it.
@@ -427,31 +432,6 @@ public abstract unsafe class AddonPanelWindow : Window
         groupedFrom = fresh;
         groupedWith = options;
         hiddenByFilter = PanelGrouping.Regroup(fresh, options, groups);
-    }
-
-    private void DrawGroup(SlotGroup group, bool bySlot, bool stale)
-    {
-        if (!bySlot)
-        {
-            foreach (var row in group.Rows)
-                DrawRow(row, stale);
-
-            return;
-        }
-
-        var label = group.Hidden > 0
-            ? $"{group.Label}  ({group.NotCollected} of {group.Rows.Count + group.Hidden})"
-            : group.NotCollected > 0
-                ? $"{group.Label}  ({group.NotCollected})"
-                : group.Label;
-
-        if (!UiParts.CollapsingHeader(headers, label, collapsePrefix + group.Label))
-            return;
-
-        foreach (var row in group.Rows)
-            DrawRow(row, stale);
-
-        ImGui.Spacing();
     }
 
     /// <summary>

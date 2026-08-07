@@ -36,4 +36,15 @@ internal enum Surfaces
 {
     None = 0,
     VendorPanel = 1 << 0,
+    DresserPanel = 1 << 1,
+    ArmoirePanel = 1 << 2,
+    MarketBoardPanel = 1 << 3,
+
+    /// <summary>Every panel that rides beside a game window.</summary>
+    /// <remarks>
+    /// Named rather than spelled out at the call site, because these four go native together and
+    /// are the set a player judges as one - four game windows beside four game windows, rather than
+    /// a mix that looks like a mistake.
+    /// </remarks>
+    AddonPanels = VendorPanel | DresserPanel | ArmoirePanel | MarketBoardPanel,
 }

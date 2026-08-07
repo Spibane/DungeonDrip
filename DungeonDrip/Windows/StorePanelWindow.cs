@@ -1,7 +1,4 @@
 using System.Collections.Generic;
-using Dalamud.Bindings.ImGui;
-using Dalamud.Interface;
-using Dalamud.Interface.Utility.Raii;
 using DungeonDrip.Core;
 using DungeonDrip.Presentation;
 
@@ -36,7 +33,7 @@ public abstract class StorePanelWindow : AddonPanelWindow
     protected override bool EmptyIsGood => true;
 
     /// <summary>Anything this box wants to add to a row's tooltip.</summary>
-    protected virtual void DrawRowNotes(HeldGearRow row) { }
+    private protected virtual IReadOnlyList<Node> RowNotes(HeldGearRow row) => [];
 
     /// <summary>The two filters for gear that is already spoken for.</summary>
     private protected sealed override IReadOnlyList<ToolButtonModel> ExtraToolButtons() =>
@@ -47,49 +44,9 @@ public abstract class StorePanelWindow : AddonPanelWindow
     /// the same thing on all of them. The column goes to where the piece is instead, which is the part
     /// that changes what has to be done about it.
     /// </summary>
-    protected sealed override void DrawRow(GearRow row, bool stale)
+    private protected sealed override Node Row(GearRow row, bool stale)
     {
         var held = (HeldGearRow)row;
-
-        ImGui.AlignTextToFramePadding();
-
-        using (Plugin.PluginInterface.UiBuilder.IconFontFixedWidthHandle.Push())
-        {
-            ImGui.TextColored(
-                Palette.For(held.Blocked == null ? ColourRole.Muted : ColourRole.Warning),
-                Glyphs.For(MarkerGlyph.For(held.Location)).ToIconString());
-        }
-
-        ImGui.SameLine();
-        UiParts.ItemIcon(row.IconId, 20);
-
-        var quantity = held.Quantity > 1 ? $"  x{held.Quantity}" : string.Empty;
-        ImGui.Text($"{row.Name}{quantity}");
-
-        var hovered = ImGui.IsItemHovered();
-        UiParts.ItemContextMenu(Plugin, row.ItemId, row.Name);
-
-        if (!hovered)
-            return;
-
-        using var tooltip = ImRaii.Tooltip();
-        ImGui.Text(row.Name);
-        ImGui.TextColored(Palette.For(ColourRole.Muted), Describe(held.Location));
-
-        DrawRowNotes(held);
-
-        if (held.Blocked != null)
-            ImGui.TextColored(Palette.For(ColourRole.Warning), held.Blocked);
-
-        ImGui.Spacing();
-        ImGui.TextColored(Palette.For(ColourRole.Muted), "Right-click for options.");
+        return StorePanelPresenter.Row(held, RowNotes(held));
     }
-
-    private static string Describe(CarryLocation location) => location switch
-    {
-        CarryLocation.Bags => "In your bags",
-        CarryLocation.Armoury => "In your armoury chest",
-        CarryLocation.Equipped => "Equipped",
-        _ => "In your saddlebag",
-    };
 }

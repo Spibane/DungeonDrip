@@ -20,4 +20,15 @@ internal static class PanelText
     /// this prevents costs actual gil.
     /// </remarks>
     public const string VendorUncertain = "Your dresser snapshot predates this - check before buying.";
+
+    /// <summary>
+    /// What a stale snapshot means at a market board.
+    /// </summary>
+    /// <remarks>
+    /// The same sentence as the vendor's, and named separately because the two mean it for different
+    /// reasons and either could come to want its own wording. Staleness bites hardest here of
+    /// anywhere: a board is reached by travelling to one, and zoning is exactly what wipes the
+    /// dresser data, so this is almost always the oldest snapshot the plugin ever draws from.
+    /// </remarks>
+    public const string MarketUncertain = VendorUncertain;
 }

@@ -35,12 +35,18 @@ internal sealed class ImGuiUi : IPluginUi
 
         // Always open; each decides for itself whether the addon it rides on is up.
         windowSystem.AddWindow(new LootCompanionWindow(plugin) { IsOpen = true });
-        windowSystem.AddWindow(new DresserPanelWindow(plugin) { IsOpen = true });
-        windowSystem.AddWindow(new ArmoirePanelWindow(plugin) { IsOpen = true });
-        windowSystem.AddWindow(new MarketBoardPanelWindow(plugin) { IsOpen = true });
 
         if (!without.HasFlag(Surfaces.VendorPanel))
             windowSystem.AddWindow(new VendorPanelWindow(plugin) { IsOpen = true });
+
+        if (!without.HasFlag(Surfaces.DresserPanel))
+            windowSystem.AddWindow(new DresserPanelWindow(plugin) { IsOpen = true });
+
+        if (!without.HasFlag(Surfaces.ArmoirePanel))
+            windowSystem.AddWindow(new ArmoirePanelWindow(plugin) { IsOpen = true });
+
+        if (!without.HasFlag(Surfaces.MarketBoardPanel))
+            windowSystem.AddWindow(new MarketBoardPanelWindow(plugin) { IsOpen = true });
 
         Plugin.PluginInterface.UiBuilder.Draw += windowSystem.Draw;
     }

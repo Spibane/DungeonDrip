@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using DungeonDrip.Windows;
 using KamiToolKit;
 
@@ -19,7 +20,9 @@ namespace DungeonDrip.Native;
 internal sealed class NativeUi : IPluginUi
 {
     private readonly ImGuiUi fallback;
-    private readonly VendorPanelAddon? vendorPanel;
+
+    /// <summary>The panels drawn as game windows, or empty after a failed start.</summary>
+    private readonly IReadOnlyList<NativePanelAddon> panels;
 
     /// <summary>One per plugin, because it holds a draw callback and every panel's icons go through it.</summary>
     private readonly GlyphTextures? glyphs;
@@ -29,15 +32,14 @@ internal sealed class NativeUi : IPluginUi
     /// False after a failed start, when this is an <see cref="ImGuiUi"/> in all but name. Worth
     /// asking before telling anyone the game look is on.
     /// </remarks>
-    public bool Active => vendorPanel != null;
+    public bool Active => panels.Count > 0;
 
-    private NativeUi(Plugin plugin, GlyphTextures? glyphs, VendorPanelAddon? vendorPanel)
+    private NativeUi(Plugin plugin, GlyphTextures? glyphs, IReadOnlyList<NativePanelAddon> panels)
     {
         this.glyphs = glyphs;
-        this.vendorPanel = vendorPanel;
+        this.panels = panels;
 
-        fallback = new ImGuiUi(
-            plugin, vendorPanel != null ? Surfaces.VendorPanel : Surfaces.None);
+        fallback = new ImGuiUi(plugin, panels.Count > 0 ? Surfaces.AddonPanels : Surfaces.None);
     }
 
     /// <summary>
@@ -60,7 +62,15 @@ internal sealed class NativeUi : IPluginUi
 
             glyphs = new GlyphTextures();
 
-            return new NativeUi(plugin, glyphs, new VendorPanelAddon(plugin, glyphs));
+            // All four together. They are the set a player judges as one, and a shop drawn as a
+            // game window beside a dresser drawn as an overlay reads as something being broken
+            // rather than as a port in progress.
+            return new NativeUi(plugin, glyphs, [
+                new VendorPanelAddon(plugin, glyphs),
+                new DresserPanelAddon(plugin, glyphs),
+                new ArmoirePanelAddon(plugin, glyphs),
+                new MarketPanelAddon(plugin, glyphs),
+            ]);
         }
         catch (System.Exception exception)
         {
@@ -99,7 +109,9 @@ internal sealed class NativeUi : IPluginUi
     /// </remarks>
     public void Dispose()
     {
-        vendorPanel?.Dispose();
+        foreach (var panel in panels)
+            panel.Dispose();
+
         glyphs?.Dispose();
         fallback.Dispose();
         TryCleanup();
