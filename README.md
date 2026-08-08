@@ -29,6 +29,10 @@ Its answers also reach the game's own right-click menus, and the window has a se
 collection as a whole — which outfit sets are closest to finished, how full the dresser is, and which
 carried pieces a box already has.
 
+All of that draws as ordinary plugin windows by default, and can instead be drawn as the game's own —
+following the UI theme, scaling with the UI scale, and hiding with the rest of the interface. See
+[Drawn as game windows](#drawn-as-game-windows).
+
 ## Installing
 
 Not yet in the official Dalamud plugin list. In the meantime it is available from a
@@ -450,10 +454,11 @@ rather than a plugin with no windows at all.
 ## Settings
 
 Settings are split by what they affect. **General** holds the rules every gear list obeys — the duty
-window, the loot-roll companion and the vendor panel alike. **Duties** and **Vendors** hold only
-what is specific to that surface. **Data** covers where the plugin's answers come from, and **Files**
-holds the config folder and the one button that empties every cache — neither of those is a setting,
-which is why they sit apart from the rest.
+window, the loot-roll companion and the panels alike. **Duties** and **Panels** hold only what is
+specific to those surfaces. **In-game UI** covers what the plugin adds to the game's own windows,
+and which of its own it draws as game windows. **Data** covers where the plugin's answers come from,
+and **Files** holds the config folder and the one button that empties every cache — neither of those
+is a setting, which is why they sit apart from the rest.
 
 Each tab scrolls on its own if it does not fit, and the window is held inside the screen rather than
 growing past it — the Data tab lists one row per retainer read, so its height is not something the
@@ -681,7 +686,18 @@ Each has a reset in Settings; see [starting again](#starting-again).
 
 ## Building
 
-Needs the .NET 10 SDK (10.0.101 or newer) and the Dalamud dev assemblies, which the SDK finds from a
+Clone with submodules — the game windows are drawn by
+[KamiToolKit](https://github.com/MidoriKami/KamiToolKit), which publishes no package and is
+vendored under `external/` and pinned by commit:
+
+```bash
+git clone --recurse-submodules https://github.com/Spibane/DungeonDrip.git
+```
+
+An existing clone catches up with `git submodule update --init --recursive`. Without it the build
+fails on a missing project reference rather than on anything that names the cause.
+
+Then the .NET 10 SDK (10.0.101 or newer) and the Dalamud dev assemblies, which the SDK finds from a
 local XIVLauncher install:
 
 | Host | Path |
@@ -927,6 +943,9 @@ game install is needed, and uploads the packaged plugin.
 ## Licence
 
 [GNU AGPL v3.0 or later](./LICENSE).
+
+The distributed plugin also contains KamiToolKit, under the MIT licence. Its notice is in
+[THIRD-PARTY-NOTICES.md](./THIRD-PARTY-NOTICES.md).
 
 ## AI use
 
