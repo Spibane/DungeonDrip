@@ -48,7 +48,29 @@ internal sealed record RuleNode : Node;
 /// a list of nodes. This is the other kind: one button in the middle of a surface, saying the one
 /// thing that surface can offer to do about what it is reporting.
 /// </remarks>
-internal sealed record ButtonNode(string Label, System.Action Press) : Node;
+/// <param name="Small">
+/// Whether it is the smaller button a list uses to reveal the rest of itself, rather than the
+/// ordinary one a surface offers an action on. The distinction is real: a full-height button in the
+/// middle of a list reads as a section break.
+/// </param>
+internal sealed record ButtonNode(string Label, System.Action Press, bool Small = false) : Node;
+
+/// <summary>A checkbox that reads and writes a setting where the setting is being felt.</summary>
+/// <remarks>
+/// Distinct from a toolbar button, which shows the state it is in and is pressed to move: this says
+/// what it is called and is ticked. Both exist because a filter above a list wants an icon and a
+/// named option inside a list wants a name.
+/// </remarks>
+internal sealed record ToggleNode(
+    string Label, bool Value, System.Action<bool> Set, string? Tooltip = null) : Node;
+
+/// <summary>How full something is, as a bar rather than as a sentence.</summary>
+/// <remarks>
+/// Alongside the sentence rather than instead of it. The number is the answer; the bar is what makes
+/// "nearly full" visible without reading it, and neither look draws a bar with words on it - the
+/// line above already says them.
+/// </remarks>
+internal sealed record ProgressNode(float Fraction) : Node;
 
 /// <summary>A table of columns sized by weight. See <see cref="RouletteTableModel"/>.</summary>
 /// <remarks>
@@ -75,10 +97,16 @@ internal readonly record struct ItemContext(uint ItemId, string Name);
 /// native row hangs a collision node over the whole line. Naming the row as the target lets each do
 /// it its own way.
 /// </remarks>
+/// <param name="Trailing">
+/// A fact appended after the row, outside what the row answers for. It sits after the name and does
+/// not take the hover or the right-click menu with it: those belong to the piece, and a price or a
+/// second location is a note about the piece rather than a second thing to act on.
+/// </param>
 internal sealed record RowNode(
     IReadOnlyList<Node> Parts,
     IReadOnlyList<Node>? Tooltip = null,
-    ItemContext? Context = null) : Node;
+    ItemContext? Context = null,
+    TextNode? Trailing = null) : Node;
 
 /// <summary>
 /// A heading with rows folded under it, remembering whether it is open.
@@ -95,4 +123,30 @@ internal sealed record RowNode(
 internal sealed record CollapsibleNode(
     string Key,
     string Label,
-    IReadOnlyList<Node> Children) : Node;
+    IReadOnlyList<Node> Children,
+    bool DefaultOpen = true,
+    ColourRole? Colour = null) : Node;
+
+/// <summary>
+/// A row that opens to reveal more, without the framed bar a section heading carries.
+/// </summary>
+/// <remarks>
+/// Not the same thing as a <see cref="CollapsibleNode"/>, and the difference is what each is for. A
+/// heading divides a surface into sections; this is one entry in a list that happens to have more
+/// inside it - an outfit set and the pieces it still wants, a count and the pieces it counted. Drawn
+/// as a heading, a list of thirty of them reads as thirty sections.
+/// </remarks>
+/// <param name="Trailing">A fact on the header line, after the label. See <see cref="RowNode"/>.</param>
+/// <param name="Note">
+/// A line under the header, shown whether or not it is open. What it says is usually the caveat that
+/// makes the count above it mean something, which is worth as much to somebody who has decided not
+/// to open it.
+/// </param>
+internal sealed record TreeNode(
+    string Key,
+    string Label,
+    IReadOnlyList<Node> Children,
+    ushort IconId = 0,
+    TextNode? Trailing = null,
+    TextNode? Note = null,
+    bool DefaultOpen = false) : Node;

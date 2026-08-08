@@ -1,5 +1,7 @@
 using System.Collections.Generic;
+using System.Numerics;
 using Dalamud.Bindings.ImGui;
+using Dalamud.Interface.Utility;
 using Dalamud.Interface;
 using Dalamud.Interface.Utility.Raii;
 using DungeonDrip.Presentation;
@@ -62,12 +64,18 @@ internal static class ImGuiRenderer
                 break;
 
             case CollapsibleNode group:
-                if (UiParts.CollapsingHeader(headers, group.Label, group.Key))
+                if (UiParts.CollapsingHeader(
+                        headers, group.Label, group.Key,
+                        colour: group.Colour, defaultOpen: group.DefaultOpen))
                 {
                     Draw(plugin, group.Children, headers);
                     ImGui.Spacing();
                 }
 
+                break;
+
+            case TreeNode tree:
+                DrawTree(plugin, tree, headers);
                 break;
 
             case RowNode row:
@@ -79,8 +87,31 @@ internal static class ImGuiRenderer
                 break;
 
             case ButtonNode button:
-                if (ImGui.Button(button.Label))
+            {
+                var pressed = button.Small
+                    ? ImGui.SmallButton(button.Label)
+                    : ImGui.Button(button.Label);
+
+                if (pressed)
                     button.Press();
+
+                break;
+            }
+
+            case ToggleNode toggle:
+            {
+                var value = toggle.Value;
+                if (UiParts.Toggle(toggle.Label, ref value, toggle.Tooltip))
+                    toggle.Set(value);
+
+                break;
+            }
+
+            case ProgressNode progress:
+                ImGui.ProgressBar(
+                    progress.Fraction,
+                    new Vector2(-1, 6 * ImGuiHelpers.GlobalScale),
+                    string.Empty);
 
                 break;
 
@@ -96,6 +127,45 @@ internal static class ImGuiRenderer
                 DrawPart(node);
                 break;
         }
+    }
+
+    /// <summary>
+    /// A tree row, which is a heading everywhere except in how it looks.
+    /// </summary>
+    /// <remarks>
+    /// The note is drawn whether or not the tree is open, indented either way. It is usually the
+    /// sentence that makes the count on the header mean something, which is worth as much to
+    /// somebody who has decided not to open it as to somebody who has.
+    /// </remarks>
+    private static void DrawTree(Plugin plugin, TreeNode tree, HeaderState? headers)
+    {
+        if (tree.IconId != 0)
+            UiParts.ItemIcon(tree.IconId, 20);
+
+        var flags = ImGuiTreeNodeFlags.SpanAvailWidth |
+                    (tree.DefaultOpen ? ImGuiTreeNodeFlags.DefaultOpen : ImGuiTreeNodeFlags.None);
+
+        var open = ImGui.TreeNodeEx($"{tree.Label}###{tree.Key}", flags);
+
+        if (tree.Trailing != null)
+        {
+            ImGui.SameLine();
+            ImGui.TextColored(Palette.For(tree.Trailing.Colour), tree.Trailing.Text);
+        }
+
+        if (!open)
+        {
+            if (tree.Note != null)
+                ImGui.TextColored(Palette.For(tree.Note.Colour), $"   {tree.Note.Text}");
+
+            return;
+        }
+
+        if (tree.Note != null)
+            ImGui.TextColored(Palette.For(tree.Note.Colour), tree.Note.Text);
+
+        Draw(plugin, tree.Children, headers);
+        ImGui.TreePop();
     }
 
     /// <summary>
@@ -171,6 +241,13 @@ internal static class ImGuiRenderer
 
         if (row.Context is { } context)
             UiParts.ItemContextMenu(plugin, context.ItemId, context.Name);
+
+        // After both, so a note about the piece does not take the hover or the menu off the piece.
+        if (row.Trailing != null)
+        {
+            ImGui.SameLine();
+            ImGui.TextColored(Palette.For(row.Trailing.Colour), row.Trailing.Text);
+        }
 
         if (!hovered || row.Tooltip == null)
             return;
