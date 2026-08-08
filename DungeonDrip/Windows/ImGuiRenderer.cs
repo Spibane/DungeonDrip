@@ -34,6 +34,10 @@ internal static class ImGuiRenderer
 
             var button = buttons[index];
 
+            // Greyed rather than skipped, and the tooltip still reads: a disabled button here is
+            // one showing a state worth seeing named, so hiding it would take the state with it.
+            using var disabled = ImRaii.Disabled(!button.Enabled);
+
             if (UiParts.ToolButton($"##{id}{index}", ToolGlyphs.For(button.Icon), button.Tooltip))
                 button.Press();
         }
@@ -74,6 +78,16 @@ internal static class ImGuiRenderer
                 ImGui.Separator();
                 break;
 
+            case ButtonNode button:
+                if (ImGui.Button(button.Label))
+                    button.Press();
+
+                break;
+
+            case TableNode table:
+                DrawTable(plugin, table.Model);
+                break;
+
             case SpacingNode:
                 ImGui.Spacing();
                 break;
@@ -81,6 +95,55 @@ internal static class ImGuiRenderer
             default:
                 DrawPart(node);
                 break;
+        }
+    }
+
+    /// <summary>
+    /// The roulette advice, through ImGui's own table.
+    /// </summary>
+    /// <remarks>
+    /// Stretch-proportional, so the weights in the model are what ImGui divides the width by rather
+    /// than something worked out here. The row's first cell is a selectable spanning every column,
+    /// which is what makes the tooltip reachable from anywhere along the row instead of only from
+    /// the name - and it is why the hover flag is taken there and used at the end.
+    /// </remarks>
+    private static void DrawTable(Plugin plugin, RouletteTableModel model)
+    {
+        using var table = ImRaii.Table(
+            "roulettes", model.Headings.Count,
+            ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingStretchProp);
+
+        if (!table.Success)
+            return;
+
+        for (var column = 0; column < model.Headings.Count; column++)
+        {
+            ImGui.TableSetupColumn(
+                model.Headings[column], ImGuiTableColumnFlags.WidthStretch, model.Weights[column]);
+        }
+
+        ImGui.TableHeadersRow();
+
+        foreach (var row in model.Rows)
+        {
+            ImGui.TableNextRow();
+            ImGui.TableNextColumn();
+
+            var first = row.Cells[0];
+            ImGui.Selectable($"{first.Text}##roulette{first.Text}", false, ImGuiSelectableFlags.SpanAllColumns);
+            var hovered = ImGui.IsItemHovered();
+
+            for (var cell = 1; cell < row.Cells.Count; cell++)
+            {
+                ImGui.TableNextColumn();
+                ImGui.TextColored(Palette.For(row.Cells[cell].Colour), row.Cells[cell].Text);
+            }
+
+            if (!hovered)
+                continue;
+
+            using var tooltip = ImRaii.Tooltip();
+            Draw(plugin, row.Tooltip);
         }
     }
 
@@ -126,6 +189,13 @@ internal static class ImGuiRenderer
     {
         switch (node)
         {
+            case TextNode { Wrap: true } wrapped:
+            {
+                using var colour = ImRaii.PushColor(ImGuiCol.Text, Palette.For(wrapped.Colour));
+                ImGui.TextWrapped(wrapped.Text);
+                return false;
+            }
+
             case TextNode text:
                 ImGui.TextColored(Palette.For(text.Colour), text.Text);
                 return false;

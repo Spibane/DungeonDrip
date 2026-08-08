@@ -162,7 +162,7 @@ internal static class UiParts
             .Encode();
 
         var draw = new SeStringDrawParams();
-        ImGuiHelpers.SeStringWrapped(text, ref draw);
+        ImGuiHelpers.SeStringWrapped(text, in draw);
 
         ImGui.SameLine();
         ImGui.AlignTextToFramePadding();

@@ -14,4 +14,10 @@ namespace DungeonDrip.Presentation;
 /// the configuration. The presenter that built the button is the thing that knows what pressing it
 /// has to invalidate, and this is how it says so once.
 /// </remarks>
-internal sealed record ToolButtonModel(ToolGlyph Icon, string Tooltip, Action Press);
+/// <param name="Enabled">
+/// False for a button that is showing a state it cannot move from. Greyed rather than hidden, and
+/// only where the button's absence would be read as the feature being missing - the duty view's pin
+/// is the one case, since "following wherever you are" is a state worth seeing named.
+/// </param>
+internal sealed record ToolButtonModel(
+    ToolGlyph Icon, string Tooltip, Action Press, bool Enabled = true);

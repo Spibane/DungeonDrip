@@ -36,6 +36,24 @@ internal static class ToolGlyphs
         ToolGlyph.EquippedListed => FontAwesomeIcon.Tshirt,
         ToolGlyph.EquippedHidden => FontAwesomeIcon.UserSlash,
 
+        ToolGlyph.ShowingCollection => FontAwesomeIcon.BoxOpen,
+        ToolGlyph.ShowingDuty => FontAwesomeIcon.Dungeon,
+
+        ToolGlyph.PickerOpen => FontAwesomeIcon.SearchMinus,
+        ToolGlyph.PickerShut => FontAwesomeIcon.Search,
+
+        // The pin's three states are one button, and only two of them are pinned. The dice say where
+        // letting go lands rather than what letting go does, which is the useful half.
+        ToolGlyph.HoldingDuty => FontAwesomeIcon.Thumbtack,
+        ToolGlyph.HoldingDutyOverRoulettes => FontAwesomeIcon.Dice,
+        ToolGlyph.FollowingPlayer => FontAwesomeIcon.ThumbtackSlash,
+
+        ToolGlyph.GroupedBySlot => FontAwesomeIcon.Vest,
+        ToolGlyph.GroupedByRole => FontAwesomeIcon.PeopleGroup,
+        ToolGlyph.GroupedBySource => FontAwesomeIcon.Skull,
+
+        ToolGlyph.Settings => FontAwesomeIcon.Cog,
+
         ToolGlyph.SizeOverridden => FontAwesomeIcon.ArrowsAltV,
 
         _ => FontAwesomeIcon.Question,

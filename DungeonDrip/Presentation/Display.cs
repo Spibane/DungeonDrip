@@ -15,7 +15,13 @@ namespace DungeonDrip.Presentation;
 internal abstract record Node;
 
 /// <summary>A run of text, in whatever colour the role resolves to.</summary>
-internal sealed record TextNode(string Text, ColourRole Colour = ColourRole.Default) : Node;
+/// <param name="Wrap">
+/// Whether the line may be broken to fit the width it is given. Off by default, because almost
+/// every line the plugin writes is short and a row of a list must never reflow - only the few
+/// paragraphs that explain something want it, and those are explaining rather than listing.
+/// </param>
+internal sealed record TextNode(
+    string Text, ColourRole Colour = ColourRole.Default, bool Wrap = false) : Node;
 
 /// <summary>The small mark at the head of a row. See <see cref="GlyphToken"/>.</summary>
 internal sealed record GlyphNode(GlyphToken Token, ColourRole Colour) : Node;
@@ -35,6 +41,22 @@ internal sealed record IconNode(ushort IconId, float Size) : Node;
 
 /// <summary>A dividing rule.</summary>
 internal sealed record RuleNode : Node;
+
+/// <summary>A pressable button with words on it, for the few places an icon cannot say enough.</summary>
+/// <remarks>
+/// Distinct from <see cref="ToolButtonModel"/>, which is a toolbar's business and never appears in
+/// a list of nodes. This is the other kind: one button in the middle of a surface, saying the one
+/// thing that surface can offer to do about what it is reporting.
+/// </remarks>
+internal sealed record ButtonNode(string Label, System.Action Press) : Node;
+
+/// <summary>A table of columns sized by weight. See <see cref="RouletteTableModel"/>.</summary>
+/// <remarks>
+/// A node kind rather than something a surface hangs beside its list, unlike a toolbar, because it
+/// genuinely belongs in the stream: the roulette advice is what the duty view shows in place of a
+/// list, not alongside one.
+/// </remarks>
+internal sealed record TableNode(RouletteTableModel Model) : Node;
 
 /// <summary>A gap, where one is doing work that a rule would overstate.</summary>
 internal sealed record SpacingNode : Node;

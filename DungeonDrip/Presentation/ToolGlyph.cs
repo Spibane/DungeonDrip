@@ -43,6 +43,39 @@ internal enum ToolGlyph
     /// <summary>Worn gear is left out.</summary>
     EquippedHidden,
 
+    /// <summary>The duty view is showing the collection rather than a duty's loot.</summary>
+    ShowingCollection,
+
+    /// <summary>The duty view is showing a duty's loot rather than the collection.</summary>
+    ShowingDuty,
+
+    /// <summary>The duty picker is open.</summary>
+    PickerOpen,
+
+    /// <summary>The duty picker is shut.</summary>
+    PickerShut,
+
+    /// <summary>Held on a duty that was looked up; letting go returns to following the player.</summary>
+    HoldingDuty,
+
+    /// <summary>Held on a duty; letting go returns to the roulette advice, there being no duty here.</summary>
+    HoldingDutyOverRoulettes,
+
+    /// <summary>Following wherever the player is, which is the state with nothing to let go of.</summary>
+    FollowingPlayer,
+
+    /// <summary>The list is grouped by equipment slot.</summary>
+    GroupedBySlot,
+
+    /// <summary>The list is grouped by who can roll Need.</summary>
+    GroupedByRole,
+
+    /// <summary>The list is grouped by the boss or coffer a piece comes from.</summary>
+    GroupedBySource,
+
+    /// <summary>Opens the settings window.</summary>
+    Settings,
+
     /// <summary>
     /// The panel is at a size the player dragged it to rather than the game window's.
     /// </summary>
