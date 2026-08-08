@@ -382,9 +382,9 @@ so — nothing else is affected.
 ## Drawn as game windows
 
 Everything above describes the plugin as Dalamud draws it — overlay windows in Dalamud's own style,
-which is how the plugin has always looked and how it looks by default. The panels and the loot
-companion can instead be drawn as the game's own windows, under **Settings → In-game UI → Draw the
-panels as game windows**. The switch takes effect immediately; nothing needs reloading.
+which is how the plugin has always looked and how it looks by default. Almost all of it can instead
+be drawn as the game's own windows, under **Settings → In-game UI → Draw the panels as game
+windows**. The switch takes effect immediately; nothing needs reloading.
 
 What that buys is the things an imitation cannot do. A game window follows whichever UI theme is
 chosen in Character Configuration — Dark, Light, Classic and Clear Blue all work — and takes its
@@ -393,12 +393,16 @@ than being told to. It scales with the game's UI scale, and each window can be s
 the right-click menu on its header. Its frame, header and scroll bar are the game's, because they
 are the game's.
 
-**Five surfaces move; three do not.** The four panels that ride beside a game window — vendor, market
-board, Glamour Dresser, Armoire — and the companion beside the Need/Greed roll are drawn as game
-windows. The duty window, the Collection view and this plugin's Settings window stay as Dalamud
-windows. Settings is staying that way permanently: it is by far the largest surface, it is opened
-rarely and never during play, and the widgets it leans on are the ones a game window is worst at. So
-a mixed look is the destination rather than a stage on the way to something.
+The main window is the only one of them the player opens rather than one that appears beside
+something, so it is the only one with a close button and a remembered position. It survives zoning
+and opens itself on entering a duty exactly as the Dalamud one does.
+
+**Everything moves except Settings.** The four panels that ride beside a game window — vendor, market
+board, Glamour Dresser, Armoire — the companion beside the Need/Greed roll, and the main window with
+both of its views are drawn as game windows. Settings stays a Dalamud window permanently: it is by
+far the largest surface, it is opened rarely and never during play, and the widgets it leans on are
+the ones a game window is worst at. So a mixed look is the destination rather than a stage on the
+way to something.
 
 Both looks list the same things in the same order, with the same markers, the same wording and the
 same right-click menus. The marker table under [At vendors](#at-vendors) is true of either.
@@ -411,13 +415,16 @@ same right-click menus. The marker table under [At vendors](#at-vendors) is true
 | Reset to the game window's size | a button appears while a dragged size is in use | absent, because there is never a dragged size to undo |
 | Getting one out of the way | fold it to its title bar | switch that panel off in **Settings → Panels** |
 | Long item names | the panel widens to fit the longest | cut with an ellipsis; the full name is on the row's tooltip |
-| Group headings on the Light and Classic themes | readable | dark text on a dark bar — see below |
+| The duty search | every match, in a list that scrolls | the first twelve, with a line saying how many more |
+| Outfit sets and the Armoire's lists | an arrow you open | the same framed bar a section heading uses |
+| Group headings on a light theme | readable | dark text on a dark bar — see below |
 
-**Group headings are hard to read on the two light themes, and that is a standing limit rather than a
-bug to be fixed here.** A collapsing header's bar is a dark texture under every theme, so its label
-wants to be pale in all four — but the library that draws it colours the label from the themed body
-text colour, which goes dark brown on the light themes. The label sits on a node the library keeps
-private, so it cannot be corrected from this side; the fix is a one-line change upstream. Carrying it
+**Group headings are hard to read on a light theme, and that is a standing limit rather than a bug to
+be fixed here.** A collapsing header's bar is a dark texture under every theme, so its label wants to
+be pale in all four — but the library that draws it colours the label from the themed body text
+colour, which goes dark brown wherever the theme writes dark text. The label sits on a node the
+library keeps private, so it cannot be corrected from this side; the fix is a one-line change
+upstream. Carrying it
 as a local patch was tried and rejected, because pinning to a commit no other clone can fetch trades
 a colour for every build but one.
 
@@ -912,6 +919,9 @@ game install is needed, and uploads the packaged plugin.
 - The Settings window as a game window. It is the largest surface the plugin has, it is opened rarely
   and never during play, and the widgets it leans on are the ones a game window is worst at — so it
   stays a Dalamud window, and a mixed look is the destination rather than a stage.
+- A duty search that lists every match as a game window. It offers the first twelve and says how many
+  more there are, because a search nobody has narrowed matches every duty in the game — and the
+  alternative, a list that scrolls inside a window that already scrolls, was worse than the cap.
 - Nothing else currently planned.
 
 ## Licence
