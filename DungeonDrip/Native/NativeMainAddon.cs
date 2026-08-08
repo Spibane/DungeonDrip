@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using Dalamud.Game.ClientState.Conditions;
 using DungeonDrip.Core;
 using DungeonDrip.Presentation;
 using FFXIVClientStructs.FFXIV.Component.GUI;
@@ -27,6 +28,15 @@ namespace DungeonDrip.Native;
 internal sealed unsafe class NativeMainAddon : IDisposable
 {
     private static readonly Vector2 InitialSize = new(560f, 640f);
+
+    /// <summary>
+    /// How long after a zone a hide is still taken to be the game's rather than the player's.
+    /// </summary>
+    /// <remarks>
+    /// Generous, because being a second too forgiving costs a close button that has to be pressed
+    /// again, and being a second too strict costs a window that vanishes on every duty entered.
+    /// </remarks>
+    private const long ZoningGraceMs = 6000;
 
     /// <summary>
     /// How many duties the picker offers before it asks for a narrower search.
@@ -65,6 +75,20 @@ internal sealed unsafe class NativeMainAddon : IDisposable
 
     private VerticalListNode? builtInto;
 
+    /// <summary>Until when a hide is the game's doing rather than the player's, in ticks.</summary>
+    /// <remarks>
+    /// Zoning takes every addon down, this one included, and it arrives as the same hide the close
+    /// button sends - there is nothing in the signal to say which happened. Left alone, a zone shut
+    /// the window, and the automatic open that follows entering a duty was then cancelled by the
+    /// tail of the loading screen it was reacting to.
+    ///
+    /// <b>Held from the loading screen itself rather than from the zone change.</b> Starting it when
+    /// the territory changed was the first cut and is too late: the client reports the new territory
+    /// near the end of a load and takes its windows down at the start of one, so the hide that
+    /// mattered had already been and gone.
+    /// </remarks>
+    private long settledAt;
+
     /// <summary>Whether the body needs re-stacking on the next tick, without being rebuilt.</summary>
     /// <remarks>
     /// Folding a heading changes its height and nothing above it, so the answer is to re-stack what
@@ -90,6 +114,7 @@ internal sealed unsafe class NativeMainAddon : IDisposable
         {
             Glyphs = glyphs,
             OnTabSelected = SelectTab,
+            OnHidden = Hidden,
             InternalName = "DungeonDripMain",
             Title = "Dungeon Drip",
             Size = InitialSize,
@@ -112,6 +137,24 @@ internal sealed unsafe class NativeMainAddon : IDisposable
 
     public void Toggle() => IsOpen = !IsOpen;
 
+    /// <summary>Takes the window down, unless the game is only moving the player somewhere.</summary>
+    private void Hidden()
+    {
+        if (Environment.TickCount64 < settledAt)
+            return;
+
+        IsOpen = false;
+    }
+
+    /// <summary>Whether the game is between places, and so taking its own windows down.</summary>
+    /// <remarks>
+    /// Two flags rather than one, because the client uses a second for the last stretch of a load
+    /// and the window is torn down across both.
+    /// </remarks>
+    private static bool Zoning() =>
+        Plugin.Condition[ConditionFlag.BetweenAreas] ||
+        Plugin.Condition[ConditionFlag.BetweenAreas51];
+
     /// <summary>Opens the window with the picker already filtered, for <c>/dungeondrip &lt;name&gt;</c>.</summary>
     public void OpenPicker(string filter)
     {
@@ -121,12 +164,23 @@ internal sealed unsafe class NativeMainAddon : IDisposable
         Invalidate();
     }
 
+    /// <remarks>
+    /// <b>Whether the window is shut is never inferred from whether the addon is.</b> That was the
+    /// first cut and it made the window unopenable: asking to open it set the flag, and the next
+    /// tick saw a closed addon beside a set flag and concluded the player must have closed it - so
+    /// every attempt to open cancelled itself. Zoning and the commands both went through that path,
+    /// which is why both appeared to break the window for good.
+    ///
+    /// A close is a thing the addon says instead, once, when it happens. Anything else that takes
+    /// the addon away - zoning is the one that does - leaves the flag alone, and the window is put
+    /// back up on the next tick.
+    /// </remarks>
     private void OnUpdate(Dalamud.Plugin.Services.IFramework framework)
     {
-        // A close is the player's, so it is read back rather than fought. Nothing else in the plugin
-        // would otherwise know the window had gone.
-        if (!addon.IsOpen && IsOpen && addon.WasOpened)
-            IsOpen = false;
+        // Held forward for as long as the loading screen lasts and a while after it, since the last
+        // teardown of a zone lands about when the client says it has arrived.
+        if (Zoning())
+            settledAt = Environment.TickCount64 + ZoningGraceMs;
 
         if (!IsOpen)
         {
@@ -411,10 +465,10 @@ internal sealed unsafe class NativeMainAddon : IDisposable
 
         public void RemeasureScroll() => scroller?.RecalculateSizes();
 
-        /// <summary>Whether the addon has ever been opened, so a close can be told from a start.</summary>
-        public bool WasOpened { get; private set; }
-
         public required GlyphTextures Glyphs { private get; init; }
+
+        /// <summary>Said when the window goes away, whoever asked for it.</summary>
+        public required Action OnHidden { private get; init; }
 
         /// <summary>What to do when a tab is pressed, since the strip is built before there is one.</summary>
         public required Action<CollectionTab> OnTabSelected { private get; init; }
@@ -472,10 +526,15 @@ internal sealed unsafe class NativeMainAddon : IDisposable
             WindowNode?.SetTitle(title);
         }
 
+        /// <remarks>
+        /// The one place the plugin finds out the window has been shut. Reading it off the addon's
+        /// open state instead cannot tell a player pressing the close button from an addon that has
+        /// not been put up yet, and treating the second as the first is what stopped it reopening.
+        /// </remarks>
+        protected override unsafe void OnHide(AtkUnitBase* addon) => OnHidden();
+
         protected override unsafe void OnSetup(AtkUnitBase* addon, Span<AtkValue> values)
         {
-            WasOpened = true;
-
             // One fitted list, as the panels use, because the strip is there in one view and not the
             // other - so how much room the body has is not a constant.
             chrome = new VerticalListNode
