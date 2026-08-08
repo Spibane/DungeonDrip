@@ -379,6 +379,53 @@ function. It appends and never replaces, and marks its own line so it cannot dou
 another plugin's. If a patch moves what it hooks, the line simply does not appear and Settings says
 so — nothing else is affected.
 
+## Drawn as game windows
+
+Everything above describes the plugin as Dalamud draws it — overlay windows in Dalamud's own style,
+which is how the plugin has always looked and how it looks by default. The panels and the loot
+companion can instead be drawn as the game's own windows, under **Settings → In-game UI → Draw the
+panels as game windows**. The switch takes effect immediately; nothing needs reloading.
+
+What that buys is the things an imitation cannot do. A game window follows whichever UI theme is
+chosen in Character Configuration — Dark, Light, Classic and Clear Blue all work — and takes its
+text colour from the same place the game's own windows take theirs, so it changes with them rather
+than being told to. It scales with the game's UI scale, and each window can be scaled on its own from
+the right-click menu on its header. Its frame, header and scroll bar are the game's, because they
+are the game's.
+
+**Five surfaces move; three do not.** The four panels that ride beside a game window — vendor, market
+board, Glamour Dresser, Armoire — and the companion beside the Need/Greed roll are drawn as game
+windows. The duty window, the Collection view and this plugin's Settings window stay as Dalamud
+windows. Settings is staying that way permanently: it is by far the largest surface, it is opened
+rarely and never during play, and the widgets it leans on are the ones a game window is worst at. So
+a mixed look is the destination rather than a stage on the way to something.
+
+Both looks list the same things in the same order, with the same markers, the same wording and the
+same right-click menus. The marker table under [At vendors](#at-vendors) is true of either.
+
+### What differs
+
+| | Dalamud windows | Game windows |
+| --- | --- | --- |
+| Resizing | drag any edge, and the size is remembered per panel | no resize handle — scale the window from its header's right-click menu |
+| Reset to the game window's size | a button appears while a dragged size is in use | absent, because there is never a dragged size to undo |
+| Getting one out of the way | fold it to its title bar | switch that panel off in **Settings → Panels** |
+| Long item names | the panel widens to fit the longest | cut with an ellipsis; the full name is on the row's tooltip |
+| Group headings on the Light and Classic themes | readable | dark text on a dark bar — see below |
+
+**Group headings are hard to read on the two light themes, and that is a standing limit rather than a
+bug to be fixed here.** A collapsing header's bar is a dark texture under every theme, so its label
+wants to be pale in all four — but the library that draws it colours the label from the themed body
+text colour, which goes dark brown on the light themes. The label sits on a node the library keeps
+private, so it cannot be corrected from this side; the fix is a one-line change upstream. Carrying it
+as a local patch was tried and rejected, because pinning to a commit no other clone can fetch trades
+a colour for every build but one.
+
+**If the game windows cannot start, the plugin falls back to the Dalamud ones for that session** and
+says so in the log. They are built on a library pinned to a particular commit, and a game patch can
+break it independently of anything else here — so a break on patch day is a temporary downgrade
+rather than a plugin with no windows at all.
+
 ## Commands
 
 | Command | What it does |
@@ -432,6 +479,7 @@ plugin can bound.
 | Group each panel by slot | Panels | on |
 | Gear options on the game's right-click menus | In-game UI | on |
 | Marker on the game's item tooltips | In-game UI | off |
+| Draw the panels as game windows | In-game UI | off |
 | Warn when dresser data is older than | Data | 7 days |
 | Record gear that drops in duties | Data | on |
 | Fill gaps from the wiki | Data | on |
@@ -692,12 +740,14 @@ DungeonDrip/
 │   ├── MarketBoardWatcher.cs    what the board's browse list is showing
 │   ├── DresserAddWatcher.cs     carried gear the dresser has not got
 │   ├── ArmoireAddWatcher.cs     the same of the Armoire, whose own screen will not say
+│   ├── LootRollWatcher.cs       what is up for a Need/Greed roll, and what is missing
 │   ├── OwnershipTracker.cs      per-character snapshot and staleness
 │   └── LootObserver.cs          records gear seen dropping
 ├── Core/
 │   ├── MissingItems.cs          the ownership decision
 │   ├── CollectionMarkers.cs     that decision turned into a glyph
 │   ├── GearRow.cs               one resolved row, shared by every panel
+│   ├── LootRoll.cs              one item up for roll, and whether it is collected
 │   ├── DutyReport.cs            territory + ownership → the drawn list
 │   ├── DutyCatalog.cs           duty list for the picker
 │   ├── DropSources.cs           the loot tables backwards: piece → duties
@@ -720,19 +770,63 @@ DungeonDrip/
 │       ├── ShopSources.cs       gil, currency and Grand Company tills
 │       ├── QuestSources.cs      Quest reward columns, checked before believed
 │       └── AchievementSources.cs
-└── Windows/
-    ├── MissingItemsWindow.cs    picker, freshness banner, item list, roulette advice
-    ├── CollectionView.cs        the window's other mode: sets, dresser, carried gear
-    ├── AddonPanelWindow.cs      anchoring, sizing and the drag latch every panel shares
-    ├── VendorPanelWindow.cs     what is vendor-specific about the vendor panel
-    ├── StorePanelWindow.cs      what the two "what should go in" panels share
-    ├── DresserPanelWindow.cs    the add list beside the Glamour Dresser
-    ├── ArmoirePanelWindow.cs    the same beside the Armoire
-    ├── MarketBoardPanelWindow.cs what is board-specific about the board panel
-    ├── PanelGrouping.cs         slot headings and the filter counts
-    ├── LootCompanionWindow.cs   read-only list beside the Need/Greed window
-    └── ConfigWindow.cs
+├── IPluginUi.cs                 the seam Plugin.cs talks to, whichever look is on
+├── Presentation/                what each surface shows, named rather than drawn
+│   ├── Display.cs               the node kinds both renderers walk
+│   ├── PanelPresenter.cs        the addon panels: rows, headings, filters, warnings
+│   ├── StorePanelPresenter.cs   the same for "what should go in this box"
+│   ├── LootCompanionPresenter.cs the roll list, and why it refuses without a snapshot
+│   ├── ColourRole.cs            what a colour means, before either look picks one
+│   ├── GlyphToken.cs            what a marker claims, before either look draws it
+│   ├── ToolGlyph.cs             the same for a filter button's two states
+│   ├── ToolButtonModel.cs       one button: state, tooltip, and what pressing it writes
+│   ├── GameSymbol.cs            marks taken from the game's own icon set
+│   ├── MarkerGlyph.cs           collection state → marker and colour
+│   ├── PanelGrouping.cs         slot headings and the filter counts
+│   ├── DutyGrouping.cs          the duty list's headings
+│   ├── CollectionSnapshot.cs    the collection view's figures
+│   ├── HeaderState.cs           which headings are folded, remembered once for both looks
+│   ├── PanelText.cs             wording a surface uses in either look
+│   ├── AddonAnchor.cs           where a panel sits beside a game window
+│   └── AddonFrame.cs            how much of a game window's rectangle is ornament
+├── Windows/                     the Dalamud look
+│   ├── ImGuiUi.cs               owns the window system
+│   ├── ImGuiRenderer.cs         walks the description into ImGui calls
+│   ├── MissingItemsWindow.cs    picker, freshness banner, item list, roulette advice
+│   ├── CollectionView.cs        the window's other mode: sets, dresser, carried gear
+│   ├── AddonPanelWindow.cs      anchoring, sizing and the drag latch every panel shares
+│   ├── VendorPanelWindow.cs     what is vendor-specific about the vendor panel
+│   ├── StorePanelWindow.cs      what the two "what should go in" panels share
+│   ├── DresserPanelWindow.cs    the add list beside the Glamour Dresser
+│   ├── ArmoirePanelWindow.cs    the same beside the Armoire
+│   ├── MarketBoardPanelWindow.cs what is board-specific about the board panel
+│   ├── LootCompanionWindow.cs   read-only list beside the Need/Greed window
+│   ├── Palette.cs               ColourRole → an ImGui colour
+│   ├── Glyphs.cs                GlyphToken → a FontAwesome glyph, read by both looks
+│   ├── ToolGlyphs.cs            the same for the filter buttons
+│   ├── GameSymbols.cs           GameSymbol → one of the game's icons, read by both
+│   ├── UiShared.cs              the widgets more than one window draws
+│   └── ConfigWindow.cs
+└── Native/                      the game-window look
+    ├── NativeUi.cs              owns the one controller, and falls back if it will not start
+    ├── NativeRenderer.cs        walks the same description into game interface nodes
+    ├── NativePanelAddon.cs      what every panel beside a game window shares
+    ├── NativeStorePanelAddon.cs what the two "what should go in" panels share
+    ├── VendorPanelAddon.cs      ┐
+    ├── DresserPanelAddon.cs     │ the four panels: anchor, rows, header, filters
+    ├── ArmoirePanelAddon.cs     │
+    ├── MarketPanelAddon.cs      ┘
+    ├── LootCompanionAddon.cs    the roll list, sized once and never after
+    ├── NativeToolbar.cs         the filter buttons as game buttons
+    ├── NativeContextMenu.cs     one menu per panel, refilled per click
+    ├── NativePalette.cs         ColourRole → the theme's own colours
+    └── GlyphTextures.cs         a font glyph rendered into a texture a node can show
 ```
+
+Neither renderer holds any of the plugin's content. Both walk one description, which is what keeps
+the two looks from drifting: a change to what a surface says is made once, in a presenter, and
+appears in both. Only the files under `Native/` name a type from the interface library, so if that
+library ever has to be replaced the exposure is bounded.
 
 The companion window reads the loot addon and never draws into it, so it does not conflict with
 plugins that recolour game UI nodes.
@@ -811,6 +905,13 @@ game install is needed, and uploads the packaged plugin.
   holds once its own window has been opened, so the honest answers would be "done", "not done" and
   "cannot say yet", with the third showing most often. The quest's level is given instead, which is what
   makes an old one recognisable.
+- Resizing a game window by dragging, and the button that undoes a dragged size. Neither exists
+  in the game's own windows, so under **Draw the panels as game windows** a panel matches the window
+  it accompanies and is scaled from its header's right-click menu instead. Both are still there in
+  the Dalamud windows.
+- The Settings window as a game window. It is the largest surface the plugin has, it is opened rarely
+  and never during play, and the widgets it leans on are the ones a game window is worst at — so it
+  stays a Dalamud window, and a mixed look is the destination rather than a stage.
 - Nothing else currently planned.
 
 ## Licence
