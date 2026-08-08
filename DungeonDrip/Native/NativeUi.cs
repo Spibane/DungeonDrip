@@ -24,6 +24,9 @@ internal sealed class NativeUi : IPluginUi
     /// <summary>The panels drawn as game windows, or empty after a failed start.</summary>
     private readonly IReadOnlyList<NativePanelAddon> panels;
 
+    /// <summary>The loot companion, which is not a panel and does not share their base.</summary>
+    private readonly LootCompanionAddon? loot;
+
     /// <summary>One per plugin, because it holds a draw callback and every panel's icons go through it.</summary>
     private readonly GlyphTextures? glyphs;
 
@@ -34,12 +37,19 @@ internal sealed class NativeUi : IPluginUi
     /// </remarks>
     public bool Active => panels.Count > 0;
 
-    private NativeUi(Plugin plugin, GlyphTextures? glyphs, IReadOnlyList<NativePanelAddon> panels)
+    private NativeUi(
+        Plugin plugin, GlyphTextures? glyphs, IReadOnlyList<NativePanelAddon> panels,
+        LootCompanionAddon? loot)
     {
         this.glyphs = glyphs;
         this.panels = panels;
+        this.loot = loot;
 
-        fallback = new ImGuiUi(plugin, panels.Count > 0 ? Surfaces.AddonPanels : Surfaces.None);
+        var taken = panels.Count > 0 ? Surfaces.AddonPanels : Surfaces.None;
+        if (loot != null)
+            taken |= Surfaces.LootCompanion;
+
+        fallback = new ImGuiUi(plugin, taken);
     }
 
     /// <summary>
@@ -70,7 +80,7 @@ internal sealed class NativeUi : IPluginUi
                 new DresserPanelAddon(plugin, glyphs),
                 new ArmoirePanelAddon(plugin, glyphs),
                 new MarketPanelAddon(plugin, glyphs),
-            ]);
+            ], new LootCompanionAddon(plugin, glyphs));
         }
         catch (System.Exception exception)
         {
@@ -115,6 +125,8 @@ internal sealed class NativeUi : IPluginUi
     /// </remarks>
     public void Dispose()
     {
+        loot?.Dispose();
+
         foreach (var panel in panels)
             panel.Dispose();
 

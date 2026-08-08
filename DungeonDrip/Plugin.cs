@@ -162,6 +162,9 @@ public sealed class Plugin : IDalamudPlugin
     /// <summary>The gear the market board is currently browsing.</summary>
     public MarketBoardWatcher Market { get; }
 
+    /// <summary>What is up for a Need/Greed roll, for the companion window in either look.</summary>
+    public LootRollWatcher Loot { get; }
+
     private readonly ContentFinderIndex contentFinder;
     private readonly JobRoleIndex jobRoles;
     private readonly LootObserver lootObserver;
@@ -232,6 +235,7 @@ public sealed class Plugin : IDalamudPlugin
         Dresser = new DresserAddWatcher(this);
         Armoire = new ArmoireAddWatcher(this);
         Market = new MarketBoardWatcher(this);
+        Loot = new LootRollWatcher(this);
         gameContextMenu = new GameContextMenu(this);
         tooltipLine = new ItemTooltipLine(this, SigScanner, GameInterop);
         Wiki = new WikiLootSource(configDirectory, Configuration, http);

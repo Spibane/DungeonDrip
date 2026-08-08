@@ -20,6 +20,16 @@ internal sealed record TextNode(string Text, ColourRole Colour = ColourRole.Defa
 /// <summary>The small mark at the head of a row. See <see cref="GlyphToken"/>.</summary>
 internal sealed record GlyphNode(GlyphToken Token, ColourRole Colour) : Node;
 
+/// <summary>One of the game's own icons, drawn from a payload rather than a font.</summary>
+/// <remarks>
+/// A part of its own rather than something folded into the text beside it, and the reason is what
+/// each backend has to do to draw one. The game draws it from a macro inside a string; the overlay
+/// draws it through a renderer that understands those macros and is not the call that draws
+/// ordinary text. Keeping it separate lets each use the right one, and leaves a row's name the
+/// plain text item that a right-click menu can still be attached to.
+/// </remarks>
+internal sealed record SymbolNode(GameSymbol Symbol) : Node;
+
 /// <summary>A game item icon, at a size in unscaled pixels.</summary>
 internal sealed record IconNode(ushort IconId, float Size) : Node;
 

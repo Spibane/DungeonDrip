@@ -48,6 +48,9 @@ internal static class NativeRenderer
     private const float GlyphWidth = 20f;
     private const float IconSize = 24f;
 
+    /// <summary>The column one of the game's own icons gets, which is about a character wide.</summary>
+    private const float SymbolWidth = 18f;
+
     /// <summary>
     /// The size the game sets its own list rows in.
     /// </summary>
@@ -130,18 +133,7 @@ internal static class NativeRenderer
 
         foreach (var node in nodes)
         {
-            NodeBase? built = node switch
-            {
-                TextNode text => Text(text.Text, text.Colour, width, height: NoticeLineHeight),
-                RuleNode => new HorizontalLineNode
-                {
-                    Size = new System.Numerics.Vector2(width, RuleHeight),
-                    IsVisible = true,
-                },
-
-                _ => null,
-            };
-
+            var built = Line(node, width);
             if (built != null)
                 list.AddNode(built);
         }
@@ -155,6 +147,22 @@ internal static class NativeRenderer
     {
         RowNode row => Row(menu, glyphs, row, width),
         CollapsibleNode group => Collapsible(menu, glyphs, headers, group, width, onFoldChanged),
+
+        // A list is not only rows. The loot companion says what it cannot answer and what it found
+        // nothing new in, on lines between the rows rather than above them.
+        _ => Line(node, width),
+    };
+
+    /// <summary>A line that is not a row: a sentence, or a rule between them.</summary>
+    private static NodeBase? Line(Node node, float width) => node switch
+    {
+        TextNode text => Text(text.Text, text.Colour, width, height: NoticeLineHeight),
+        RuleNode => new HorizontalLineNode
+        {
+            Size = new System.Numerics.Vector2(width, RuleHeight),
+            IsVisible = true,
+        },
+
         _ => null,
     };
 
@@ -229,10 +237,28 @@ internal static class NativeRenderer
             IsVisible = true,
         };
 
-        // What the name has left after the fixed columns and the gaps between them. A text node
+        // What the name has left after the parts beside it and the gaps between them. A text node
         // given no width does not shrink to fit - it reports zero, the row lays the next part out
         // on top of it, and the name ends up over the icon.
-        var remaining = width - RowIndent - GlyphWidth - IconSize - (ColumnGap * 3f);
+        //
+        // Measured from the parts this row actually has, rather than from the panels' three columns.
+        // Assuming a marker that a row does not carry takes twenty pixels off the name for nothing,
+        // and since a name is drawn with an ellipsis what goes missing is the end of it - which on
+        // the loot companion is exactly where the mark saying "you do not have this" sits.
+        var taken = RowIndent + (ColumnGap * row.Parts.Count);
+
+        foreach (var part in row.Parts)
+        {
+            taken += part switch
+            {
+                GlyphNode => GlyphWidth,
+                SymbolNode => SymbolWidth,
+                IconNode => IconSize,
+                _ => 0f,
+            };
+        }
+
+        var remaining = width - taken;
 
         foreach (var part in row.Parts)
         {
@@ -255,6 +281,8 @@ internal static class NativeRenderer
     private static NodeBase? Part(GlyphTextures glyphs, Node part, float textWidth) => part switch
     {
         GlyphNode glyph => Marker(glyphs, glyph),
+
+        SymbolNode symbol => Symbol(symbol.Symbol),
 
         IconNode icon => Icon(icon.IconId),
 
@@ -307,6 +335,29 @@ internal static class NativeRenderer
             : 0f;
 
         return node;
+    }
+
+    /// <summary>
+    /// One of the game's own icons, which is a macro in a string rather than anything drawn.
+    /// </summary>
+    /// <remarks>
+    /// A text node holding nothing but the icon. That is how the game puts one in its own text, and
+    /// it is the only way to get one: these are substituted by the renderer when it meets the
+    /// macro, so an icon has no id a node could be pointed at and no character a font could carry.
+    /// </remarks>
+    private static GameText Symbol(GameSymbol symbol)
+    {
+        var builder = new SeStringBuilder();
+        builder.AppendIcon((uint)GameSymbols.For(symbol));
+
+        return new GameText
+        {
+            String = builder.ToReadOnlySeString(),
+            FontSize = FontSize,
+            AlignmentType = AlignmentType.Left,
+            Size = new System.Numerics.Vector2(SymbolWidth, RowHeight),
+            IsVisible = true,
+        };
     }
 
     /// <summary>An item icon, scaled down to the row rather than cropped to it.</summary>

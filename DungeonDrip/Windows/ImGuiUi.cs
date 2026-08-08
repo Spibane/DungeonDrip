@@ -34,7 +34,8 @@ internal sealed class ImGuiUi : IPluginUi
         windowSystem.AddWindow(configWindow);
 
         // Always open; each decides for itself whether the addon it rides on is up.
-        windowSystem.AddWindow(new LootCompanionWindow(plugin) { IsOpen = true });
+        if (!without.HasFlag(Surfaces.LootCompanion))
+            windowSystem.AddWindow(new LootCompanionWindow(plugin) { IsOpen = true });
 
         if (!without.HasFlag(Surfaces.VendorPanel))
             windowSystem.AddWindow(new VendorPanelWindow(plugin) { IsOpen = true });

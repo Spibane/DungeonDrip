@@ -2,7 +2,10 @@ using System;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
+using Dalamud.Game.Text.SeStringHandling;
+using Dalamud.Game.Text.SeStringHandling.Payloads;
 using Dalamud.Interface.Components;
+using Dalamud.Interface.ImGuiSeStringRenderer;
 using Dalamud.Interface.Textures;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
@@ -137,6 +140,32 @@ internal static class UiParts
 
         state.Record(key, open, defaultOpen);
         return open;
+    }
+
+    /// <summary>
+    /// Draws one of the game's own icons and leaves the cursor on the same line.
+    /// </summary>
+    /// <remarks>
+    /// Through Dalamud's string renderer rather than through a text call, because the icon is a
+    /// macro the game substitutes rather than a character any font has - two attempts to write one
+    /// as text drew nothing at all, in either look.
+    ///
+    /// The name beside it is deliberately not drawn through the same call. A right-click menu binds
+    /// to the last item drawn, and what this leaves behind is not the plain text item those menus
+    /// have always been attached to.
+    /// </remarks>
+    public static void GameSymbol(Presentation.GameSymbol symbol)
+    {
+        var text = new SeStringBuilder()
+            .Add(new IconPayload(GameSymbols.For(symbol)))
+            .Build()
+            .Encode();
+
+        var draw = new SeStringDrawParams();
+        ImGuiHelpers.SeStringWrapped(text, ref draw);
+
+        ImGui.SameLine();
+        ImGui.AlignTextToFramePadding();
     }
 
     /// <summary>

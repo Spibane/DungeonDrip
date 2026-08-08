@@ -49,6 +49,7 @@ internal enum Surfaces
     DresserPanel = 1 << 1,
     ArmoirePanel = 1 << 2,
     MarketBoardPanel = 1 << 3,
+    LootCompanion = 1 << 4,
 
     /// <summary>Every panel that rides beside a game window.</summary>
     /// <remarks>

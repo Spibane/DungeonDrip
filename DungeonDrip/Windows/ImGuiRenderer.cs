@@ -141,6 +141,10 @@ internal static class ImGuiRenderer
                 UiParts.ItemIcon(icon.IconId, icon.Size);
                 return true;
 
+            case SymbolNode symbol:
+                UiParts.GameSymbol(symbol.Symbol);
+                return true;
+
             case SpacingNode:
                 ImGui.Spacing();
                 return false;
