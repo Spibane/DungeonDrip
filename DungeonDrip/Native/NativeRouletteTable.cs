@@ -20,8 +20,10 @@ namespace DungeonDrip.Native;
 /// The widths come from <see cref="RouletteTableModel"/> rather than from here, so the columns are
 /// the same fractions in both looks - see there on why that is the point of the model existing.
 ///
-/// The alternating row background is dropped rather than approximated. It was decoration in the
-/// overlay too, and a nine-grid behind every other row is a lot of nodes to spend on a stripe.
+/// <b>Ruled between rows rather than striped behind them.</b> The overlay shades alternate rows,
+/// which is the same job done the way its toolkit offers - here it would mean a nine-grid behind
+/// every other row, which is a great many nodes to spend on a stripe. A line between rows costs one
+/// node each and does more, because it also says where a row ends when its cells are short.
 /// </remarks>
 internal static class NativeRouletteTable
 {
@@ -31,6 +33,17 @@ internal static class NativeRouletteTable
 
     /// <summary>Space at the right of each cell, so a long value cannot touch the next column.</summary>
     private const float CellGap = 6f;
+
+    /// <summary>How thick the game draws a dividing rule, and how much of one is wanted here.</summary>
+    /// <remarks>
+    /// Faint on purpose. A rule at full strength between every row turns a short table into a grid
+    /// of boxes and competes with the window's own divisions; at a third it reads as guidance for
+    /// the eye and nothing else. The one under the headings is left at full strength, because that
+    /// division is real - it separates what the columns are from what they hold.
+    /// </remarks>
+    private const float RuleHeight = 4f;
+
+    private const float RuleAlpha = 0.35f;
 
     public static NodeBase Build(RouletteTableModel model, float width)
     {
@@ -42,19 +55,29 @@ internal static class NativeRouletteTable
         };
 
         table.AddNode(Headings(model, width));
+        table.AddNode(Rule(width, 1f));
 
-        foreach (var row in model.Rows)
-            table.AddNode(Row(model, row, width));
+        for (var index = 0; index < model.Rows.Count; index++)
+        {
+            table.AddNode(Row(model, model.Rows[index], width));
+
+            // Between rows and not after the last, so the table ends where its last row does rather
+            // than with a line under nothing.
+            if (index < model.Rows.Count - 1)
+                table.AddNode(Rule(width, RuleAlpha));
+        }
 
         table.RecalculateLayout();
         return table;
     }
 
-    /// <remarks>
-    /// Muted, and without a rule under them. The game's own tables separate a heading from its rows
-    /// by colour rather than by a line, and a rule here would read as the end of a section when the
-    /// section is only starting.
-    /// </remarks>
+    private static NodeBase Rule(float width, float alpha) => new HorizontalLineNode
+    {
+        Size = new Vector2(width, RuleHeight),
+        Alpha = alpha,
+        IsVisible = true,
+    };
+
     private static NodeBase Headings(RouletteTableModel model, float width)
     {
         var line = new HorizontalListNode
