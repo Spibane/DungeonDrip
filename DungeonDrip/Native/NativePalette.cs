@@ -39,8 +39,25 @@ internal static class NativePalette
 
     private const uint OutlineColourId = 7;
 
-    /// <summary>How much of the text colour a muted line keeps.</summary>
-    private const float MutedAlpha = 0.60f;
+    /// <summary>
+    /// How far a muted line is faded towards what is behind it.
+    /// </summary>
+    /// <remarks>
+    /// <b>A mix rather than an alpha, which is what the first cut used and what made these lines
+    /// hard to read.</b> Sixty per cent of white on black is a grey; sixty per cent of dark brown on
+    /// parchment is most of the way to the parchment, because the thing behind it is close to what
+    /// it is being faded towards. Mixing to a solid colour fades the same amount either way.
+    ///
+    /// <b>Two amounts, and they are not close.</b> Fading towards what is behind the text is not
+    /// symmetric: on a dark window there is a long way to travel before a pale grey stops being
+    /// legible, and on a light one the text is already near its background and a third of the way
+    /// is most of the distance. The first attempt at this used one number for both and changed
+    /// nothing anybody could see, because a third of the way and sixty per cent alpha land within a
+    /// few per cent of each other.
+    /// </remarks>
+    private const float MutedFadeOnDark = 0.35f;
+
+    private const float MutedFadeOnLight = 0.14f;
 
     /// <summary>
     /// Whether the theme in use puts dark text on a light window.
@@ -54,6 +71,17 @@ internal static class NativePalette
     /// Configuration, and a remembered answer would leave the plugin the only thing on screen that
     /// had not noticed.
     /// </remarks>
+    /// <summary>
+    /// Whether the window behind the text is a light one.
+    /// </summary>
+    /// <remarks>
+    /// Public because it decides more than a colour: text on a light window is drawn without the
+    /// outline every other theme gives it. That outline is a pale halo there, and a pale halo around
+    /// small dark text thins every stroke of it - which is most of why the light theme read as
+    /// washed out even where the colour was right.
+    /// </remarks>
+    public static bool OnLightTheme => OnParchment();
+
     private static bool OnParchment()
     {
         var text = ColorHelper.GetColor(TextColourId);
@@ -61,9 +89,6 @@ internal static class NativePalette
         // Rec. 601, which is the cheap luminance and more than enough to tell one end from the other.
         return (text.X * 0.299f) + (text.Y * 0.587f) + (text.Z * 0.114f) < 0.5f;
     }
-
-    /// <summary>How far a muted tooltip line is faded towards what is behind it.</summary>
-    private const float MutedFade = 0.45f;
 
     /// <summary>
     /// A role as one solid colour, for the places that cannot composite an alpha.
@@ -85,8 +110,9 @@ internal static class NativePalette
 
         var text = ColorHelper.GetColor(TextColourId);
         var behind = ColorHelper.GetColor(OutlineColourId);
+        var fade = OnParchment() ? MutedFadeOnLight : MutedFadeOnDark;
 
-        return Vector4.Lerp(text, behind, MutedFade) with { W = 1f };
+        return Vector4.Lerp(text, behind, fade) with { W = 1f };
     }
 
     /// <summary>
@@ -145,7 +171,9 @@ internal static class NativePalette
                 ? new Vector4(0.09f, 0.28f, 0.62f, 1.00f)
                 : new Vector4(0.30f, 0.60f, 0.95f, 1.00f), outline),
 
-            ColourRole.Muted => (text with { W = MutedAlpha }, outline),
+            // The same value a tooltip and a mark use. There is one muted, and it was drifting into
+            // three answers because each place needed it a different way round.
+            ColourRole.Muted => (Solid(ColourRole.Muted), outline),
 
             _ => (text, outline),
         };

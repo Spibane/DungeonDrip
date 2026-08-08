@@ -595,6 +595,15 @@ internal static class NativeRenderer
         IsVisible = true,
     };
 
+    private static TextFlags Edge(bool wrap)
+    {
+        var flags = wrap
+            ? TextFlags.WordWrap | TextFlags.MultiLine
+            : TextFlags.Ellipsis;
+
+        return NativePalette.OnLightTheme ? flags : flags | TextFlags.Edge;
+    }
+
     /// <remarks>
     /// <see cref="AlignmentType.Left"/> is left-aligned and <em>vertically centred</em>, which is
     /// what makes the text sit on the same line as the icon beside it rather than on the row's top
@@ -651,9 +660,10 @@ internal static class NativeRenderer
             // stopping at it - which is how a long name ended up under the scroll bar. Nothing is
             // lost by cutting a name: the row's tooltip opens with it in full. A sentence has no
             // such second copy, so it is broken across lines instead.
-            TextFlags = wrap
-                ? TextFlags.Edge | TextFlags.WordWrap | TextFlags.MultiLine
-                : TextFlags.Edge | TextFlags.Ellipsis,
+            // The edge is what makes pale text carry over a dark window, and what makes dark text
+            // look thin over a light one - so it is dropped on the light themes rather than being
+            // given a colour that works there, because there is no such colour.
+            TextFlags = Edge(wrap),
             FontSize = FontSize,
             AlignmentType = alignment,
             Size = new System.Numerics.Vector2(width, height ?? RowHeight),
