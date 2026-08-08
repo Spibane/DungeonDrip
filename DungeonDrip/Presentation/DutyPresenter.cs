@@ -160,19 +160,18 @@ internal static class DutyPresenter
             ];
         }
 
-        var age = Format.Age(tracker.DresserUpdatedUtc!.Value);
-        var built = new List<Node>(2)
+        var built = new List<Node>(2);
+
+        // Only when something is wrong. How full the box is and when it was last read are the
+        // collection view's questions, and repeating them above every duty spent two lines saying
+        // that nothing needs doing - which is the state the window is in almost every time it opens.
+        if (tracker.IsDresserStale)
         {
-            tracker.IsDresserStale
-                ? new TextNode(
-                    $"Glamour Dresser snapshot is {age} old - open your dresser to refresh it.",
-                    ColourRole.Warning)
-                : new TextNode(
-                    tracker.DresserSlotCapacity > 0
-                        ? $"Dresser: {tracker.DresserSlotsUsed} of {tracker.DresserSlotCapacity} slots, read {age} ago."
-                        : $"Dresser: {tracker.DresserSlotsUsed} slots, read {age} ago.",
-                    ColourRole.Muted),
-        };
+            built.Add(new TextNode(
+                $"Glamour Dresser snapshot is {Format.Age(tracker.DresserUpdatedUtc!.Value)} old - " +
+                "open your dresser to refresh it.",
+                ColourRole.Warning));
+        }
 
         if (tracker.ArmoireUpdatedUtc == null)
         {

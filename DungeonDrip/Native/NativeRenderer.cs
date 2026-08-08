@@ -15,6 +15,7 @@ using IconNode = DungeonDrip.Presentation.IconNode;
 using GameText = KamiToolKit.Nodes.TextNode;
 using GameIcon = KamiToolKit.Nodes.IconImageNode;
 using GameImage = KamiToolKit.Nodes.ImGuiImageNode;
+using ProgressNode = DungeonDrip.Presentation.ProgressNode;
 
 namespace DungeonDrip.Native;
 
@@ -44,6 +45,16 @@ internal static class NativeRenderer
     /// fixed-width icon font for its glyph.
     /// </remarks>
     private const float RowHeight = 28f;
+
+    /// <summary>The shortest a row is allowed to be, whatever it holds.</summary>
+    /// <remarks>
+    /// A row of nothing but text still has to be tall enough to read and to hit. Below this the
+    /// lines of a long list run together.
+    /// </remarks>
+    private const float MinRowHeight = 22f;
+
+    /// <summary>Room above and below the tallest thing in a row.</summary>
+    private const float RowPadding = 4f;
 
     private const float GlyphWidth = 20f;
     private const float IconSize = 24f;
@@ -81,6 +92,56 @@ internal static class NativeRenderer
     /// <summary>How big a game item icon actually is, as opposed to how big it is drawn.</summary>
     private const float GameIconSize = 40f;
 
+    /// <summary>
+    /// A gap where a rule would overstate the division.
+    /// </summary>
+    /// <remarks>
+    /// Smaller than it reads, because the list this sits in spaces its own items as well - eight
+    /// pixels of gap plus the list's own made a blank line out of what should be a breath.
+    /// </remarks>
+    private const float SpacingHeight = 4f;
+
+    private const float ButtonWidth = 120f;
+    private const float ButtonHeight = 28f;
+    private const float SmallButtonWidth = 180f;
+    private const float SmallButtonHeight = 22f;
+
+    /// <summary>How thick the occupancy bar is drawn.</summary>
+    private const float BarHeight = 12f;
+
+    /// <summary>
+    /// How much narrower than its node a wrapped line is assumed to be.
+    /// </summary>
+    /// <remarks>
+    /// A word that will not fit is moved down whole, so the last word of a line ends somewhere short
+    /// of the edge rather than at it. Counting lines against the full width therefore counts too
+    /// few, and one line too few is a line drawn over the next thing along.
+    /// </remarks>
+    private const float WrapSlack = 24f;
+
+    /// <summary>
+    /// How far apart the lines of a wrapped sentence sit.
+    /// </summary>
+    /// <remarks>
+    /// A text node defaults to twelve, which is the size of the font it was written for and smaller
+    /// than the one used here - so a wrapped sentence came out with its lines touching.
+    ///
+    /// Slightly tighter than the step between two separate lines, and deliberately: lines of one
+    /// sentence belong to each other, and spacing them as far apart as two sentences makes a
+    /// paragraph read as a list.
+    /// </remarks>
+    private const uint WrappedLineSpacing = 18;
+
+    /// <summary>
+    /// How much of a row's remaining width the name keeps when there is a note after it.
+    /// </summary>
+    /// <remarks>
+    /// A fixed share rather than a measurement, because measuring text is something the overlay's
+    /// toolkit offers and a node tree does not. Names are longer than the notes after them almost
+    /// always, which is why the split is not even.
+    /// </remarks>
+    private const float NameShareWithTrailing = 0.62f;
+
 
     /// <summary>
     /// Builds a list of rows into a vertical list, replacing whatever was there.
@@ -100,9 +161,27 @@ internal static class NativeRenderer
         NativeContextMenu menu, GlyphTextures glyphs, HeaderState headers, VerticalListNode list,
         IReadOnlyList<Node> nodes, float reservedRight, Action onFoldChanged)
     {
-        var width = list.Width - reservedRight;
-
         list.Clear();
+        Append(menu, glyphs, headers, list, nodes, reservedRight, onFoldChanged);
+        list.RecalculateLayout();
+    }
+
+    /// <summary>
+    /// Adds a description to whatever is already in a list, without clearing or re-stacking it.
+    /// </summary>
+    /// <remarks>
+    /// For the surfaces that put their own widgets among described ones - a search field between a
+    /// banner and a list, a tab strip above one. Those cannot be described, because they hold state
+    /// of their own, so the alternative would be a node kind per widget that only one surface ever
+    /// uses.
+    ///
+    /// The caller re-stacks when it has finished adding, which is why this does not.
+    /// </remarks>
+    public static void Append(
+        NativeContextMenu menu, GlyphTextures glyphs, HeaderState headers, VerticalListNode list,
+        IReadOnlyList<Node> nodes, float reservedRight, Action onFoldChanged)
+    {
+        var width = list.Width - reservedRight;
 
         foreach (var node in nodes)
         {
@@ -110,8 +189,6 @@ internal static class NativeRenderer
             if (built != null)
                 list.AddNode(built);
         }
-
-        list.RecalculateLayout();
     }
 
     /// <summary>
@@ -147,24 +224,112 @@ internal static class NativeRenderer
     {
         RowNode row => Row(menu, glyphs, row, width),
         CollapsibleNode group => Collapsible(menu, glyphs, headers, group, width, onFoldChanged),
+        TreeNode tree => Tree(menu, glyphs, headers, tree, width, onFoldChanged),
+        TableNode table => NativeRouletteTable.Build(table.Model, width),
 
         // A list is not only rows. The loot companion says what it cannot answer and what it found
         // nothing new in, on lines between the rows rather than above them.
         _ => Line(node, width),
     };
 
-    /// <summary>A line that is not a row: a sentence, or a rule between them.</summary>
+    /// <summary>A line that is not a row: a sentence, a rule, a control, or a bar.</summary>
     private static NodeBase? Line(Node node, float width) => node switch
     {
-        TextNode text => Text(text.Text, text.Colour, width, height: NoticeLineHeight),
+        TextNode text => Wrapped(text, width),
+
         RuleNode => new HorizontalLineNode
         {
             Size = new System.Numerics.Vector2(width, RuleHeight),
             IsVisible = true,
         },
 
+        SpacingNode => new ResNode
+        {
+            Size = new System.Numerics.Vector2(width, SpacingHeight),
+            IsVisible = true,
+        },
+
+        ButtonNode button => new TextButtonNode
+        {
+            String = button.Label,
+            OnClick = button.Press,
+
+            // A small button is narrower as well as shorter. Full width would make the one that
+            // reveals the rest of a list look like the list's own footer.
+            Size = new System.Numerics.Vector2(
+                button.Small ? SmallButtonWidth : ButtonWidth,
+                button.Small ? SmallButtonHeight : ButtonHeight),
+
+            IsVisible = true,
+        },
+
+        ToggleNode toggle => new CheckboxNode
+        {
+            String = toggle.Label,
+            IsChecked = toggle.Value,
+            OnClick = toggle.Set,
+            TextTooltip = toggle.Tooltip ?? string.Empty,
+            Size = new System.Numerics.Vector2(width, RowHeight),
+            IsVisible = true,
+        },
+
+        ProgressNode progress => Bar(progress.Fraction, width),
+
         _ => null,
     };
+
+    /// <summary>
+    /// How full something is, as a bar.
+    /// </summary>
+    /// <remarks>
+    /// <b>Sized before it is filled, and the order is the whole of it.</b> A bar's fill is stored as
+    /// a width rather than as a fraction, so setting the fraction first multiplies it by a width of
+    /// nothing - and then sizing the bar stretches the fill to the full width. It came out solid at
+    /// every value, which reads as a box that is always full.
+    /// </remarks>
+    private static NodeBase Bar(float fraction, float width)
+    {
+        var bar = new ProgressBarNode
+        {
+            Size = new System.Numerics.Vector2(width, BarHeight),
+            IsVisible = true,
+        };
+
+        bar.Progress = System.Math.Clamp(fraction, 0f, 1f);
+        return bar;
+    }
+
+    /// <summary>
+    /// A tree row, which is a heading in this look and is not in the other.
+    /// </summary>
+    /// <remarks>
+    /// <b>A first cut, and the one place the two looks differ in shape rather than in colour.</b> The
+    /// overlay draws these as bare arrows precisely so that thirty outfit sets do not read as thirty
+    /// sections, and the nearest thing the game offers is the same framed bar its headings use. The
+    /// library's own tree is data-bound to a row type rather than to arbitrary contents, so using it
+    /// would mean describing these lists twice.
+    ///
+    /// What follows the label and what sits under it are folded into the header and the children,
+    /// since a framed bar has nowhere else to put them, and the icon is dropped.
+    /// </remarks>
+    private static NodeBase Tree(
+        NativeContextMenu menu, GlyphTextures glyphs, HeaderState headers, TreeNode tree,
+        float width, Action onFoldChanged)
+    {
+        var children = new List<Node>();
+
+        if (tree.Note != null)
+            children.Add(tree.Note);
+
+        children.AddRange(tree.Children);
+
+        var label = tree.Trailing != null ? $"{tree.Label}   {tree.Trailing.Text}" : tree.Label;
+
+        return Collapsible(
+            menu, glyphs, headers,
+            new CollapsibleNode(tree.Key, label, children, tree.DefaultOpen),
+            width, onFoldChanged);
+    }
 
     /// <summary>
     /// A heading with its rows folded under it, opening as the user last left it.
@@ -197,23 +362,7 @@ internal static class NativeRenderer
             String = group.Label,
             Width = width,
             FitWidth = true,
-            IsCollapsed = !headers.IsOpen(group.Key),
             IsVisible = true,
-        };
-
-        // Folding changes this header's height but nothing tells the list holding it, so without
-        // the callback the rows below stay where they were: a collapsed group leaves a hole, and
-        // reopening it draws over the group beneath. The scroll extent moves with it.
-        header.OnCollapse = () =>
-        {
-            headers.Record(group.Key, false);
-            onFoldChanged();
-        };
-
-        header.OnUncollapse = () =>
-        {
-            headers.Record(group.Key, true);
-            onFoldChanged();
         };
 
         foreach (var child in group.Children)
@@ -223,17 +372,55 @@ internal static class NativeRenderer
                 header.AddNode(built);
         }
 
+        // <b>Set twice, to the wrong state and then the right one, and it has to be.</b> The header
+        // only rearranges itself when the value actually changes, and a header built in the state it
+        // already believes it is in therefore never rearranges at all - which left its bar drawn in
+        // one place and the part of it that answered a click in another. Doing it once the children
+        // are attached is what makes the library lay the whole thing out.
+        //
+        // Before the callbacks are hung, so the pass that fixes the layout does not read as the
+        // player folding something.
+        var open = headers.IsOpen(group.Key, group.DefaultOpen);
+
+        header.IsCollapsed = open;
+        header.IsCollapsed = !open;
+
+        // Folding changes this header's height but nothing tells the list holding it, so without
+        // the callback the rows below stay where they were: a collapsed group leaves a hole, and
+        // reopening it draws over the group beneath. The scroll extent moves with it.
+        header.OnCollapse = () =>
+        {
+            headers.Record(group.Key, false, group.DefaultOpen);
+            onFoldChanged();
+        };
+
+        header.OnUncollapse = () =>
+        {
+            headers.Record(group.Key, true, group.DefaultOpen);
+            onFoldChanged();
+        };
+
         return header;
     }
 
     private static NodeBase Row(
         NativeContextMenu menu, GlyphTextures glyphs, RowNode row, float width)
     {
+        // Sized to what the row holds rather than to a constant. The panels put a 24-pixel item icon
+        // on every row and wanted the height; the collection's lists use icons two thirds that size,
+        // and a fixed row spread thirty of them over half again as much window as they need.
+        var height = RowHeightFor(row);
+
+        // The indent is there to keep a marker off the window's inside edge. A row that opens with
+        // words has no marker, and indenting it sets its text a few pixels right of every plain line
+        // around it - which is exactly what it looked like.
+        var indented = row.Parts.Count > 0 && row.Parts[0] is not TextNode;
+
         var line = new HorizontalListNode
         {
-            Size = new System.Numerics.Vector2(width, RowHeight),
+            Size = new System.Numerics.Vector2(width, height),
             ItemSpacing = ColumnGap,
-            FirstItemSpacing = RowIndent,
+            FirstItemSpacing = indented ? RowIndent : 0f,
             IsVisible = true,
         };
 
@@ -253,18 +440,28 @@ internal static class NativeRenderer
             {
                 GlyphNode => GlyphWidth,
                 SymbolNode => SymbolWidth,
-                IconNode => IconSize,
+                IconNode icon => icon.Size,
                 _ => 0f,
             };
         }
 
-        var remaining = width - taken;
+        var remaining = System.Math.Max(0f, width - taken);
+
+        // The name gives up part of its width when there is a note after it, since both share what
+        // is left once the fixed columns are taken off.
+        var nameWidth = row.Trailing != null ? remaining * NameShareWithTrailing : remaining;
 
         foreach (var part in row.Parts)
         {
-            var node = Part(glyphs, part, remaining);
+            var node = Part(glyphs, part, nameWidth, height);
             if (node != null)
                 line.AddNode(node);
+        }
+
+        if (row.Trailing != null)
+        {
+            line.AddNode(Text(
+                row.Trailing.Text, row.Trailing.Colour, remaining - nameWidth, height: height));
         }
 
         // One tooltip on the row rather than on each part, so the whole line answers rather than
@@ -278,15 +475,30 @@ internal static class NativeRenderer
         return line;
     }
 
-    private static NodeBase? Part(GlyphTextures glyphs, Node part, float textWidth) => part switch
+    /// <summary>How tall a row has to be for the tallest thing in it.</summary>
+    private static float RowHeightFor(RowNode row)
     {
-        GlyphNode glyph => Marker(glyphs, glyph),
+        var tallest = 0f;
 
-        SymbolNode symbol => Symbol(symbol.Symbol),
+        foreach (var part in row.Parts)
+        {
+            if (part is IconNode icon)
+                tallest = System.Math.Max(tallest, icon.Size);
+        }
 
-        IconNode icon => Icon(icon.IconId),
+        return System.Math.Max(MinRowHeight, tallest + RowPadding);
+    }
 
-        TextNode text => Text(text.Text, text.Colour, textWidth),
+    private static NodeBase? Part(
+        GlyphTextures glyphs, Node part, float textWidth, float rowHeight) => part switch
+    {
+        GlyphNode glyph => Marker(glyphs, glyph, rowHeight),
+
+        SymbolNode symbol => Symbol(symbol.Symbol, rowHeight),
+
+        IconNode icon => Icon(icon.IconId, icon.Size, rowHeight),
+
+        TextNode text => Text(text.Text, text.Colour, textWidth, height: rowHeight),
 
         _ => null,
     };
@@ -315,7 +527,7 @@ internal static class NativeRenderer
     /// for the same reason a tooltip's is: a texture cannot carry a muted alpha to be composited
     /// later, so what goes in has to be faded already.
     /// </remarks>
-    private static NodeBase Marker(GlyphTextures glyphs, GlyphNode glyph)
+    private static NodeBase Marker(GlyphTextures glyphs, GlyphNode glyph, float rowHeight)
     {
         var node = new GameImage
         {
@@ -323,7 +535,7 @@ internal static class NativeRenderer
             Size = new System.Numerics.Vector2(GlyphWidth, GlyphWidth),
 
             // Centred against the row rather than sat on its top edge, as the item icon is.
-            Y = (RowHeight - GlyphWidth) / 2f,
+            Y = (rowHeight - GlyphWidth) / 2f,
             IsVisible = true,
         };
 
@@ -345,7 +557,7 @@ internal static class NativeRenderer
     /// it is the only way to get one: these are substituted by the renderer when it meets the
     /// macro, so an icon has no id a node could be pointed at and no character a font could carry.
     /// </remarks>
-    private static GameText Symbol(GameSymbol symbol)
+    private static GameText Symbol(GameSymbol symbol, float rowHeight)
     {
         var builder = new SeStringBuilder();
         builder.AppendIcon((uint)GameSymbols.For(symbol));
@@ -355,7 +567,7 @@ internal static class NativeRenderer
             String = builder.ToReadOnlySeString(),
             FontSize = FontSize,
             AlignmentType = AlignmentType.Left,
-            Size = new System.Numerics.Vector2(SymbolWidth, RowHeight),
+            Size = new System.Numerics.Vector2(SymbolWidth, rowHeight),
             IsVisible = true,
         };
     }
@@ -370,16 +582,16 @@ internal static class NativeRenderer
     /// defaults to 32, game item icons are 40, and the eight pixels of difference are the sliver
     /// that was being cut off every icon.
     /// </remarks>
-    private static GameIcon Icon(ushort iconId) => new()
+    private static GameIcon Icon(ushort iconId, float size, float rowHeight) => new()
     {
         IconId = iconId,
         TextureSize = new System.Numerics.Vector2(GameIconSize, GameIconSize),
         FitTexture = true,
-        Size = new System.Numerics.Vector2(IconSize, IconSize),
+        Size = new System.Numerics.Vector2(size, size),
 
         // Centred against the row rather than sat on its top edge, since the icon is shorter than
         // the line and the eye reads the two as one row.
-        Y = (RowHeight - IconSize) / 2f,
+        Y = (rowHeight - size) / 2f,
         IsVisible = true,
     };
 
@@ -388,9 +600,45 @@ internal static class NativeRenderer
     /// what makes the text sit on the same line as the icon beside it rather than on the row's top
     /// edge.
     /// </remarks>
+    /// <summary>
+    /// A line of a surface's own prose, broken to fit rather than cut to fit.
+    /// </summary>
+    /// <remarks>
+    /// <b>Every standalone line wraps; a line inside a row never does.</b> The two are different
+    /// kinds of writing. A row's text is a name in a column and has to keep its baseline with the
+    /// icon beside it, so a name too long for its column is cut and given in full on hover. A line
+    /// like "every row is two copies of one piece" is a sentence, and half a sentence with an
+    /// ellipsis on it cannot be recovered from anywhere - which is what these were.
+    ///
+    /// How tall it ends up is worked out rather than measured, and the difference matters: asking a
+    /// text node how big its text is answers for the text laid out in one line, whatever the node's
+    /// own width and flags say. Believing that answer left the second line drawn outside the node's
+    /// box and over whatever came next.
+    ///
+    /// So the line count is the full width over the width available, rounded up, with a little
+    /// taken off the divisor because words break where words end rather than where the edge is. The
+    /// estimate leans towards too tall on purpose: a line too many is a gap, and a line too few is
+    /// text written over other text.
+    /// </remarks>
+    private static NodeBase Wrapped(TextNode text, float width)
+    {
+        var node = Text(text.Text, text.Colour, width, height: NoticeLineHeight, wrap: true);
+        node.LineSpacing = WrappedLineSpacing;
+
+        var measured = node.GetTextDrawSize(text.Text);
+        var usable = System.Math.Max(1f, width - WrapSlack);
+        var lines = System.Math.Max(1, (int)System.Math.Ceiling(measured.X / usable));
+
+        // The box is what the lines take, not what the measurement claims. Sizing it to the reported
+        // height of a line left a paragraph with an empty line's worth of window under it, which
+        // read as a gap between it and whatever came next.
+        node.Height = System.Math.Max(NoticeLineHeight, lines * WrappedLineSpacing);
+        return node;
+    }
+
     private static GameText Text(
         string content, ColourRole role, float width, AlignmentType alignment = AlignmentType.Left,
-        float? height = null)
+        float? height = null, bool wrap = false)
     {
         var (fill, outline) = NativePalette.For(role);
 
@@ -401,8 +649,11 @@ internal static class NativeRenderer
             TextOutlineColor = outline,
             // Ellipsis, because a text node otherwise draws past its own width rather than
             // stopping at it - which is how a long name ended up under the scroll bar. Nothing is
-            // lost by cutting it: the row's tooltip opens with the name in full.
-            TextFlags = TextFlags.Edge | TextFlags.Ellipsis,
+            // lost by cutting a name: the row's tooltip opens with it in full. A sentence has no
+            // such second copy, so it is broken across lines instead.
+            TextFlags = wrap
+                ? TextFlags.Edge | TextFlags.WordWrap | TextFlags.MultiLine
+                : TextFlags.Edge | TextFlags.Ellipsis,
             FontSize = FontSize,
             AlignmentType = alignment,
             Size = new System.Numerics.Vector2(width, height ?? RowHeight),
@@ -427,7 +678,7 @@ internal static class NativeRenderer
     /// Anything that is not text or a gap is skipped rather than described. A rule or an icon has
     /// no meaning in a string, and the presenters do not put one in a tooltip.
     /// </remarks>
-    private static ReadOnlySeString Tooltip(IReadOnlyList<Node> lines)
+    internal static ReadOnlySeString Tooltip(IReadOnlyList<Node> lines)
     {
         var builder = new SeStringBuilder();
         var written = 0;

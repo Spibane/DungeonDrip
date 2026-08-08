@@ -53,7 +53,13 @@ internal sealed record RuleNode : Node;
 /// ordinary one a surface offers an action on. The distinction is real: a full-height button in the
 /// middle of a list reads as a section break.
 /// </param>
-internal sealed record ButtonNode(string Label, System.Action Press, bool Small = false) : Node;
+/// <param name="Key">
+/// What tells this button from another with the same words, where a look needs telling. Kept apart
+/// from the label because one of them puts an id in the string and the other would print it: the
+/// game window drew "Show all 40###setsAll" exactly as written.
+/// </param>
+internal sealed record ButtonNode(
+    string Label, System.Action Press, bool Small = false, string? Key = null) : Node;
 
 /// <summary>A checkbox that reads and writes a setting where the setting is being felt.</summary>
 /// <remarks>

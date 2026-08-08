@@ -88,9 +88,11 @@ internal static class ImGuiRenderer
 
             case ButtonNode button:
             {
+                var label = button.Key == null ? button.Label : $"{button.Label}###{button.Key}";
+
                 var pressed = button.Small
-                    ? ImGui.SmallButton(button.Label)
-                    : ImGui.Button(button.Label);
+                    ? ImGui.SmallButton(label)
+                    : ImGui.Button(label);
 
                 if (pressed)
                     button.Press();

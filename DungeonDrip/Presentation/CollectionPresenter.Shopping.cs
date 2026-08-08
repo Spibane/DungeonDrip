@@ -155,10 +155,11 @@ internal static class ShoppingPresenter
             children.Add(new SpacingNode());
             children.Add(new ButtonNode(
                 expanded
-                    ? $"Show the cheapest {CollectionPresenter.InitialOffersShown}###offers{group.CurrencyItemId}"
-                    : $"Show all {group.Pieces.Count}###offers{group.CurrencyItemId}",
+                    ? $"Show the cheapest {CollectionPresenter.InitialOffersShown}"
+                    : $"Show all {group.Pieces.Count}",
                 () => toggleExpanded(group.CurrencyItemId),
-                Small: true));
+                Small: true,
+                Key: $"offers{group.CurrencyItemId}"));
         }
 
         return new CollapsibleNode(

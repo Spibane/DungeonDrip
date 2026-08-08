@@ -97,10 +97,11 @@ internal static class CollectionPresenter
         built.Add(new SpacingNode());
         built.Add(new ButtonNode(
             showAll
-                ? $"Show the closest {InitialSetsShown}###setsAll"
-                : $"Show all {snapshot.Sets.Count}###setsAll",
+                ? $"Show the closest {InitialSetsShown}"
+                : $"Show all {snapshot.Sets.Count}",
             toggleShowAll,
-            Small: true));
+            Small: true,
+            Key: "setsAll"));
 
         return built;
     }

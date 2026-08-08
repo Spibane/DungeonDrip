@@ -460,6 +460,11 @@ internal abstract unsafe class NativePanelAddon : IDisposable
         /// </remarks>
         protected override unsafe void OnSetup(AtkUnitBase* addon, Span<AtkValue> values)
         {
+            // <b>The scroll area is attached before the chrome, and the order is load-bearing.</b>
+            // A scroll area clips what it draws but not what a click can reach, so a list scrolled
+            // up puts its rows' collision over whatever sits above it - and of two overlapping
+            // nodes the later sibling wins. Attached last, the chrome stays reachable however far
+            // the list is scrolled; attached first, its buttons went dead the moment one was.
             chrome = new VerticalListNode
             {
                 FitContents = true,
@@ -471,8 +476,6 @@ internal abstract unsafe class NativePanelAddon : IDisposable
                 ItemSpacing = ChromeSpacing,
                 IsVisible = true,
             };
-
-            AddNode(chrome);
 
             header = new VerticalListNode { FitContents = true, IsVisible = false };
             chrome.AddNode(header);
@@ -502,6 +505,7 @@ internal abstract unsafe class NativePanelAddon : IDisposable
             scroller.ContentNode.FitWidth = false;
 
             AddNode(scroller);
+            AddNode(chrome);
 
             Relayout();
         }

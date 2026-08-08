@@ -51,6 +51,14 @@ internal enum Surfaces
     MarketBoardPanel = 1 << 3,
     LootCompanion = 1 << 4,
 
+    /// <summary>The duty view and the collection view, which are one window with two modes.</summary>
+    /// <remarks>
+    /// One flag for both, because they are one window and its toolbar switches between them. Taking
+    /// over half of it would leave a button on screen that switched to a view this look could not
+    /// draw.
+    /// </remarks>
+    MainWindow = 1 << 5,
+
     /// <summary>Every panel that rides beside a game window.</summary>
     /// <remarks>
     /// Named rather than spelled out at the call site, because these four go native together and

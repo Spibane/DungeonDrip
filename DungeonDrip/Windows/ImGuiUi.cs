@@ -30,8 +30,12 @@ internal sealed class ImGuiUi : IPluginUi
 
         mainWindow = new MissingItemsWindow(plugin);
         configWindow = new ConfigWindow(plugin);
-        windowSystem.AddWindow(mainWindow);
         windowSystem.AddWindow(configWindow);
+
+        // The settings window is always here; the main one only when nothing else has taken it. It
+        // is still built either way, since the seam below answers through it.
+        if (!without.HasFlag(Surfaces.MainWindow))
+            windowSystem.AddWindow(mainWindow);
 
         // Always open; each decides for itself whether the addon it rides on is up.
         if (!without.HasFlag(Surfaces.LootCompanion))

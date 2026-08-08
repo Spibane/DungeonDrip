@@ -191,14 +191,20 @@ internal static class DresserTabPresenter
         // row is reporting and was being left for the reader to infer from a location heading and a
         // trailing clause, and where it reads from is not guessable from the contents and changes
         // what an empty list means.
+        // One node rather than the two this was written as. The break was put in by hand because
+        // the overlay does not wrap, and a sentence broken by hand cannot be re-broken to fit - so
+        // the halves sat at the spacing of two separate lines with the second half wrapping again
+        // underneath, which read as three lines with the gaps in the wrong places.
         var built = new List<Node>
         {
-            new TextNode("Every row is two copies of one piece:", ColourRole.Muted),
             new TextNode(
                 plugin.Ownership.Retainers.Count > 0
-                    ? "one in your bags, armoury chest, saddlebag or with a retainer, and one the collection has."
-                    : "one in your bags, armoury chest or saddlebag, and one the collection has.",
-                ColourRole.Muted),
+                    ? "Every row is two copies of one piece: one in your bags, armoury chest, " +
+                      "saddlebag or with a retainer, and one the collection has."
+                    : "Every row is two copies of one piece: one in your bags, armoury chest or " +
+                      "saddlebag, and one the collection has.",
+                ColourRole.Muted,
+                Wrap: true),
         };
 
         if (snapshot.Carried.AlreadyStored.Count == 0 && snapshot.Carried.OnlyInsideAnOutfit.Count == 0)
@@ -320,16 +326,6 @@ internal static class DresserTabPresenter
             new TextNode(CollectionSnapshot.SecondCopy(piece.StoredIn), ColourRole.Muted),
         };
 
-        if (insideOutfit)
-        {
-            // Why this one is amber rather than grey. The dresser's copy is not a piece sitting in
-            // the box, it is a slot of a whole set sitting in the box, so it is only there for as
-            // long as the set is - which the two flat statements above cannot say on their own.
-            tooltip.Add(new TextNode(
-                "That second copy belongs to the set, so taking the set out takes it too.",
-                ColourRole.Warning));
-        }
-
         if (piece.ArmoireWouldTake)
             tooltip.Add(new TextNode("The Armoire would take this too.", ColourRole.Muted));
 
@@ -337,8 +333,14 @@ internal static class DresserTabPresenter
             [new IconNode(piece.IconId, 20), new TextNode($"{piece.Name}{quantity}")],
             tooltip,
             new ItemContext(piece.ItemId, piece.Name),
+            // Shorter than the plugin's usual wording for this state, which is "part of a stored
+            // outfit set" and is both too long for the space and, after all that, a sentence about
+            // set mechanics the game explains itself when a set is taken out. What the row has to
+            // say is where the other copy is; the amber says it is a set's slot rather than a piece.
             new TextNode(
-                $"- also {MissingItems.Describe(piece.StoredIn).ToLowerInvariant()}",
+                insideOutfit
+                    ? "- also in a stored outfit"
+                    : $"- also {MissingItems.Describe(piece.StoredIn).ToLowerInvariant()}",
                 insideOutfit ? ColourRole.Warning : ColourRole.Muted));
     }
 
@@ -364,11 +366,14 @@ internal static class DresserTabPresenter
         // What the amber rows mean, said only when there are some. The row itself says which pieces
         // they are and the hover says what to do about it; this is here so the colour is not a thing
         // to work out.
+        // What the colour means, and nothing about what follows from it. That a set comes out whole
+        // is the game's to explain and it does, on the screen where it would happen.
         if (snapshot.Carried!.OnlyInsideAnOutfit.Count > 0)
         {
             built.Add(new TextNode(
-                "Amber: the second copy is a slot of a stored outfit set rather than a piece of its own.",
-                ColourRole.Muted));
+                "Amber: the second copy is inside a stored outfit set.",
+                ColourRole.Muted,
+                Wrap: true));
         }
 
         if (!snapshot.Carried.SaddlebagReadable)
