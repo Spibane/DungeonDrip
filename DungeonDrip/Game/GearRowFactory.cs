@@ -82,6 +82,16 @@ public sealed class GearRowFactory(Plugin plugin)
         var (stored, total) = MissingItems.Shortfall(
             itemId, view, sets, source, plugin.Configuration.OutfitOwnership, plugin.Configuration.Scope);
 
+        // The Armoire's half of the same question. A piece it would take cannot be called missing on
+        // the strength of a snapshot taken a patch ago or never taken at all - and only when the
+        // Armoire is being compared against, since a dresser-only comparison never claimed anything
+        // about it in the first place.
+        var armoireInDoubt =
+            source == OwnershipSource.None &&
+            kind.HasFlag(StorageKind.Armoire) &&
+            plugin.Configuration.Scope != CollectionScope.DresserOnly &&
+            plugin.Ownership.IsArmoireStale;
+
         var (slotOrder, slotName) = EquipSlots.Describe(item.EquipSlotCategory.Value);
 
         return new GearRow(
@@ -90,7 +100,8 @@ public sealed class GearRowFactory(Plugin plugin)
             (ushort)item.Icon,
             slotOrder,
             slotName,
-            CollectionMarkers.For(source, plugin.Ownership.HasDresserData, completed, stored > 0),
+            CollectionMarkers.For(
+                source, plugin.Ownership.HasDresserData, completed, stored > 0, armoireInDoubt),
             plugin.JobFilter.CanEquip(item),
             plugin.EquipLocks.LocksOn(item),
             stored,
@@ -100,6 +111,7 @@ public sealed class GearRowFactory(Plugin plugin)
     private MarkerContext Capture() => new(
         plugin.Ownership.Revision,
         plugin.Ownership.HasDresserData,
+        plugin.Ownership.IsArmoireStale,
         plugin.Configuration.Scope,
         plugin.Configuration.OutfitOwnership,
         plugin.Configuration.CountInventoryAndEquipped,
@@ -114,8 +126,11 @@ public sealed class GearRowFactory(Plugin plugin)
     /// invalidates this" to a single line instead of several scattered checks.
     /// </summary>
     /// <remarks>
-    /// Staleness is absent on purpose: it changes how a marker is drawn, not which marker it is, so
-    /// an ageing snapshot never rebuilds the cache. The job, the gender and the race are here because
+    /// Dresser staleness is absent on purpose: it changes how a marker is drawn, not which marker it
+    /// is, so an ageing dresser snapshot never rebuilds the cache. The Armoire's is here for the
+    /// opposite reason - it decides between two markers - and it is the one that moves on its own,
+    /// crossing the threshold on a clock rather than on anything the player did. The job, the gender
+    /// and the race are here because
     /// wearability is baked into the row - the last two because a Fantasia mid-session would
     /// otherwise leave every cached row answering for the previous appearance.
     ///
@@ -125,6 +140,7 @@ public sealed class GearRowFactory(Plugin plugin)
     private readonly record struct MarkerContext(
         int OwnershipRevision,
         bool HasDresserData,
+        bool ArmoireIsStale,
         CollectionScope Scope,
         OutfitOwnershipMode OutfitMode,
         bool CountInventory,

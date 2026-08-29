@@ -41,6 +41,10 @@ internal static class Glyphs
         GlyphToken.WornByRetainer => FontAwesomeIcon.UserTie,
         GlyphToken.NotCollected => FontAwesomeIcon.Times,
 
+        // A ringed question mark rather than the bare one Unknown gets. The two sit on the same
+        // list and mean different amounts of doubt, so they cannot be the same shape.
+        GlyphToken.ArmoireUnread => FontAwesomeIcon.QuestionCircle,
+
         GlyphToken.InBags => FontAwesomeIcon.Briefcase,
         GlyphToken.InArmoury => FontAwesomeIcon.Archive,
         GlyphToken.Equipped => FontAwesomeIcon.User,

@@ -4,7 +4,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-0.17.2-121212)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.18.0-121212)](./CHANGELOG.md)
 [![Status](https://img.shields.io/badge/status-Beta-yellow)](./CHANGELOG.md)
 [![Changelog](https://img.shields.io/badge/changelog-blue)](./CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-AGPL--3.0--or--later-663366)](./LICENSE)
@@ -125,6 +125,7 @@ collected".
 | briefcase | grey | Carried or equipped |
 | figure | grey | In a retainer's bags |
 | figure in a tie | grey | Worn by a retainer, not in their bags |
+| ringed question mark | amber | Not in the dresser, and the Armoire that could have it has not been read lately |
 | question mark | amber | No dresser data — nothing can honestly be said either way |
 
 The marker carries the state; the name only says whether the thing is needed. Missing pieces are named
@@ -135,6 +136,13 @@ the red x and the green star.
 glamours are added far more often than they are removed, so an old snapshot's "owned" almost always
 still holds, while its "not owned" is exactly what goes out of date. Amber on an x means *probably new,
 but worth checking*.
+
+**The Armoire has its own age, and it is usually the older one.** The dresser is re-read on any glamour
+operation; the Armoire only loads when it is opened at an inn. A piece the Armoire accepts, that the
+dresser does not have, gets the ringed question mark rather than the red x whenever that Armoire read is
+older than the staleness setting — including when it has never happened at all. It still counts as
+missing and still shows in the lists, because most of what the Armoire accepts is not in anybody's
+Armoire; the mark says the plugin cannot rule it out, not that it has.
 
 Three buttons at the top flip the list filters without a trip to Settings — whether owned pieces are
 listed, whether the list is held to the current job, and whether weapons are included. They write the

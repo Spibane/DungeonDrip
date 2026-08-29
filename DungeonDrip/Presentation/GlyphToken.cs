@@ -42,6 +42,17 @@ internal enum GlyphToken
     /// <summary>Nowhere in the collection, and the collection was actually read.</summary>
     NotCollected,
 
+    /// <summary>
+    /// Not in the dresser, and the Armoire that might have it has not been read recently enough to
+    /// say.
+    /// </summary>
+    /// <remarks>
+    /// Distinct from <see cref="Unknown"/> even though both mark a doubt, because a backend has two
+    /// different things to convey: one says nothing was read, the other says one box of two was.
+    /// Sharing a shape would have made the narrower state unreadable.
+    /// </remarks>
+    ArmoireUnread,
+
     /// <summary>No snapshot exists, so no claim can honestly be made either way.</summary>
     Unknown,
 

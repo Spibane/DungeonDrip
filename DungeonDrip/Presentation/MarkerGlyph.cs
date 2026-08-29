@@ -27,6 +27,7 @@ internal static class MarkerGlyph
         CollectionMarker.Retainer => GlyphToken.WithRetainer,
         CollectionMarker.RetainerEquipped => GlyphToken.WornByRetainer,
         CollectionMarker.NotCollected => GlyphToken.NotCollected,
+        CollectionMarker.ArmoireUnread => GlyphToken.ArmoireUnread,
         _ => GlyphToken.Unknown,
     };
 
@@ -50,8 +51,8 @@ internal static class MarkerGlyph
     /// What the glyph's colour is saying, which is not the same question as which glyph it is.
     /// </summary>
     /// <remarks>
-    /// A partway outfit and an unread snapshot both come out as
-    /// <see cref="ColourRole.Warning"/> rather than as the missing red: in both cases the piece may
+    /// A partway outfit, an unread Armoire and an unread snapshot all come out as
+    /// <see cref="ColourRole.Warning"/> rather than as the missing red: in every case the piece may
     /// well be in the box and it is the claim that is unsatisfied, so the hover is what settles it.
     /// The red is kept for the one state that means go and get one.
     /// </remarks>
@@ -60,6 +61,7 @@ internal static class MarkerGlyph
         CollectionMarker.OutfitComplete => ColourRole.Good,
         CollectionMarker.NotCollected => uncertain ? ColourRole.Warning : ColourRole.NotOwned,
         CollectionMarker.OutfitPartial => ColourRole.Warning,
+        CollectionMarker.ArmoireUnread => ColourRole.Warning,
         CollectionMarker.Unknown => ColourRole.Warning,
         _ => ColourRole.Muted,
     };
