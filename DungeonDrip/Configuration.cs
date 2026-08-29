@@ -336,6 +336,21 @@ public class Configuration : IPluginConfiguration
     public bool ShowGameContextMenu { get; set; } = true;
 
     /// <summary>
+    /// Draw the plugin's windows as the game's own windows rather than as plugin overlays.
+    /// </summary>
+    /// <remarks>
+    /// Off while the native surfaces are still arriving one at a time. What is drawn natively is
+    /// behind what the plugin overlays do - markers are placeholders and some toolbars are missing
+    /// - so on by default would be a downgrade for anyone who has those today, and this is a thing
+    /// to go and try rather than to be given.
+    ///
+    /// The settings window is not covered and never will be, so a mixed look is the destination
+    /// rather than a stage of getting there. A native surface that fails to start falls back on its
+    /// own: see <c>NativeUi</c>, which would rather be the old look for a session than be nothing.
+    /// </remarks>
+    public bool UseNativeUi { get; set; }
+
+    /// <summary>
     /// Append a line to the game's own item tooltip saying where the piece is in the collection.
     /// </summary>
     /// <remarks>

@@ -3,11 +3,16 @@ using DungeonDrip.Presentation;
 
 namespace DungeonDrip.Windows;
 
-/// <summary>The ImGui backend's answer to each <see cref="GlyphToken"/>.</summary>
+/// <summary>The FontAwesome glyph behind each <see cref="GlyphToken"/>.</summary>
 /// <remarks>
-/// These are the FontAwesome glyphs the panels have always drawn, unchanged. The readme's marker
-/// table describes them by shape, so a change here is a change to a document as well as to a
-/// window.
+/// These are the glyphs the panels have always drawn, unchanged. The readme's marker table
+/// describes them by shape, so a change here is a change to a document as well as to a window.
+///
+/// <b>Both backends read this, which is why one table is enough.</b> The native panels draw these
+/// same glyphs rather than curated game icon ids - see <c>Native.GlyphTextures</c> on why those ids
+/// would have been guesses - so the marker vocabulary is one set of shapes and the readme can go on
+/// naming them. It lives here rather than in <c>Presentation</c> because naming a shape is a
+/// rendering decision, and the rule that no presenter may name one is what keeps it revisitable.
 ///
 /// Two tokens share a glyph: <see cref="GlyphToken.InArmoire"/> and
 /// <see cref="GlyphToken.InArmoury"/> are both an archive box, and
@@ -35,6 +40,10 @@ internal static class Glyphs
         // The dressed figure, because this one is not in any bag: the retainer has it on.
         GlyphToken.WornByRetainer => FontAwesomeIcon.UserTie,
         GlyphToken.NotCollected => FontAwesomeIcon.Times,
+
+        // A ringed question mark rather than the bare one Unknown gets. The two sit on the same
+        // list and mean different amounts of doubt, so they cannot be the same shape.
+        GlyphToken.ArmoireUnread => FontAwesomeIcon.QuestionCircle,
 
         GlyphToken.InBags => FontAwesomeIcon.Briefcase,
         GlyphToken.InArmoury => FontAwesomeIcon.Archive,

@@ -622,7 +622,24 @@ public class ConfigWindow : Window
     {
         var changed = false;
 
-        TabHeading("Right-click menus");
+        TabHeading(
+            "Window look",
+            "Which of the plugin's own windows are drawn by the game.");
+
+        var nativeUi = configuration.UseNativeUi;
+        if (UiParts.Toggle("Draw the panels as game windows", ref nativeUi,
+                "The panels beside vendors, the market board, the Glamour Dresser and the\n" +
+                "Armoire are drawn as the game's own windows: they follow your UI theme,\n" +
+                "scale with your UI scale and hide with the rest of the interface.\n\n" +
+                "They cannot be resized by dragging, because a game window has no resize\n" +
+                "handle - use the header's own right-click menu to scale one instead.\n\n" +
+                "This window, the duty window and the loot roll list stay as they are."))
+        {
+            configuration.UseNativeUi = nativeUi;
+            changed = true;
+        }
+
+        SectionHeading("Right-click menus");
 
         var contextMenu = configuration.ShowGameContextMenu;
         if (UiParts.Toggle("Add gear options to the game's right-click menus", ref contextMenu,

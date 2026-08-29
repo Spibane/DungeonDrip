@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
-using Dalamud.Interface;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
@@ -40,8 +39,6 @@ public abstract unsafe class AddonPanelWindow : Window
 
     private const float MinWidth = 180f;
     private const float MinHeight = 120f;
-
-    protected const string SharedNote = "Also applies to the duty list.";
 
     protected readonly Plugin Plugin;
 
@@ -114,11 +111,11 @@ public abstract unsafe class AddonPanelWindow : Window
     /// </remarks>
     protected abstract IReadOnlyList<GearRow>? ResolveRows();
 
-    /// <summary>Drawn above the toolbar, for anything the panel wants to say about itself.</summary>
-    protected virtual void DrawHeader() { }
+    /// <summary>Shown above the toolbar, for anything the panel wants to say about itself.</summary>
+    private protected virtual IReadOnlyList<Node> Header() => [];
 
-    /// <summary>Extra buttons after the shared filters. Returns whether a setting moved.</summary>
-    protected virtual bool DrawExtraToolbarButtons() => false;
+    /// <summary>Extra buttons after the shared filters, described rather than drawn.</summary>
+    private protected virtual IReadOnlyList<ToolButtonModel> ExtraToolButtons() => [];
 
     /// <summary>
     /// Whether the show-owned filter means anything here.
@@ -201,11 +198,16 @@ public abstract unsafe class AddonPanelWindow : Window
         var display = ImGui.GetIO().DisplaySize;
         var scale = ImGuiHelpers.GlobalScale;
 
+        // Against the window rather than the rectangle the game reports for it - see
+        // <see cref="AddonFrame"/> on why those are not always the same thing.
+        var frame = AddonFrame.For(name);
+
         // Matching the addon's height keeps a long list on screen, and lines the two windows up.
         // A size the user dragged to wins.
         var desired = Settings is { Width: > 0, Height: > 0 }
             ? new Vector2(Settings.Width, Settings.Height)
-            : new Vector2(contentWidth, unit->GetScaledHeight(true));
+            : new Vector2(
+                contentWidth, unit->GetScaledHeight(true) - frame.Top - frame.Bottom);
 
         // Against the constraints as ImGui will enforce them, not as they were written: a floor the
         // window then overrides is a size asked for and not got, which reads as a drag below.
@@ -239,7 +241,13 @@ public abstract unsafe class AddonPanelWindow : Window
         }
 
         var placement = AddonPlacement.Of(unit);
-        Position = AddonAnchor.Beside(placement.Position, placement.Width, Settings.Side, desired, display);
+
+        Position = AddonAnchor.Beside(
+            placement.Position + new Vector2(frame.Left, frame.Top),
+            placement.Width - frame.Left - frame.Right,
+            Settings.Side,
+            desired,
+            display);
         PositionCondition = ImGuiCond.Always;
     }
 
@@ -260,15 +268,9 @@ public abstract unsafe class AddonPanelWindow : Window
         if (rows == null)
             return;
 
-        DrawHeader();
+        ImGuiRenderer.Draw(Plugin, Header());
 
-        if (DrawToolbar())
-        {
-            Plugin.Configuration.Save();
-
-            // The filters are shared with the duty list, so flipping one here has to rebuild that.
-            Plugin.InvalidateReport();
-        }
+        ImGuiRenderer.Toolbar(toolbarId, ToolButtons());
 
         var ownership = Plugin.Ownership;
 
@@ -279,7 +281,7 @@ public abstract unsafe class AddonPanelWindow : Window
         // Unlike a loot roll, these are decisions that can be come back to, so this says how much to
         // trust itself and shows the list anyway rather than refusing.
         if (DependsOnDresserSnapshot)
-            DrawSnapshotWarning(ownership, stale);
+            ImGuiRenderer.Draw(Plugin, PanelPresenter.SnapshotWarning(ownership, stale));
 
         // The same filters the duty window uses, so each means one thing across the plugin.
         var options = new ViewOptions(
@@ -294,10 +296,9 @@ public abstract unsafe class AddonPanelWindow : Window
 
         if (groups.Count == 0)
         {
-            if (hiddenByFilter > 0)
-                ImGui.TextColored(Palette.For(ColourRole.Muted), FilteredEmptyMessage);
-            else
-                ImGui.TextColored(EmptyIsGood ? Palette.For(ColourRole.Good) : Palette.For(ColourRole.Muted), EmptyMessage);
+            ImGuiRenderer.Draw(
+                Plugin,
+                PanelPresenter.Empty(hiddenByFilter > 0, EmptyMessage, FilteredEmptyMessage, EmptyIsGood));
 
             return;
         }
@@ -307,13 +308,8 @@ public abstract unsafe class AddonPanelWindow : Window
         if (!list.Success)
             return;
 
-        foreach (var group in groups)
-            DrawGroup(group, options.GroupBySlot, stale);
+        ImGuiRenderer.Draw(Plugin, PanelPresenter.List(groups, collapsePrefix, row => Row(row, stale)), headers);
     }
-
-    /// <summary>How much to trust the list, said above it rather than instead of it.</summary>
-    private void DrawSnapshotWarning(Game.OwnershipTracker ownership, bool stale) =>
-        ImGuiRenderer.Draw(Plugin, PanelPresenter.SnapshotWarning(ownership, stale));
 
     /// <summary>
     /// One row: the marker glyph, the icon, the name, its menu and its tooltip.
@@ -322,8 +318,8 @@ public abstract unsafe class AddonPanelWindow : Window
     /// Virtual because a panel whose rows are all the same marker by construction gets nothing from
     /// the glyph and would rather spend that column on something it does know.
     /// </remarks>
-    protected virtual void DrawRow(GearRow row, bool stale) =>
-        ImGuiRenderer.Draw(Plugin, PanelPresenter.Row(row, stale, UncertainNote));
+    private protected virtual Node Row(GearRow row, bool stale) =>
+        PanelPresenter.Row(row, stale, UncertainNote);
 
     /// <summary>
     /// Keeps a value between two bounds, with the floor winning if the ceiling is below it.
@@ -382,78 +378,50 @@ public abstract unsafe class AddonPanelWindow : Window
     /// The list filters, as buttons rather than a trip to Settings.
     /// </summary>
     /// <remarks>
-    /// They write the shared settings rather than per-panel copies: standing at a vendor is where the
-    /// wrong filter gets noticed. Each button shows the state it is in, not the state it would move to,
-    /// so it reads as an indicator that can also be pressed.
+    /// The order is the shared filters, then the reset-size button, then whatever the panel adds.
+    /// It has been that order since the buttons existed and moving one moves it on every panel at
+    /// once, which is the sort of change that is noticed and not welcomed.
     /// </remarks>
-    private bool DrawToolbar()
+    private IReadOnlyList<ToolButtonModel> ToolButtons()
     {
-        var configuration = Plugin.Configuration;
-        var changed = false;
-
-        if (HasOwnedRows)
-        {
-            var showOwned = configuration.ShowOwnedItems;
-            if (UiParts.ToolButton(
-                    $"##{toolbarId}Owned",
-                    showOwned ? FontAwesomeIcon.Eye : FontAwesomeIcon.EyeSlash,
-                    showOwned
-                        ? "Showing pieces you already have. Click to list only what you are missing.\n" + SharedNote
-                        : "Hiding pieces you already have. Click to list them too.\n" + SharedNote))
-            {
-                configuration.ShowOwnedItems = !showOwned;
-                changed = true;
-            }
-
-            ImGui.SameLine();
-        }
-
-        var jobOnly = configuration.OnlyCurrentJobEquippable;
-        if (UiParts.ToolButton(
-                $"##{toolbarId}Job",
-                jobOnly ? FontAwesomeIcon.User : FontAwesomeIcon.Users,
-                jobOnly
-                    ? "Showing only what your current job can wear. Click to show every job.\n" + SharedNote
-                    : "Showing gear for every job. Click to show only your current job.\n" + SharedNote))
-        {
-            configuration.OnlyCurrentJobEquippable = !jobOnly;
-            changed = true;
-        }
-
-        ImGui.SameLine();
-
-        var hideWeapons = configuration.HideWeapons;
-        if (UiParts.ToolButton(
-                $"##{toolbarId}Weapons",
-                hideWeapons ? FontAwesomeIcon.Ban : FontAwesomeIcon.Khanda,
-                hideWeapons
-                    ? "Hiding weapons and off-hands. Click to list them.\n" + SharedNote
-                    : "Listing weapons and off-hands. Click to hide them.\n" + SharedNote))
-        {
-            configuration.HideWeapons = !hideWeapons;
-            changed = true;
-        }
+        var buttons = new List<ToolButtonModel>(
+            PanelPresenter.Filters(Plugin.Configuration, HasOwnedRows, FiltersChanged));
 
         // Only once there is something to undo. Without it a drag is a one-way door.
+        //
+        // Absent rather than disabled in the game look, and not by omission here: a game window has
+        // no resize handle, so there is never a dragged size to undo and a button offering to undo
+        // one would be answering a question that look does not ask.
         if (Settings is { Width: > 0, Height: > 0 })
         {
-            ImGui.SameLine();
+            buttons.Add(new ToolButtonModel(
+                ToolGlyph.SizeOverridden,
+                "Using a size you set. Click to match the game window again.",
+                () =>
+                {
+                    Settings.Width = 0;
+                    Settings.Height = 0;
 
-            if (UiParts.ToolButton(
-                    $"##{toolbarId}Size",
-                    FontAwesomeIcon.ArrowsAltV,
-                    "Using a size you set. Click to match the game window again."))
-            {
-                Settings.Width = 0;
-                Settings.Height = 0;
-                changed = true;
-            }
+                    // Saved but not invalidating the report, unlike the filters: the duty list does
+                    // not care how big this panel is.
+                    Plugin.Configuration.Save();
+                }));
         }
 
-        changed |= DrawExtraToolbarButtons();
+        buttons.AddRange(ExtraToolButtons());
+        return buttons;
+    }
 
-        ImGui.Separator();
-        return changed;
+    /// <summary>What a filter press has to do beyond writing the setting.</summary>
+    /// <remarks>
+    /// The filters are shared with the duty list, so flipping one here has to rebuild that as well
+    /// as save. Handed to the presenter rather than reported back from it, because the presenter is
+    /// what knows which buttons write shared settings.
+    /// </remarks>
+    private protected void FiltersChanged()
+    {
+        Plugin.Configuration.Save();
+        Plugin.InvalidateReport();
     }
 
     private void Regroup(IReadOnlyList<GearRow> fresh, ViewOptions options)
@@ -464,31 +432,6 @@ public abstract unsafe class AddonPanelWindow : Window
         groupedFrom = fresh;
         groupedWith = options;
         hiddenByFilter = PanelGrouping.Regroup(fresh, options, groups);
-    }
-
-    private void DrawGroup(SlotGroup group, bool bySlot, bool stale)
-    {
-        if (!bySlot)
-        {
-            foreach (var row in group.Rows)
-                DrawRow(row, stale);
-
-            return;
-        }
-
-        var label = group.Hidden > 0
-            ? $"{group.Label}  ({group.NotCollected} of {group.Rows.Count + group.Hidden})"
-            : group.NotCollected > 0
-                ? $"{group.Label}  ({group.NotCollected})"
-                : group.Label;
-
-        if (!UiParts.CollapsingHeader(headers, label, collapsePrefix + group.Label))
-            return;
-
-        foreach (var row in group.Rows)
-            DrawRow(row, stale);
-
-        ImGui.Spacing();
     }
 
     /// <summary>

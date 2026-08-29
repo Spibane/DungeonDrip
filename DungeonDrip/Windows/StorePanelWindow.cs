@@ -1,6 +1,4 @@
-using Dalamud.Bindings.ImGui;
-using Dalamud.Interface;
-using Dalamud.Interface.Utility.Raii;
+using System.Collections.Generic;
 using DungeonDrip.Core;
 using DungeonDrip.Presentation;
 
@@ -23,12 +21,9 @@ namespace DungeonDrip.Windows;
 /// </remarks>
 public abstract class StorePanelWindow : AddonPanelWindow
 {
-    private readonly string toolbarId;
-
     protected StorePanelWindow(Plugin plugin, string title, string collapsePrefix, string toolbarId)
         : base(plugin, title, collapsePrefix, toolbarId)
     {
-        this.toolbarId = toolbarId;
     }
 
     /// <summary>Every row here is one the box has not got, so the filter has nothing to act on.</summary>
@@ -38,100 +33,20 @@ public abstract class StorePanelWindow : AddonPanelWindow
     protected override bool EmptyIsGood => true;
 
     /// <summary>Anything this box wants to add to a row's tooltip.</summary>
-    protected virtual void DrawRowNotes(HeldGearRow row) { }
+    private protected virtual IReadOnlyList<Node> RowNotes(HeldGearRow row) => [];
 
-    /// <summary>
-    /// The two filters for gear that is already spoken for.
-    /// </summary>
-    /// <remarks>
-    /// Written to the settings both store panels read, not to a pair of their own: armoury gear is a
-    /// gearset's and worn gear has to come off whichever box is being stood at, so switching one at the
-    /// dresser and finding it switched at the Armoire is the behaviour that needs no explaining.
-    /// </remarks>
-    protected sealed override bool DrawExtraToolbarButtons()
-    {
-        var configuration = Plugin.Configuration;
-        var changed = false;
-
-        ImGui.SameLine();
-
-        var armoury = configuration.DresserPanelIncludesArmoury;
-        if (UiParts.ToolButton(
-                $"##{toolbarId}Armoury",
-                armoury ? FontAwesomeIcon.Archive : FontAwesomeIcon.BoxOpen,
-                armoury
-                    ? "Listing armoury chest gear. Click to hide it."
-                    : "Hiding armoury chest gear. Click to list it."))
-        {
-            configuration.DresserPanelIncludesArmoury = !armoury;
-            changed = true;
-        }
-
-        ImGui.SameLine();
-
-        var equipped = configuration.DresserPanelIncludesEquipped;
-        if (UiParts.ToolButton(
-                $"##{toolbarId}Equipped",
-                equipped ? FontAwesomeIcon.Tshirt : FontAwesomeIcon.UserSlash,
-                equipped
-                    ? "Listing gear you are wearing. Click to hide it."
-                    : "Hiding gear you are wearing. Click to list it."))
-        {
-            configuration.DresserPanelIncludesEquipped = !equipped;
-            changed = true;
-        }
-
-        return changed;
-    }
+    /// <summary>The two filters for gear that is already spoken for.</summary>
+    private protected sealed override IReadOnlyList<ToolButtonModel> ExtraToolButtons() =>
+        PanelPresenter.StoreFilters(Plugin.Configuration, FiltersChanged);
 
     /// <summary>
     /// Every row here is one the box has not got by construction, so the ownership glyph would say
     /// the same thing on all of them. The column goes to where the piece is instead, which is the part
     /// that changes what has to be done about it.
     /// </summary>
-    protected sealed override void DrawRow(GearRow row, bool stale)
+    private protected sealed override Node Row(GearRow row, bool stale)
     {
         var held = (HeldGearRow)row;
-
-        ImGui.AlignTextToFramePadding();
-
-        using (Plugin.PluginInterface.UiBuilder.IconFontFixedWidthHandle.Push())
-        {
-            ImGui.TextColored(
-                Palette.For(held.Blocked == null ? ColourRole.Muted : ColourRole.Warning),
-                Glyphs.For(MarkerGlyph.For(held.Location)).ToIconString());
-        }
-
-        ImGui.SameLine();
-        UiParts.ItemIcon(row.IconId, 20);
-
-        var quantity = held.Quantity > 1 ? $"  x{held.Quantity}" : string.Empty;
-        ImGui.Text($"{row.Name}{quantity}");
-
-        var hovered = ImGui.IsItemHovered();
-        UiParts.ItemContextMenu(Plugin, row.ItemId, row.Name);
-
-        if (!hovered)
-            return;
-
-        using var tooltip = ImRaii.Tooltip();
-        ImGui.Text(row.Name);
-        ImGui.TextColored(Palette.For(ColourRole.Muted), Describe(held.Location));
-
-        DrawRowNotes(held);
-
-        if (held.Blocked != null)
-            ImGui.TextColored(Palette.For(ColourRole.Warning), held.Blocked);
-
-        ImGui.Spacing();
-        ImGui.TextColored(Palette.For(ColourRole.Muted), "Right-click for options.");
+        return StorePanelPresenter.Row(held, RowNotes(held));
     }
-
-    private static string Describe(CarryLocation location) => location switch
-    {
-        CarryLocation.Bags => "In your bags",
-        CarryLocation.Armoury => "In your armoury chest",
-        CarryLocation.Equipped => "Equipped",
-        _ => "In your saddlebag",
-    };
 }

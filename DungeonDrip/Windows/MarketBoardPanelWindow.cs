@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using DungeonDrip.Core;
 using DungeonDrip.Game;
+using DungeonDrip.Presentation;
 
 namespace DungeonDrip.Windows;
 
@@ -29,6 +30,5 @@ public sealed class MarketBoardPanelWindow(Plugin plugin)
     /// so the snapshot behind this panel is almost always the oldest one the plugin ever draws
     /// from.
     /// </remarks>
-    protected override string? UncertainNote =>
-        "Your dresser snapshot predates this - check before buying.";
+    protected override string? UncertainNote => PanelText.MarketUncertain;
 }

@@ -44,6 +44,7 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] internal static ISigScanner SigScanner { get; private set; } = null!;
     [PluginService] internal static IGameInteropProvider GameInterop { get; private set; } = null!;
     [PluginService] internal static IPluginLog Log { get; private set; } = null!;
+    [PluginService] internal static ICondition Condition { get; private set; } = null!;
 
     private const string CommandName = "/dungeondrip";
 
@@ -162,6 +163,9 @@ public sealed class Plugin : IDalamudPlugin
     /// <summary>The gear the market board is currently browsing.</summary>
     public MarketBoardWatcher Market { get; }
 
+    /// <summary>What is up for a Need/Greed roll, for the companion window in either look.</summary>
+    public LootRollWatcher Loot { get; }
+
     private readonly ContentFinderIndex contentFinder;
     private readonly JobRoleIndex jobRoles;
     private readonly LootObserver lootObserver;
@@ -169,7 +173,21 @@ public sealed class Plugin : IDalamudPlugin
     private readonly ItemTooltipLine tooltipLine;
     private readonly HttpFetcher http = new();
 
-    private readonly IPluginUi ui;
+    /// <summary>
+    /// The windows, in whichever look is switched on.
+    /// </summary>
+    /// <remarks>
+    /// Not readonly, because the look can be changed while the plugin is running - see
+    /// <see cref="SwapUi"/> for why that has to happen where it does.
+    /// </remarks>
+    private IPluginUi ui;
+
+    /// <summary>Which look <see cref="ui"/> was built as, so the setting moving is noticed.</summary>
+    /// <remarks>
+    /// What was asked for rather than what was got. A native start that falls back still counts as
+    /// native here, or a failure would be retried on every tick for the rest of the session.
+    /// </remarks>
+    private bool uiIsNative;
 
     private Core.Sources.ItemSources? itemSources;
     private DutyReportBuilder? reportBuilder;
@@ -218,6 +236,7 @@ public sealed class Plugin : IDalamudPlugin
         Dresser = new DresserAddWatcher(this);
         Armoire = new ArmoireAddWatcher(this);
         Market = new MarketBoardWatcher(this);
+        Loot = new LootRollWatcher(this);
         gameContextMenu = new GameContextMenu(this);
         tooltipLine = new ItemTooltipLine(this, SigScanner, GameInterop);
         Wiki = new WikiLootSource(configDirectory, Configuration, http);
@@ -226,7 +245,8 @@ public sealed class Plugin : IDalamudPlugin
         // returning user has data before the first frame and a first-time user gets it shortly after.
         LootData = new LootDataService(configDirectory, LearnedLoot, Wiki, contentFinder, Storage, http);
 
-        ui = new ImGuiUi(this);
+        uiIsNative = Configuration.UseNativeUi;
+        ui = uiIsNative ? Native.NativeUi.Start(this) : new ImGuiUi(this);
 
         currentTerritory = ClientState.TerritoryType;
 
@@ -335,6 +355,34 @@ public sealed class Plugin : IDalamudPlugin
     /// Follows the character between zones: stales the report and decides whether the window should
     /// open or close on its own.
     /// </summary>
+    /// <summary>
+    /// Rebuilds the windows in the other look.
+    /// </summary>
+    /// <remarks>
+    /// <b>On the framework tick, and never during drawing.</b> One of these backends owns a
+    /// <c>WindowSystem</c> that is being iterated inside the draw callback, and disposing it from in
+    /// there is a use-after-free rather than a flicker - so the setting only records what is wanted
+    /// and the swap happens here, where nothing is mid-draw.
+    ///
+    /// The main and settings windows have their open state carried across by hand. The settings one
+    /// is not optional: the switch that gets here is inside it, so dropping the state would close
+    /// the window the player just clicked in. Nothing else survives on purpose - a panel belongs to
+    /// whichever game window is open and will be back on its own.
+    /// </remarks>
+    private void SwapUi()
+    {
+        var mainOpen = ui.MainOpen;
+        var configOpen = ui.ConfigOpen;
+
+        uiIsNative = Configuration.UseNativeUi;
+
+        ui.Dispose();
+        ui = uiIsNative ? Native.NativeUi.Start(this) : new ImGuiUi(this);
+
+        ui.MainOpen = mainOpen;
+        ui.ConfigOpen = configOpen;
+    }
+
     private void OnTerritoryChanged(uint territoryId)
     {
         var leftSupportedDuty = contentFinder.IsSupportedDuty(currentTerritory) &&
@@ -370,6 +418,9 @@ public sealed class Plugin : IDalamudPlugin
     /// </remarks>
     private void OnFrameworkUpdate(IFramework framework)
     {
+        if (Configuration.UseNativeUi != uiIsNative)
+            SwapUi();
+
         Wiki.Update();
         LootData.Update();
         Ownership.Update();

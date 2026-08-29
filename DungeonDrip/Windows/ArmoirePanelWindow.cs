@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using Dalamud.Bindings.ImGui;
 using DungeonDrip.Core;
 using DungeonDrip.Presentation;
 
@@ -49,14 +48,6 @@ public sealed class ArmoirePanelWindow(Plugin plugin)
     /// pieces are on its list, they will be offered, and each will be refused on the attempt. Said as a
     /// number rather than listed, because they are the rows this panel deliberately does not have.
     /// </remarks>
-    protected override void DrawHeader()
-    {
-        var duplicates = Plugin.Armoire.Duplicates;
-        if (duplicates == 0)
-            return;
-
-        ImGui.TextColored(Palette.For(ColourRole.Muted), duplicates == 1
-            ? "1 piece on you is in the Armoire already."
-            : $"{duplicates} pieces on you are in the Armoire already.");
-    }
+    private protected override IReadOnlyList<Node> Header() =>
+        StorePanelPresenter.ArmoireHeader(Plugin.Armoire.Duplicates);
 }

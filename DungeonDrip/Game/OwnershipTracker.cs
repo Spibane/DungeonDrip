@@ -122,6 +122,28 @@ public sealed class OwnershipTracker
         DateTime.UtcNow - DresserUpdatedUtc.Value > TimeSpan.FromDays(configuration.StaleAfterDays);
 
     /// <summary>
+    /// Whether the Armoire snapshot is old enough to be worth doubting - never read included.
+    /// </summary>
+    /// <remarks>
+    /// Never read folds into stale rather than being a third state, because everything asking this
+    /// is deciding whether to doubt a negative and both answers are yes. Anything that has to word
+    /// the reason reads <see cref="ArmoireUpdatedUtc"/> and tells them apart there.
+    ///
+    /// Its own question rather than a wrinkle of <see cref="IsDresserStale"/>: the two stores are
+    /// read on entirely different occasions. The dresser refreshes on any glamour operation, so it
+    /// is nearly always current; the Armoire only loads at an inn, so a character can play for
+    /// months with a fresh dresser beside an Armoire last read a patch ago. Sharing one age would
+    /// have called that pair fresh.
+    ///
+    /// The same day count as the dresser, which flatters the Armoire for the reason just given. A
+    /// second, shorter setting was rejected as another number to explain for a difference nobody
+    /// could act on differently.
+    /// </remarks>
+    public bool IsArmoireStale =>
+        !ArmoireUpdatedUtc.HasValue ||
+        DateTime.UtcNow - ArmoireUpdatedUtc.Value > TimeSpan.FromDays(configuration.StaleAfterDays);
+
+    /// <summary>
     /// Every retainer read, longest unread first.
     /// </summary>
     /// <remarks>

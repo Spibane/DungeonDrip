@@ -1,12 +1,9 @@
-using System;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Windowing;
-using Dalamud.Utility;
-using DungeonDrip.Core;
+using DungeonDrip.Game;
 using DungeonDrip.Presentation;
-using FFXIVClientStructs.FFXIV.Client.UI;
-using Lumina.Excel.Sheets;
+using FFXIVClientStructs.FFXIV.Component.GUI;
 
 namespace DungeonDrip.Windows;
 
@@ -21,6 +18,11 @@ namespace DungeonDrip.Windows;
 /// writes last in a frame wins, and a refresh can revert either. This reads the addon's item list
 /// and screen position and draws nothing into it, so by construction there is nothing to collide
 /// with. It also survives the addon's node layout changing in a patch.
+///
+/// Auto-resizing and no toolbar, unlike the panels, and neither is an oversight: a roll is a
+/// thirty-second decision, so a window that changes size mid-roll or asks to be configured during
+/// one is hostile. What it lists comes from <see cref="LootRollWatcher"/>, which is stable for the
+/// length of a roll for the same reason.
 /// </remarks>
 public sealed unsafe class LootCompanionWindow : Window
 {
@@ -45,25 +47,15 @@ public sealed unsafe class LootCompanionWindow : Window
         DisableWindowSounds = true;
     }
 
-
     /// <summary>Only draws while the roll window is actually up and holding items.</summary>
-    public override bool DrawConditions()
-    {
-        if (!plugin.Configuration.ShowLootCompanion)
-            return false;
-
-        var addon = GetLootAddon();
-        return addon != null && addon->AtkUnitBase.IsVisible && addon->NumItems > 0;
-    }
+    public override bool DrawConditions() => plugin.Loot.Resolve() != null;
 
     /// <summary>Parks the window against whichever side of the roll window has room for it.</summary>
     public override void PreDraw()
     {
-        var addon = GetLootAddon();
-        if (addon == null)
+        var unit = Plugin.GameGui.GetAddonByName<AtkUnitBase>(LootRollWatcher.AddonName);
+        if (unit == null)
             return;
-
-        var unit = &addon->AtkUnitBase;
 
         // Auto-sized, so its own height is not knowable here; the roll window's is the stand-in.
         var ownSize = new Vector2(lastWidth, unit->GetScaledHeight(true));
@@ -72,98 +64,20 @@ public sealed unsafe class LootCompanionWindow : Window
         Position = AddonAnchor.Beside(
             placement.Position, placement.Width, plugin.Configuration.LootCompanionSide, ownSize,
             ImGui.GetIO().DisplaySize);
+
         PositionCondition = ImGuiCond.Always;
     }
 
-    /// <summary>
-    /// Lists what is up for roll and which of it is not collected, reading the addon's items afresh
-    /// each frame.
-    /// </summary>
-    /// <remarks>
-    /// No cache and no grouping, unlike the panels. The list is at most a handful of rows, it is
-    /// only on screen for the length of a roll, and anything that reorders or resizes itself mid-roll
-    /// is hostile when the reader is about to click.
-    ///
-    /// The one place in the plugin that refuses to draw its list without a dresser snapshot rather
-    /// than showing it with a warning: a roll cannot be undone and cannot be checked in the moment.
-    /// </remarks>
     public override void Draw()
     {
         lastWidth = ImGui.GetWindowWidth();
 
-        var addon = GetLootAddon();
-        if (addon == null)
+        // Resolved again rather than kept from DrawConditions: the two run a frame apart under
+        // Dalamud's window system, and a roll that ended in between would be drawn from a list the
+        // addon no longer has.
+        if (plugin.Loot.Resolve() is not { } rolls)
             return;
 
-        var ownership = plugin.Ownership;
-
-        // A roll is time-critical and unverifiable in the moment, so a stale snapshot must not be
-        // presented as fact - say so instead of showing a confident guess.
-        if (!ownership.HasDresserData)
-        {
-            ImGui.TextColored(Palette.For(ColourRole.Warning), "No dresser data.");
-            ImGui.TextColored(Palette.For(ColourRole.Warning), "Open your Glamour Dresser.");
-            return;
-        }
-
-        if (ownership.IsDresserStale)
-        {
-            ImGui.TextColored(Palette.For(ColourRole.Warning), "Dresser data is stale -");
-            ImGui.TextColored(Palette.For(ColourRole.Warning), "these may be wrong.");
-            ImGui.Separator();
-        }
-
-        var items = Plugin.DataManager.GetExcelSheet<Item>();
-        var view = ownership.Current;
-        var outfits = plugin.Outfits;
-        var mode = plugin.Configuration.OutfitOwnership;
-
-        var count = Math.Min(addon->NumItems, addon->Items.Length);
-        var anyMissing = false;
-
-        for (var i = 0; i < count; i++)
-        {
-            var (itemId, kind) = ItemUtil.GetBaseId(addon->Items[i].ItemId);
-            if (itemId == 0 || kind == ItemKind.EventItem || !items.TryGetRow(itemId, out var item))
-                continue;
-
-            // Only what the chosen store can hold; the rest of the roll list is not this plugin's business.
-            var storage = plugin.Storage;
-            if (!storage.MatchesScope(storage.Of(item), plugin.Configuration.Scope))
-                continue;
-
-            // The job filter is deliberately absent here - anyone may roll on anything - but a piece
-            // this character can never wear is not a piece to spend a Need on.
-            if (plugin.EquipLocks.Hides(item, plugin.Configuration))
-                continue;
-
-            var source = MissingItems.Resolve(
-                itemId, view, outfits.SetsContaining(itemId), mode, plugin.Configuration.Scope);
-            var owned = source != OwnershipSource.None;
-            if (!owned)
-                anyMissing = true;
-
-            DrawRow(item, owned);
-        }
-
-        if (!anyMissing)
-            ImGui.TextColored(Palette.For(ColourRole.Muted), "Nothing new here.");
+        ImGuiRenderer.Draw(plugin, LootCompanionPresenter.Build(rolls, plugin.Ownership));
     }
-
-    private void DrawRow(Item item, bool owned)
-    {
-        var name = item.Name.ExtractText();
-
-        UiParts.ItemIcon(item.Icon, 20);
-
-        if (owned)
-            ImGui.TextColored(Palette.For(ColourRole.Muted), name);
-        else
-            ImGui.TextColored(Palette.For(ColourRole.Missing), $"{name}  ←");
-
-        UiParts.ItemContextMenu(plugin, item.RowId, name);
-    }
-
-    private static AddonNeedGreed* GetLootAddon() =>
-        Plugin.GameGui.GetAddonByName<AddonNeedGreed>("NeedGreed");
 }

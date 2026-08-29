@@ -4,7 +4,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-0.17.2-121212)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.18.0-121212)](./CHANGELOG.md)
 [![Status](https://img.shields.io/badge/status-Beta-yellow)](./CHANGELOG.md)
 [![Changelog](https://img.shields.io/badge/changelog-blue)](./CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-AGPL--3.0--or--later-663366)](./LICENSE)
@@ -28,6 +28,10 @@ to queue each roulette as.
 Its answers also reach the game's own right-click menus, and the window has a second view for the
 collection as a whole — which outfit sets are closest to finished, how full the dresser is, and which
 carried pieces a box already has.
+
+All of that draws as ordinary plugin windows by default, and can instead be drawn as the game's own —
+following the UI theme, scaling with the UI scale, and hiding with the rest of the interface. See
+[Drawn as game windows](#drawn-as-game-windows).
 
 ## Installing
 
@@ -121,6 +125,7 @@ collected".
 | briefcase | grey | Carried or equipped |
 | figure | grey | In a retainer's bags |
 | figure in a tie | grey | Worn by a retainer, not in their bags |
+| ringed question mark | amber | Not in the dresser, and the Armoire that could have it has not been read lately |
 | question mark | amber | No dresser data — nothing can honestly be said either way |
 
 The marker carries the state; the name only says whether the thing is needed. Missing pieces are named
@@ -131,6 +136,13 @@ the red x and the green star.
 glamours are added far more often than they are removed, so an old snapshot's "owned" almost always
 still holds, while its "not owned" is exactly what goes out of date. Amber on an x means *probably new,
 but worth checking*.
+
+**The Armoire has its own age, and it is usually the older one.** The dresser is re-read on any glamour
+operation; the Armoire only loads when it is opened at an inn. A piece the Armoire accepts, that the
+dresser does not have, gets the ringed question mark rather than the red x whenever that Armoire read is
+older than the staleness setting — including when it has never happened at all. It still counts as
+missing and still shows in the lists, because most of what the Armoire accepts is not in anybody's
+Armoire; the mark says the plugin cannot rule it out, not that it has.
 
 Three buttons at the top flip the list filters without a trip to Settings — whether owned pieces are
 listed, whether the list is held to the current job, and whether weapons are included. They write the
@@ -379,6 +391,60 @@ function. It appends and never replaces, and marks its own line so it cannot dou
 another plugin's. If a patch moves what it hooks, the line simply does not appear and Settings says
 so — nothing else is affected.
 
+## Drawn as game windows
+
+Everything above describes the plugin as Dalamud draws it — overlay windows in Dalamud's own style,
+which is how the plugin has always looked and how it looks by default. Almost all of it can instead
+be drawn as the game's own windows, under **Settings → In-game UI → Draw the panels as game
+windows**. The switch takes effect immediately; nothing needs reloading.
+
+What that buys is the things an imitation cannot do. A game window follows whichever UI theme is
+chosen in Character Configuration — Dark, Light, Classic and Clear Blue all work — and takes its
+text colour from the same place the game's own windows take theirs, so it changes with them rather
+than being told to. It scales with the game's UI scale, and each window can be scaled on its own from
+the right-click menu on its header. Its frame, header and scroll bar are the game's, because they
+are the game's.
+
+The main window is the only one of them the player opens rather than one that appears beside
+something, so it is the only one with a close button and a remembered position. It survives zoning
+and opens itself on entering a duty exactly as the Dalamud one does.
+
+**Everything moves except Settings.** The four panels that ride beside a game window — vendor, market
+board, Glamour Dresser, Armoire — the companion beside the Need/Greed roll, and the main window with
+both of its views are drawn as game windows. Settings stays a Dalamud window permanently: it is by
+far the largest surface, it is opened rarely and never during play, and the widgets it leans on are
+the ones a game window is worst at. So a mixed look is the destination rather than a stage on the
+way to something.
+
+Both looks list the same things in the same order, with the same markers, the same wording and the
+same right-click menus. The marker table under [At vendors](#at-vendors) is true of either.
+
+### What differs
+
+| | Dalamud windows | Game windows |
+| --- | --- | --- |
+| Resizing | drag any edge, and the size is remembered per panel | no resize handle — scale the window from its header's right-click menu |
+| Reset to the game window's size | a button appears while a dragged size is in use | absent, because there is never a dragged size to undo |
+| Getting one out of the way | fold it to its title bar | switch that panel off in **Settings → Panels** |
+| Long item names | the panel widens to fit the longest | cut with an ellipsis; the full name is on the row's tooltip |
+| The duty search | every match, in a list that scrolls | the first twelve, with a line saying how many more |
+| Outfit sets and the Armoire's lists | an arrow you open | the same framed bar a section heading uses |
+| Group headings on a light theme | readable | dark text on a dark bar — see below |
+
+**Group headings are hard to read on a light theme, and that is a standing limit rather than a bug to
+be fixed here.** A collapsing header's bar is a dark texture under every theme, so its label wants to
+be pale in all four — but the library that draws it colours the label from the themed body text
+colour, which goes dark brown wherever the theme writes dark text. The label sits on a node the
+library keeps private, so it cannot be corrected from this side; the fix is a one-line change
+upstream. Carrying it
+as a local patch was tried and rejected, because pinning to a commit no other clone can fetch trades
+a colour for every build but one.
+
+**If the game windows cannot start, the plugin falls back to the Dalamud ones for that session** and
+says so in the log. They are built on a library pinned to a particular commit, and a game patch can
+break it independently of anything else here — so a break on patch day is a temporary downgrade
+rather than a plugin with no windows at all.
+
 ## Commands
 
 | Command | What it does |
@@ -396,10 +462,11 @@ so — nothing else is affected.
 ## Settings
 
 Settings are split by what they affect. **General** holds the rules every gear list obeys — the duty
-window, the loot-roll companion and the vendor panel alike. **Duties** and **Vendors** hold only
-what is specific to that surface. **Data** covers where the plugin's answers come from, and **Files**
-holds the config folder and the one button that empties every cache — neither of those is a setting,
-which is why they sit apart from the rest.
+window, the loot-roll companion and the panels alike. **Duties** and **Panels** hold only what is
+specific to those surfaces. **In-game UI** covers what the plugin adds to the game's own windows,
+and which of its own it draws as game windows. **Data** covers where the plugin's answers come from,
+and **Files** holds the config folder and the one button that empties every cache — neither of those
+is a setting, which is why they sit apart from the rest.
 
 Each tab scrolls on its own if it does not fit, and the window is held inside the screen rather than
 growing past it — the Data tab lists one row per retainer read, so its height is not something the
@@ -432,6 +499,7 @@ plugin can bound.
 | Group each panel by slot | Panels | on |
 | Gear options on the game's right-click menus | In-game UI | on |
 | Marker on the game's item tooltips | In-game UI | off |
+| Draw the panels as game windows | In-game UI | off |
 | Warn when dresser data is older than | Data | 7 days |
 | Record gear that drops in duties | Data | on |
 | Fill gaps from the wiki | Data | on |
@@ -626,7 +694,18 @@ Each has a reset in Settings; see [starting again](#starting-again).
 
 ## Building
 
-Needs the .NET 10 SDK (10.0.101 or newer) and the Dalamud dev assemblies, which the SDK finds from a
+Clone with submodules — the game windows are drawn by
+[KamiToolKit](https://github.com/MidoriKami/KamiToolKit), which publishes no package and is
+vendored under `external/` and pinned by commit:
+
+```bash
+git clone --recurse-submodules https://github.com/Spibane/DungeonDrip.git
+```
+
+An existing clone catches up with `git submodule update --init --recursive`. Without it the build
+fails on a missing project reference rather than on anything that names the cause.
+
+Then the .NET 10 SDK (10.0.101 or newer) and the Dalamud dev assemblies, which the SDK finds from a
 local XIVLauncher install:
 
 | Host | Path |
@@ -692,12 +771,14 @@ DungeonDrip/
 │   ├── MarketBoardWatcher.cs    what the board's browse list is showing
 │   ├── DresserAddWatcher.cs     carried gear the dresser has not got
 │   ├── ArmoireAddWatcher.cs     the same of the Armoire, whose own screen will not say
+│   ├── LootRollWatcher.cs       what is up for a Need/Greed roll, and what is missing
 │   ├── OwnershipTracker.cs      per-character snapshot and staleness
 │   └── LootObserver.cs          records gear seen dropping
 ├── Core/
 │   ├── MissingItems.cs          the ownership decision
 │   ├── CollectionMarkers.cs     that decision turned into a glyph
 │   ├── GearRow.cs               one resolved row, shared by every panel
+│   ├── LootRoll.cs              one item up for roll, and whether it is collected
 │   ├── DutyReport.cs            territory + ownership → the drawn list
 │   ├── DutyCatalog.cs           duty list for the picker
 │   ├── DropSources.cs           the loot tables backwards: piece → duties
@@ -720,19 +801,63 @@ DungeonDrip/
 │       ├── ShopSources.cs       gil, currency and Grand Company tills
 │       ├── QuestSources.cs      Quest reward columns, checked before believed
 │       └── AchievementSources.cs
-└── Windows/
-    ├── MissingItemsWindow.cs    picker, freshness banner, item list, roulette advice
-    ├── CollectionView.cs        the window's other mode: sets, dresser, carried gear
-    ├── AddonPanelWindow.cs      anchoring, sizing and the drag latch every panel shares
-    ├── VendorPanelWindow.cs     what is vendor-specific about the vendor panel
-    ├── StorePanelWindow.cs      what the two "what should go in" panels share
-    ├── DresserPanelWindow.cs    the add list beside the Glamour Dresser
-    ├── ArmoirePanelWindow.cs    the same beside the Armoire
-    ├── MarketBoardPanelWindow.cs what is board-specific about the board panel
-    ├── PanelGrouping.cs         slot headings and the filter counts
-    ├── LootCompanionWindow.cs   read-only list beside the Need/Greed window
-    └── ConfigWindow.cs
+├── IPluginUi.cs                 the seam Plugin.cs talks to, whichever look is on
+├── Presentation/                what each surface shows, named rather than drawn
+│   ├── Display.cs               the node kinds both renderers walk
+│   ├── PanelPresenter.cs        the addon panels: rows, headings, filters, warnings
+│   ├── StorePanelPresenter.cs   the same for "what should go in this box"
+│   ├── LootCompanionPresenter.cs the roll list, and why it refuses without a snapshot
+│   ├── ColourRole.cs            what a colour means, before either look picks one
+│   ├── GlyphToken.cs            what a marker claims, before either look draws it
+│   ├── ToolGlyph.cs             the same for a filter button's two states
+│   ├── ToolButtonModel.cs       one button: state, tooltip, and what pressing it writes
+│   ├── GameSymbol.cs            marks taken from the game's own icon set
+│   ├── MarkerGlyph.cs           collection state → marker and colour
+│   ├── PanelGrouping.cs         slot headings and the filter counts
+│   ├── DutyGrouping.cs          the duty list's headings
+│   ├── CollectionSnapshot.cs    the collection view's figures
+│   ├── HeaderState.cs           which headings are folded, remembered once for both looks
+│   ├── PanelText.cs             wording a surface uses in either look
+│   ├── AddonAnchor.cs           where a panel sits beside a game window
+│   └── AddonFrame.cs            how much of a game window's rectangle is ornament
+├── Windows/                     the Dalamud look
+│   ├── ImGuiUi.cs               owns the window system
+│   ├── ImGuiRenderer.cs         walks the description into ImGui calls
+│   ├── MissingItemsWindow.cs    picker, freshness banner, item list, roulette advice
+│   ├── CollectionView.cs        the window's other mode: sets, dresser, carried gear
+│   ├── AddonPanelWindow.cs      anchoring, sizing and the drag latch every panel shares
+│   ├── VendorPanelWindow.cs     what is vendor-specific about the vendor panel
+│   ├── StorePanelWindow.cs      what the two "what should go in" panels share
+│   ├── DresserPanelWindow.cs    the add list beside the Glamour Dresser
+│   ├── ArmoirePanelWindow.cs    the same beside the Armoire
+│   ├── MarketBoardPanelWindow.cs what is board-specific about the board panel
+│   ├── LootCompanionWindow.cs   read-only list beside the Need/Greed window
+│   ├── Palette.cs               ColourRole → an ImGui colour
+│   ├── Glyphs.cs                GlyphToken → a FontAwesome glyph, read by both looks
+│   ├── ToolGlyphs.cs            the same for the filter buttons
+│   ├── GameSymbols.cs           GameSymbol → one of the game's icons, read by both
+│   ├── UiShared.cs              the widgets more than one window draws
+│   └── ConfigWindow.cs
+└── Native/                      the game-window look
+    ├── NativeUi.cs              owns the one controller, and falls back if it will not start
+    ├── NativeRenderer.cs        walks the same description into game interface nodes
+    ├── NativePanelAddon.cs      what every panel beside a game window shares
+    ├── NativeStorePanelAddon.cs what the two "what should go in" panels share
+    ├── VendorPanelAddon.cs      ┐
+    ├── DresserPanelAddon.cs     │ the four panels: anchor, rows, header, filters
+    ├── ArmoirePanelAddon.cs     │
+    ├── MarketPanelAddon.cs      ┘
+    ├── LootCompanionAddon.cs    the roll list, sized once and never after
+    ├── NativeToolbar.cs         the filter buttons as game buttons
+    ├── NativeContextMenu.cs     one menu per panel, refilled per click
+    ├── NativePalette.cs         ColourRole → the theme's own colours
+    └── GlyphTextures.cs         a font glyph rendered into a texture a node can show
 ```
+
+Neither renderer holds any of the plugin's content. Both walk one description, which is what keeps
+the two looks from drifting: a change to what a surface says is made once, in a presenter, and
+appears in both. Only the files under `Native/` name a type from the interface library, so if that
+library ever has to be replaced the exposure is bounded.
 
 The companion window reads the loot addon and never draws into it, so it does not conflict with
 plugins that recolour game UI nodes.
@@ -811,11 +936,24 @@ game install is needed, and uploads the packaged plugin.
   holds once its own window has been opened, so the honest answers would be "done", "not done" and
   "cannot say yet", with the third showing most often. The quest's level is given instead, which is what
   makes an old one recognisable.
+- Resizing a game window by dragging, and the button that undoes a dragged size. Neither exists
+  in the game's own windows, so under **Draw the panels as game windows** a panel matches the window
+  it accompanies and is scaled from its header's right-click menu instead. Both are still there in
+  the Dalamud windows.
+- The Settings window as a game window. It is the largest surface the plugin has, it is opened rarely
+  and never during play, and the widgets it leans on are the ones a game window is worst at — so it
+  stays a Dalamud window, and a mixed look is the destination rather than a stage.
+- A duty search that lists every match as a game window. It offers the first twelve and says how many
+  more there are, because a search nobody has narrowed matches every duty in the game — and the
+  alternative, a list that scrolls inside a window that already scrolls, was worse than the cap.
 - Nothing else currently planned.
 
 ## Licence
 
 [GNU AGPL v3.0 or later](./LICENSE).
+
+The distributed plugin also contains KamiToolKit, under the MIT licence. Its notice is in
+[THIRD-PARTY-NOTICES.md](./THIRD-PARTY-NOTICES.md).
 
 ## AI use
 

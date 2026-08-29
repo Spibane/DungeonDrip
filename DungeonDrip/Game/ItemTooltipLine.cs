@@ -135,6 +135,10 @@ public sealed unsafe class ItemTooltipLine : IDisposable
         // whole message, and the panels have room to explain it.
         CollectionMarker.OutfitPartial => $"Outfit {stored}/{total}",
 
+        // The question mark is the whole point of the state: the dresser has been read and does not
+        // have this, and the box that might is one the plugin has not seen recently enough to say.
+        CollectionMarker.ArmoireUnread => "Not owned?",
+
         // The one worth acting on, and the one an old snapshot can be wrong about, so it is the
         // only one that spends characters on a caveat.
         _ => stale ? "Not owned?" : "Not owned",
@@ -220,8 +224,11 @@ public sealed unsafe class ItemTooltipLine : IDisposable
             return;
 
         // The same content rule as every other surface, so the absence of a line keeps meaning
-        // "not glamour gear" rather than "it is collected".
-        if (!plugin.Storage.CanBeStored(itemId))
+        // "not glamour gear" rather than "it is collected". The kind is kept rather than thrown
+        // away with the test, because which boxes would take the piece decides how far a negative
+        // can be trusted below.
+        var storable = plugin.Storage.Of(itemId);
+        if (storable == StorageKind.None)
             return;
 
         var view = plugin.Ownership.Current;
@@ -241,7 +248,16 @@ public sealed unsafe class ItemTooltipLine : IDisposable
         var (stored, total) = MissingItems.Shortfall(
             itemId, view, sets, source, plugin.Configuration.OutfitOwnership, plugin.Configuration.Scope);
 
-        var state = CollectionMarkers.For(source, plugin.Ownership.HasDresserData, completed, stored > 0);
+        // Missing this is what put a flat "Not owned" on gear sitting in an Armoire nobody had
+        // opened since installing the plugin.
+        var armoireInDoubt =
+            source == OwnershipSource.None &&
+            storable.HasFlag(StorageKind.Armoire) &&
+            plugin.Configuration.Scope != CollectionScope.DresserOnly &&
+            plugin.Ownership.IsArmoireStale;
+
+        var state = CollectionMarkers.For(
+            source, plugin.Ownership.HasDresserData, completed, stored > 0, armoireInDoubt);
 
         // A tooltip has no room to explain why it cannot say, so it says nothing.
         if (state == CollectionMarker.Unknown)
@@ -258,6 +274,10 @@ public sealed unsafe class ItemTooltipLine : IDisposable
             // the chosen setting asks for.
             CollectionMarker.OutfitPartial => (ushort)26,
             CollectionMarker.Inventory => (ushort)26,
+
+            // Amber for the same reason a stale dresser turns the red one amber: the piece may well
+            // be in the box, and it is the claim rather than the piece that is unsatisfied.
+            CollectionMarker.ArmoireUnread => (ushort)26,
 
             // The same as carried, for the same reason: one is owned, it is just not put away.
             CollectionMarker.Retainer => (ushort)26,

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using DungeonDrip.Core;
+using DungeonDrip.Presentation;
 
 namespace DungeonDrip.Windows;
 
@@ -20,10 +21,5 @@ public sealed class VendorPanelWindow(Plugin plugin)
 
     protected override IReadOnlyList<GearRow>? ResolveRows() => Plugin.Shop.Resolve();
 
-    /// <summary>
-    /// A vendor is reached on foot, so the dresser snapshot is usually old by then, and the
-    /// mistake this prevents costs actual gil.
-    /// </summary>
-    protected override string? UncertainNote =>
-        "Your dresser snapshot predates this - check before buying.";
+    protected override string? UncertainNote => PanelText.VendorUncertain;
 }

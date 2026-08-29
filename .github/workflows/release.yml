@@ -31,6 +31,7 @@ jobs:
         with:
           ref: ${{ github.ref_name }}
           fetch-depth: 0
+          submodules: recursive
 
       - name: Verify the tag is on main
         run: |
