@@ -117,7 +117,71 @@ internal static class DresserTabPresenter
             "Each has to be taken out of the dresser and deposited, so this one is work.",
             ColourRole.Muted));
 
+        built.AddRange(Outfits(report.OutfitsArmoireWouldTake));
+
         return built;
+    }
+
+    /// <summary>
+    /// Stored outfit sets whose pieces the Armoire would all take, one row per set.
+    /// </summary>
+    /// <remarks>
+    /// A row per set rather than per piece, because the set is what holds the dresser slot and the
+    /// set is what has to be taken out - listing its pieces on the face of the list would read as
+    /// several slots to be won where there is one. The pieces are named on hover instead, since
+    /// they are what actually goes into the Armoire.
+    ///
+    /// Its own heading rather than rows in the loose-piece list above, because the two cost
+    /// different amounts to act on: a loose piece is one deposit, a set is several and gives up
+    /// keeping it as a set. Not a tree of trees either - the game windows draw a tree as a framed
+    /// header, and a header inside a header is not something they do.
+    /// </remarks>
+    private static IReadOnlyList<Node> Outfits(IReadOnlyList<ArmoireOutfit> outfits)
+    {
+        if (outfits.Count == 0)
+            return [];
+
+        const string heading = "Outfits the Armoire would take, piece by piece";
+        var rows = new List<Node>(outfits.Count);
+
+        foreach (var outfit in outfits)
+        {
+            var tooltip = new List<Node> { new TextNode(outfit.Name) };
+
+            foreach (var piece in outfit.Pieces)
+            {
+                tooltip.Add(new TextNode(
+                    outfit.AlreadyInArmoire.Contains(piece.ItemId)
+                        ? $"   {piece.Name} - already in your Armoire"
+                        : $"   {piece.Name}",
+                    ColourRole.Muted));
+            }
+
+            // A set wholly duplicated by the Armoire is the one row worth picking out: its slot is
+            // doing nothing the Armoire is not, which is the same news as the blue list above.
+            rows.Add(new RowNode(
+                [new IconNode(outfit.IconId, 18), new TextNode(outfit.Name)],
+                tooltip,
+                new ItemContext(outfit.SetId, outfit.Name),
+                outfit.WhollyInArmoire
+                    ? new TextNode("- every piece already in your Armoire", ColourRole.Focus)
+                    : new TextNode(
+                        outfit.Pieces.Count == 1 ? "- 1 piece" : $"- {outfit.Pieces.Count} pieces",
+                        ColourRole.Muted)));
+        }
+
+        return
+        [
+            new SpacingNode(),
+            new TreeNode(
+                heading,
+                $"{heading} ({outfits.Count})",
+                rows,
+                Note: new TextNode(
+                    "The Armoire takes no outfit item, so each piece goes in on its own - " +
+                    "one dresser slot back per outfit.",
+                    ColourRole.Muted)),
+        ];
     }
 
     /// <summary>
