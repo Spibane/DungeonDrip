@@ -1,6 +1,6 @@
 # Changelog
 
-### Unreleased
+### v0.19.0 - 2026-11-04
 - **The Glamour Dresser tab names the stored outfits the Armoire would take.** A stored outfit is listed when the Armoire accepts every piece the set holds, with the pieces named on hover and those already in the Armoire marked; one whose pieces the Armoire already has in full is picked out in blue and sorted first, since its slot is duplicating the Armoire outright. The Armoire takes no outfit item - the Cabinet sheet lists none of the 1,089 - but 469 sets are made entirely of pieces it does take, so the move is the pieces going in one at a time and the set's dresser slot coming back. It is not counted in the "could be freed" headline, which only counts what costs nothing: a set moved into the Armoire stops being a set
 
 ### v0.18.0 - 2026-08-29
