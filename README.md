@@ -4,7 +4,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-0.18.0-121212)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.19.0-121212)](./CHANGELOG.md)
 [![Status](https://img.shields.io/badge/status-Beta-yellow)](./CHANGELOG.md)
 [![Changelog](https://img.shields.io/badge/changelog-blue)](./CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-AGPL--3.0--or--later-663366)](./LICENSE)
@@ -325,7 +325,11 @@ and nothing else in the sheet behaves that way.
 
 **Glamour Dresser** — two lists, because they are the same errand from both ends: the box filling up,
 and the gear that could be got rid of to empty it. First, how full it is and what would free space. An outfit stored a piece at a
-time could be one set item instead; a piece in both the dresser and the Armoire is duplicated.
+time could be one set item instead; a piece in both the dresser and the Armoire is duplicated. Once the
+Armoire has been read, it also lists the loose pieces it would take, and the stored outfits whose every
+piece it would take — the Armoire accepts no outfit item, so an outfit goes in piece by piece and gives
+back its one dresser slot. Neither of those counts toward the slots the header says could be freed,
+because both are work and the second stops the outfit being a set.
 Collapsing is phrased as a conditional, because it needs the outfit item — a tradeable attire box — and
 owning all the pieces does not produce one. The loose copies also come back to the bags, so the space
 only appears once those are cleared.

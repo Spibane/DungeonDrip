@@ -25,6 +25,26 @@ public sealed record CollapsibleSet(
 /// <summary>A piece taking up a dresser slot that something else could be holding.</summary>
 public sealed record DresserResident(uint ItemId, string Name, ushort IconId);
 
+/// <summary>An outfit set stored in the dresser whose every held piece the Armoire accepts.</summary>
+/// <param name="Pieces">
+/// The pieces the set actually holds - its filled slots, not the sheet's full list - since those are
+/// what would go into the Armoire. Never empty: a stored set with no slot filled has nothing to move.
+/// </param>
+/// <param name="AlreadyInArmoire">
+/// Which of <paramref name="Pieces"/> the Armoire already has, carried on the report so the
+/// presenter does not rebuild an ownership view per row per frame to ask.
+/// </param>
+public sealed record ArmoireOutfit(
+    uint SetId,
+    string Name,
+    ushort IconId,
+    IReadOnlyList<DresserResident> Pieces,
+    IReadOnlySet<uint> AlreadyInArmoire)
+{
+    /// <summary>The dresser slot is duplicating the Armoire outright.</summary>
+    public bool WhollyInArmoire => AlreadyInArmoire.Count == Pieces.Count;
+}
+
 /// <param name="Capacity">
 /// Zero when there is no snapshot to read it from. Also see the caveat on
 /// <see cref="DresserSnapshot.SlotCapacity"/> - it is the box's structural size.
@@ -36,6 +56,10 @@ public sealed record DresserResident(uint ItemId, string Name, ushort IconId);
 /// In the dresser and eligible for the Armoire, but not deposited there yet. Speculative, so it
 /// never counts toward the headline.
 /// </param>
+/// <param name="OutfitsArmoireWouldTake">
+/// Stored outfit sets the Armoire would take a piece at a time. Empty, not unknown, while
+/// <paramref name="ArmoireKnown"/> is false - the presenter checks that first.
+/// </param>
 public sealed record DresserPressureReport(
     int Used,
     int Capacity,
@@ -43,6 +67,7 @@ public sealed record DresserPressureReport(
     int CollapsibleSlots,
     IReadOnlyList<DresserResident> DuplicateInArmoire,
     IReadOnlyList<DresserResident> ArmoireWouldTake,
+    IReadOnlyList<ArmoireOutfit> OutfitsArmoireWouldTake,
     bool ArmoireKnown)
 {
     /// <summary>What could be freed without giving anything up. Deliberately conservative.</summary>
@@ -103,6 +128,8 @@ public static class DresserPressure
                 !view.Armoire.Contains(id) && storage.Of(id).HasFlag(StorageKind.Armoire)))
             : [];
 
+        var outfitsForArmoire = armoireKnown ? ArmoireOutfits(view, storage) : [];
+
         return new DresserPressureReport(
             view.Space?.Used ?? 0,
             view.Space?.Capacity ?? 0,
@@ -110,7 +137,77 @@ public static class DresserPressure
             ordered.Sum(entry => entry.SlotsReclaimed),
             duplicate,
             wouldTake,
+            outfitsForArmoire,
             armoireKnown);
+    }
+
+    /// <summary>
+    /// Stored outfit sets that could leave the dresser for the Armoire, wholly duplicated ones first.
+    /// </summary>
+    /// <remarks>
+    /// The Armoire takes no outfit item: of the 1,089 sets in the sheet, the Cabinet sheet lists none
+    /// of the set items themselves. What it does list is pieces, and 469 sets are made entirely of
+    /// them - so the move is the set's pieces going in one at a time, and the dresser slot the set held
+    /// coming back.
+    ///
+    /// Tested against the pieces the set holds rather than every piece the sheet gives it. An empty
+    /// slot has nothing to move, so it cannot be what stops the move. When this was written no set
+    /// was partly eligible either, so the two tests agree; the held one is the one that stays true
+    /// if a patch changes that.
+    ///
+    /// The lookup is inverted here rather than kept inverted on the view, because the view answers
+    /// "which sets hold this piece" for every surface and this is the one place asking the reverse.
+    /// It runs once per snapshot rebuild, over a few hundred stored pieces at most.
+    ///
+    /// Never counted toward <see cref="DresserPressureReport.Reclaimable"/>, even when every piece is
+    /// already in the Armoire. That headline is for what can be freed without giving anything up, and
+    /// a set kept as a set is a thing given up - the Armoire hands its pieces back one at a time, not
+    /// as an outfit.
+    /// </remarks>
+    private static IReadOnlyList<ArmoireOutfit> ArmoireOutfits(
+        OwnershipView view, StorageEligibility storage)
+    {
+        var held = new Dictionary<uint, List<uint>>();
+
+        foreach (var (piece, sets) in view.DresserOutfits)
+        {
+            foreach (var setId in sets)
+            {
+                if (!held.TryGetValue(setId, out var pieces))
+                    held[setId] = pieces = [];
+
+                pieces.Add(piece);
+            }
+        }
+
+        var items = Plugin.DataManager.GetExcelSheet<Item>();
+        var found = new List<ArmoireOutfit>();
+
+        foreach (var setId in view.StoredOutfits)
+        {
+            if (!held.TryGetValue(setId, out var pieces))
+                continue;
+
+            if (!pieces.All(id => storage.Of(id).HasFlag(StorageKind.Armoire)))
+                continue;
+
+            var residents = Residents(pieces);
+            var named = items.TryGetRow(setId, out var set);
+
+            found.Add(new ArmoireOutfit(
+                setId,
+                named ? set.Name.ExtractText() : $"Outfit {setId}",
+                named ? set.Icon : (ushort)0,
+                residents,
+                pieces.Where(view.Armoire.Contains).ToHashSet()));
+        }
+
+        return
+        [
+            .. found
+                .OrderByDescending(outfit => outfit.WhollyInArmoire)
+                .ThenBy(outfit => outfit.Name, StringComparer.OrdinalIgnoreCase),
+        ];
     }
 
     private static IReadOnlyList<DresserResident> Residents(IEnumerable<uint> itemIds)
